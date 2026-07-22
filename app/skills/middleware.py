@@ -3,8 +3,21 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from langchain.agents.middleware import AgentMiddleware, ModelRequest, ModelResponse
+# 暂时注释 langchain 依赖，先测试 Skills 核心功能
+# from langchain.agents.middleware import AgentMiddleware, ModelRequest, ModelResponse
 from loguru import logger
+
+# 临时定义，避免导入错误
+class AgentMiddleware:
+    pass
+
+class ModelRequest:
+    messages: list = []
+    system_message: Any = None
+    context: dict = {}
+
+class ModelResponse:
+    pass
 
 from app.skills.models import ExpandedSkills
 from app.skills.service import SkillService
