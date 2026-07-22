@@ -1,7 +1,7 @@
 # FastAPI 应用入口
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import routes_chat, routes_milvus, routes_session, routes_upload
+from app.api import routes_chat, routes_milvus, routes_session, routes_skills, routes_upload
 from app.core.settings import settings
 
 app = FastAPI(
@@ -37,6 +37,7 @@ app.include_router(routes_chat.router, prefix="/api")
 app.include_router(routes_milvus.router, prefix="/api/milvus")
 app.include_router(routes_session.router, prefix="/api")
 app.include_router(routes_upload.router, prefix="/api")
+app.include_router(routes_skills.router, prefix="/api")
 
 
 
