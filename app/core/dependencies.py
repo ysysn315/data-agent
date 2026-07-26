@@ -123,6 +123,11 @@ async def get_chat_agent():
     if _chat_agent is not None:
         return _chat_agent
 
+    # 必须在拿 _init_lock 之前完成：get_skill_service 内部要拿同一把锁，
+    # asyncio.Lock 不可重入，放在锁内调用会死锁（曾导致首次 chat 永久挂起）
+    skill_service = await get_skill_service()
+    mcp_service = get_mcp_service()
+
     async with _init_lock:
         if _chat_agent is not None:
             return _chat_agent
@@ -136,9 +141,6 @@ async def get_chat_agent():
         from app.core.llm import LLMFactory
         from app.skills.middleware import SkillsMiddleware
         from app.skills.tools import create_skill_tools
-
-        skill_service = await get_skill_service()
-        mcp_service = get_mcp_service()
 
         base_tools = [get_current_datetime]
         base_tools.extend(create_skill_tools(skill_service))
