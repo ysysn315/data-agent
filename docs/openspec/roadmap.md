@@ -15,7 +15,9 @@
 | 工具熔断/重试/降级（ToolRuntimeMiddleware） | my-agent 保留 | ✅ |
 | RAG 链路代码（分块/混合检索/BGE 重排） | my-agent 保留 | ✅（未接回 chat）|
 | 只读 SQL 执行（execute_sql，引擎级只读） | SQLBot 思路 | ✅（demo 级）|
-| pytest 测试体系（22 用例） | — | ✅ |
+| pytest 测试体系（118 用例，随批次持续增长） | — | ✅ |
+| Text-to-SQL 执行准确率评估 92.9%（28 例）+ 4 模型对比 | my-agent 思路扩展 | ✅ |
+| Langfuse 调用链追踪（默认关闭） | Yuxi | ✅（PR #11）|
 
 ## 1. P0 —— demo 跑通闭环（必做，约 1 周）
 
@@ -61,23 +63,31 @@
    表结构向量化 → 按问题召回 top-N 注入。9 张表的 demo 可以先讲"预留"，
    接口已在 schema-retrieval 技能占位。
 
-## 3. P2 —— 有余力再做（每项独立可裁剪）
+## 3. P2+ 推进计划（4 轮子代理，轮间等待合并）
 
-| 项 | 来源 | 说明 |
-|---|---|---|
-| 持久化层（SQLite/PG + SQLAlchemy） | Yuxi | skills/mcp/sql示例统一入库；**工作量大，单独排期** |
-| 异步执行（ARQ + Redis 事件流） | Yuxi | 长分析任务异步化；无长任务场景前不做 |
-| Analysis Agent（P-O-R 工作流） | my-agent | 复杂多步分析 + Markdown 报告；依赖 P0/P1 稳定 |
-| 行列级数据权限 | SQLBot | JSONB 规则引擎；需先有用户体系 |
-| 多租户/工作空间 | Yuxi | 二期后段 |
-| Langfuse 调用链追踪 | Yuxi | 接入成本低，可作加分项 |
-| embedding 语义匹配 skills | 自研增量 | 复用 app/rag 向量化，替换 jieba 关键词 |
+> 2026-07-26 更新：应项目主人要求，容器沙箱与知识图谱**排入计划**（此前"明确不做"
+> 是措辞过重）。排序依据：依赖关系（持久化是地基、用户体系是权限前提）+ 冲突面控制。
+> 难任务子代理可升级 fable-high 及以上模型。
 
-## 4. 明确不做（与 REQUIREMENTS §9 一致）
+| 轮次 | 分支 | 内容 | 难度 |
+|---|---|---|---|
+| D | feat/persistence | SQLAlchemy 2.0 async + SQLite（PG 就绪），skills/mcp/SQL示例/术语统一入库 | 大 |
+| D | feat/async-tasks | ARQ + Redis 事件流，长任务提交与进度 SSE | 中 |
+| D | feat/skill-embedding-match | skills 匹配升级 embedding 召回（复用 app/rag），可回退 jieba | 小 |
+| E | feat/analysis-agent | P-O-R 工作流 + Markdown 分析报告，长任务走异步通道 | 中大 |
+| E | feat/script-sandbox | 技能脚本执行升级容器沙箱（只读挂载/资源限制/超时，可切回 subprocess）；远程技能从此可安全启用 | 难⭐ |
+| E | feat/knowledge-graph | LLM 三元组抽取 + 轻量图存储（SQLite 边表 + NetworkX，Neo4j 留接口）+ 图查询技能 | 难⭐ |
+| F | feat/auth-workspace | 用户体系 + API Key 真鉴权 + 工作空间（多租户-lite） | 中大 |
+| F | feat/frontend-v2 | 前端补页：分析报告 / 任务进度 / 图谱 / 示例与术语管理 | 中 |
+| G | feat/row-col-permission | 行列级数据权限（JSONB 规则引擎，作用于 execute_sql 与数据源层），依赖 F | 中大 |
 
-- 容器沙箱/provisioner（subprocess + 远程技能默认禁用已覆盖 demo 需求）
-- 知识图谱（Neo4j）
-- 12 种数据源方言（SQLite + PostgreSQL 两种够讲清设计）
+每项继续强制：四段式 IMPLEMENTATION.md、pytest 全绿、中文 commit、验收后 PR。
+
+## 4. 暂缓项（非"不做"，提出即可排期）
+
+> 旧版本此节叫"明确不做"，属 AI 拟稿措辞过重；容器沙箱与知识图谱已排入上方 E 轮。
+
+- 12 种数据源方言（先用 SQLite + PostgreSQL 验证架构，接新方言只是配置量）
 - 看板/大屏、嵌入式集成、i18n
 
 ## 5. 简历叙事对照
