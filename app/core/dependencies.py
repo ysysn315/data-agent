@@ -157,6 +157,7 @@ async def get_chat_agent():
         from app.agents.middlewares import ToolRuntimeMiddleware
         from app.agents.tools.datetime_tool import get_current_datetime
         from app.agents.tools.schema_tool import create_schema_search_tool
+        from app.agents.tools.graph_tool import create_graph_search_tool
         from app.agents.tools.sql_context_tool import create_sql_context_tool
         from app.agents.tools.sql_tool import create_execute_sql_tool
         from app.core.llm import LLMFactory
@@ -191,6 +192,7 @@ async def get_chat_agent():
             create_execute_sql_tool(settings.sqlite_db_path),
             create_schema_search_tool(settings.sqlite_db_path),
             create_sql_context_tool(get_example_store(), get_term_store()),
+            create_graph_search_tool(get_graph_service()),
         ]
 
         _chat_agent = ChatAgent(
@@ -214,13 +216,14 @@ def reset_singletons() -> None:
     只清业务单例引用；持久化 engine/后台循环是进程级、守护线程常驻，
     NullPool 无常驻连接，不随单例重置销毁（如需换库调 app.db.reset_engine）。
     """
-    global _skill_service, _mcp_service, _chat_agent, _example_store, _term_store, _task_service
+    global _skill_service, _mcp_service, _chat_agent, _example_store, _term_store, _task_service, _graph_service
     _skill_service = None
     _mcp_service = None
     _chat_agent = None
     _example_store = None
     _term_store = None
     _task_service = None
+    _graph_service = None
 
 
 # ========== 异步任务（arq + Redis Streams），D 轮追加 ==========

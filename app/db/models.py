@@ -1,4 +1,4 @@
-"""持久化层 - SQLAlchemy 2.0 Declarative 模型（四张表）
+"""持久化层 - SQLAlchemy 2.0 Declarative 模型（五张表）
 
 对齐 Yuxi 的关键设计（backend/.../postgres/models_business.py:229-273 的 Skill 表）：
 **技能正文存文件系统，数据库只存元数据索引**。因此 skills 表刻意不含 content 列，
