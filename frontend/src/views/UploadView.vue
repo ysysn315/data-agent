@@ -2,7 +2,7 @@
   <div class="upload-view">
     <!-- 上传区域 -->
     <div class="upload-section card">
-      <h3 class="card-title">📁 知识库文档上传</h3>
+      <h3 class="card-title">知识库</h3>
       <p class="card-desc">上传运维文档、故障排查手册等，AI 将自动学习并在对话中引用。</p>
       
       <div 
@@ -20,7 +20,7 @@
           @change="handleFileSelect"
           hidden
         >
-        <div class="upload-icon">📄</div>
+        <div class="upload-icon"><svg viewBox="0 0 20 20" fill="none" width="28" height="28"><path d="M10 13V4m0 0L6.5 7.5M10 4l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.5 13v2.5a1.5 1.5 0 0 0 1.5 1.5h10a1.5 1.5 0 0 0 1.5-1.5V13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
         <p class="upload-text">拖拽文件到此处，或点击选择文件</p>
         <p class="upload-hint">支持 .txt, .md, .pdf, .docx, .html, .csv, .json, .xlsx, .xls 格式</p>
       </div>
@@ -49,7 +49,7 @@
     <!-- 文档列表 -->
     <div class="documents-section card">
       <div class="card-header">
-        <h3 class="card-title">📚 已上传文档</h3>
+        <h3 class="card-title">已上传文档</h3>
         <button class="btn btn-secondary" @click="refreshDocuments">刷新</button>
       </div>
       
@@ -63,7 +63,7 @@
       
       <div v-else class="document-list">
         <div v-for="doc in documents" :key="doc.id" class="document-item">
-          <span class="doc-icon">📄</span>
+          <span class="doc-icon"><svg viewBox="0 0 20 20" fill="none" width="18" height="18"><path d="M5 2.5h6.5L16 7v10.5H5V2.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M11.5 2.5V7H16" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span>
           <div class="doc-info">
             <p class="doc-name">{{ doc.name }}</p>
             <p class="doc-meta">{{ doc.chunks || 0 }} 个文档块</p>

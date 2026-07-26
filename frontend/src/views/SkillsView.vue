@@ -3,7 +3,7 @@
     <!-- 顶部：标题 + 搜索 + 刷新 -->
     <div class="page-header card">
       <div class="page-header-left">
-        <h3 class="card-title">🧩 Skills 管理</h3>
+        <h3 class="card-title">Skills 技能</h3>
         <p class="page-desc">技能以目录形式挂载（SKILL.md + 可选脚本），启用后其声明的门控工具对 Agent 可见。</p>
       </div>
       <div class="page-header-actions">
@@ -33,7 +33,7 @@
             @click="openDetail(skill)"
           >
             <div class="skill-card-head">
-              <span class="skill-icon">🪄</span>
+              <span class="monogram" :class="{ dim: !skill.enabled }">{{ skill.name.slice(0, 1).toUpperCase() }}</span>
               <div class="skill-name-area">
                 <div class="skill-name">{{ skill.name }}</div>
                 <div class="skill-slug">{{ skill.slug }}</div>
@@ -304,9 +304,6 @@ fetchSkills()
   gap: 10px;
 }
 
-.skill-icon {
-  font-size: 1.4rem;
-}
 
 .skill-name-area {
   flex: 1;

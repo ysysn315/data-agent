@@ -3,7 +3,7 @@
     <!-- 顶部：标题 + 刷新 -->
     <div class="page-header card">
       <div class="page-header-left">
-        <h3 class="card-title">🔌 MCP Server 管理</h3>
+        <h3 class="card-title">MCP 工具</h3>
         <p class="page-desc">MCP server 以标准协议接入外部工具。stdio 传输等价于在服务器上执行命令，务必只连可信来源。</p>
       </div>
       <button class="btn btn-secondary" @click="fetchServers" :disabled="loading">刷新</button>
@@ -21,7 +21,7 @@
     <div v-else class="server-list">
       <div v-for="server in servers" :key="server.slug" class="server-card card">
         <div class="server-head">
-          <span class="server-icon">🔌</span>
+          <span class="monogram" :class="{ dim: !server.enabled }">{{ (server.name || server.slug).slice(0, 1).toUpperCase() }}</span>
           <div class="server-name-area">
             <div class="server-name">{{ server.name || server.slug }}</div>
             <div class="server-slug">{{ server.slug }}</div>

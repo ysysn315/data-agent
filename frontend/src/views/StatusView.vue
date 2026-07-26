@@ -51,7 +51,7 @@
         <!-- Redis 服务 -->
         <div class="service-item" :class="services.redis.status">
           <div class="service-header">
-            <span class="service-icon">⚡</span>
+            <span class="service-icon"><svg viewBox="0 0 20 20" fill="none" width="16" height="16"><path d="M11 2 4 11.5h5L9 18l7-9.5h-5L11 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span>
             <span class="service-name">Redis 缓存</span>
           </div>
           <div class="service-status">
@@ -68,7 +68,7 @@
     <!-- 会话统计 -->
     <div class="session-section card">
       <div class="card-header">
-        <h3 class="card-title">📊 会话统计</h3>
+        <h3 class="card-title">会话统计</h3>
         <button class="btn btn-secondary" @click="refreshSessions">刷新</button>
       </div>
       
