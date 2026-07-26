@@ -196,3 +196,19 @@ def test_execute_sql_can_query_sqlite_master(sql_guard_db):
     data = json.loads(out)
     names = {row[0] for row in data["rows"]}
     assert "orders" in names and "customers" in names
+
+
+def test_select_alias_in_order_by_not_false_positive(sql_guard_db):
+    """回归：SELECT 别名在 ORDER BY/GROUP BY 中引用不得误报为未知列。
+
+    与 CTE 误报同类问题，合并 feat/demo-data 后被其集成测试抓到。
+    """
+    from app.agents.tools.sql_guard import validate_sql
+
+    result = validate_sql(
+        "SELECT customer_state, COUNT(*) AS n FROM customers "
+        "GROUP BY customer_state ORDER BY n DESC",
+        schema={"customers": ["customer_id", "customer_state"]},
+    )
+    assert result.ok, result.error
+    assert "LIMIT 1000" in result.fixed_sql

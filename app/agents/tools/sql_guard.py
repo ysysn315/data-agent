@@ -95,6 +95,11 @@ def _check_columns(
     """
     alias_map = _build_alias_map(root, cte_names)
 
+    # SELECT 别名集合：`COUNT(*) AS n ... ORDER BY n` 里 n 是输出列别名，
+    # 不是物理列，SQLite 允许在 ORDER BY/GROUP BY/HAVING 引用 —— 必须跳过，
+    # 否则与 CTE 同类误报（合并 feat/demo-data 后被集成测试抓到）。
+    select_aliases = {a.alias.lower() for a in root.find_all(exp.Alias) if a.alias}
+
     # 判断是否"简单"到可以做非限定列推断：只有一层 SELECT、没有子查询、没有 CTE
     select_count = len(list(root.find_all(exp.Select)))
     has_subquery = any(True for _ in root.find_all(exp.Subquery))
@@ -106,6 +111,8 @@ def _check_columns(
         if not col_name:
             continue
         qualifier = column.table  # 限定符（表名或别名），无则为 ""
+        if not qualifier and col_name.lower() in select_aliases:
+            continue  # 引用的是 SELECT 输出列别名，合法
 
         target_table: str | None = None
         if qualifier:
