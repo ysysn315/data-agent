@@ -24,6 +24,8 @@
 | Analysis Agent（P-O-R 工作流 + Markdown 报告） | my-agent | ✅（E 轮）|
 | 技能脚本容器沙箱（Docker 一次性容器，真机实测） | Yuxi | ✅（E 轮）|
 | 知识图谱（三元组抽取 + graph_search 技能） | Yuxi | ✅（E 轮）|
+| 用户体系 + API Key 鉴权 + 工作空间隔离（默认关闭） | Yuxi/SQLBot | ✅（F 轮）|
+| 前端 v2：任务中心 SSE / 图谱 SVG 可视化 / 知识管理 | — | ✅（F 轮）|
 
 ## 1. P0 —— demo 跑通闭环（必做，约 1 周）
 
@@ -83,8 +85,8 @@
 | E ✅ | feat/analysis-agent | P-O-R 工作流 + Markdown 分析报告，长任务走异步通道 | 中大 |
 | E ✅ | feat/script-sandbox | 技能脚本执行升级容器沙箱（只读挂载/资源限制/超时，可切回 subprocess）；远程技能从此可安全启用 | 难⭐ |
 | E ✅ | feat/knowledge-graph | LLM 三元组抽取 + 轻量图存储（SQLite 边表 + NetworkX，Neo4j 留接口）+ 图查询技能 | 难⭐ |
-| F | feat/auth-workspace | 用户体系 + API Key 真鉴权 + 工作空间（多租户-lite） | 中大 |
-| F | feat/frontend-v2 | 前端补页：分析报告 / 任务进度 / 图谱 / 示例与术语管理 | 中 |
+| F ✅ | feat/auth-workspace | 用户体系 + API Key 真鉴权 + 工作空间（多租户-lite） | 中大 |
+| F ✅ | feat/frontend-v2 | 前端补页：分析报告 / 任务进度 / 图谱 / 示例与术语管理 | 中 |
 | G | feat/row-col-permission | 行列级数据权限（JSONB 规则引擎，作用于 execute_sql 与数据源层），依赖 F | 中大 |
 
 每项继续强制：四段式 IMPLEMENTATION.md、pytest 全绿、中文 commit、验收后 PR。
