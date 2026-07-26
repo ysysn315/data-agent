@@ -110,3 +110,15 @@ CLI 只是 attach 到守护进程的客户端，**容器本体还在跑**，这�
   capability 集约束，未做 `--user` 降权与 seccomp 定制；数据文件必须放进技能目录，
   未提供"额外数据目录只读挂载"配置；镜像需人工预拉取。以上均可在不动 `ScriptRunner`
   协议的前提下增量补齐。
+
+## 附：macOS + colima 实测记录（2026-07-26）
+
+真容器 4 例已在 colima（docker server 29.5.2）实测全绿。两个踩坑记录，换机器部署时照做：
+
+1. **colima 默认只挂载 $HOME**：pytest 临时目录在 `/private/var/folders/...`，默认不进 VM，
+   容器里 `/skill` 为空、脚本秒退（表象是超时用例 DID NOT RAISE）。需建 VM 时显式挂载：
+   `colima start --mount "$HOME:w" --mount "/private/var/folders:w" --mount "/private/tmp:w"`
+   注意 **--mount 只在 VM 创建时生效**，已有 VM 要 `colima delete` 重建。
+2. **/var 软链差异**：macOS 的 `/var` 是 `/private/var` 的软链，Linux VM 里不是。
+   传给 `docker -v` 的宿主路径必须先 `Path.resolve()` 展开（DockerRunner 已内置这一步——
+   这也是它能直接通过测试的原因）。
