@@ -250,3 +250,31 @@ async def get_task_service():
             arq_pool=await create_arq_pool(settings),
         )
     return _task_service
+
+
+# ========== 知识图谱（E 轮追加） ==========
+
+_graph_service = None
+
+
+def get_graph_service():
+    """GraphService 单例（graph_triples 表 + NetworkX 内存镜像；首启表空写入演示种子）。
+
+    LLM 惰性注入：llm_provider 传工厂而非实例，不调抽取接口就不要求配置 LLM_API_KEY。
+    注意：reset_singletons 早于本段存在、未覆盖 _graph_service（本文件权限边界为
+    只在末尾追加）；测试请用 dependency_overrides 注入独立实例，不依赖单例重置。
+    """
+    global _graph_service
+    if _graph_service is None:
+        from app.core.llm import LLMFactory
+        from app.db import ensure_initialized, get_sessionmaker, run_sync
+        from app.db.repositories import GraphTripleRepository
+        from app.graph.service import GraphService
+        from app.graph.store import GraphStore
+
+        ensure_initialized()
+        _graph_service = GraphService(
+            store=GraphStore(GraphTripleRepository(get_sessionmaker()), runner=run_sync),
+            llm_provider=LLMFactory.create_llm,
+        )
+    return _graph_service

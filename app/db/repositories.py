@@ -410,3 +410,65 @@ class TerminologyRepository:
         async with self._sm() as session:
             stmt = select(func.count()).select_from(TerminologyModel)
             return int((await session.execute(stmt)).scalar_one())
+
+
+# ========== 知识图谱三元组仓储（E 轮追加；import 就近声明，不改动文件头部） ==========
+
+from app.db.models import GraphTripleModel  # noqa: E402
+
+
+class GraphTripleRepository:
+    """知识图谱三元组存储后端（供 app/graph/store.GraphStore 的持久化层）。
+
+    领域层收发 dict（subject/predicate/object/source），与示例/术语仓储同风格。
+    幂等由 add_many 的 (s,p,o) 判重实现（先查后插，一次提交），而不是逐条
+    捕 IntegrityError —— 后者会让批量插入在第一条冲突处整批回滚。
+    """
+
+    def __init__(self, sessionmaker: async_sessionmaker):
+        self._sm = sessionmaker
+
+    @staticmethod
+    def _to_dict(row: GraphTripleModel) -> dict:
+        return {
+            "subject": row.subject,
+            "predicate": row.predicate,
+            "object": row.object,
+            "source": row.source,
+        }
+
+    async def list_all(self) -> list[dict]:
+        async with self._sm() as session:
+            stmt = select(GraphTripleModel).order_by(GraphTripleModel.id)
+            rows = (await session.execute(stmt)).scalars().all()
+            return [self._to_dict(r) for r in rows]
+
+    async def add_many(self, triples: list[dict]) -> int:
+        """批量入库，返回实际新增条数；库内已有或批内重复的 (s,p,o) 都只留一条。"""
+        if not triples:
+            return 0
+        async with self._sm() as session:
+            stmt = select(
+                GraphTripleModel.subject, GraphTripleModel.predicate, GraphTripleModel.object
+            )
+            existing = {tuple(row) for row in (await session.execute(stmt)).all()}
+            added = 0
+            for t in triples:
+                key = (t["subject"], t["predicate"], t["object"])
+                if key in existing:
+                    continue
+                session.add(GraphTripleModel(
+                    subject=t["subject"],
+                    predicate=t["predicate"],
+                    object=t["object"],
+                    source=t.get("source") or "manual",
+                ))
+                existing.add(key)
+                added += 1
+            await session.commit()
+            return added
+
+    async def count(self) -> int:
+        async with self._sm() as session:
+            stmt = select(func.count()).select_from(GraphTripleModel)
+            return int((await session.execute(stmt)).scalar_one())

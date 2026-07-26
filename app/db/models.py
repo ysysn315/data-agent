@@ -101,3 +101,30 @@ class TerminologyModel(Base):
     definition: Mapped[str] = mapped_column(Text, nullable=False, default="")
     sql_hint: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
+
+
+# ========== 知识图谱（E 轮追加；本段 import 就近声明，不改动文件头部） ==========
+
+from sqlalchemy import UniqueConstraint  # noqa: E402
+
+
+class GraphTripleModel(Base):
+    """graph_triples 表：知识图谱三元组（轻量版图谱的唯一持久化层）。
+
+    (subject, predicate, object) 唯一约束保证入库幂等；NetworkX 内存图是本表的
+    只读镜像（app/graph/store.GraphStore 惰性重建），不另设图数据库（取舍见
+    app/graph/IMPLEMENTATION.md §4，Neo4j 升级路径预留在文档里）。
+    """
+
+    __tablename__ = "graph_triples"
+    __table_args__ = (
+        UniqueConstraint("subject", "predicate", "object", name="uq_graph_triples_spo"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    subject: Mapped[str] = mapped_column(String(256), nullable=False, index=True)
+    predicate: Mapped[str] = mapped_column(String(256), nullable=False)
+    object: Mapped[str] = mapped_column(String(256), nullable=False, index=True)
+    # 来源标记：seed（首启种子）/ manual（API 手动补录）/ llm（LLM 抽取）
+    source: Mapped[str] = mapped_column(String(64), nullable=False, default="manual")
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)

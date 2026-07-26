@@ -43,6 +43,7 @@ app.include_router(routes_session.router, prefix="/api")
 app.include_router(routes_upload.router, prefix="/api")
 app.include_router(routes_skills.router, prefix="/api")
 app.include_router(routes_mcp.router, prefix="/api")
+from app.api import routes_graph; app.include_router(routes_graph.router, prefix="/api")  # noqa: E402,E702 —— E 轮：知识图谱
 app.include_router(routes_knowledge.router, prefix="/api")
 app.include_router(routes_tasks.router, prefix="/api")
 
