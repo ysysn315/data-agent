@@ -9,6 +9,8 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, SystemMessage
 from loguru import logger
 
+from app.core.tracing import get_langfuse_callbacks
+
 DEFAULT_SYSTEM_PROMPT = (
     "你是一个数据分析助手。优先使用可用的技能（Skills）和工具回答问题；"
     "涉及数据查询时先了解表结构再生成 SQL；"
@@ -67,8 +69,10 @@ class ChatAgent:
     ) -> str:
         """执行一轮对话，返回最终回答文本。"""
         logger.info(f"ChatAgent 收到问题: {question}")
+        # callbacks 为空列表时（未启用 Langfuse）行为与未接入完全一致
         result = await self.graph.ainvoke(
-            {"messages": self._build_messages(question, history, summary)}
+            {"messages": self._build_messages(question, history, summary)},
+            config={"callbacks": get_langfuse_callbacks()},
         )
 
         messages = result.get("messages", [])
@@ -89,6 +93,7 @@ class ChatAgent:
         async for chunk, _meta in self.graph.astream(
             {"messages": self._build_messages(question, history, summary)},
             stream_mode="messages",
+            config={"callbacks": get_langfuse_callbacks()},
         ):
             if isinstance(chunk, AIMessageChunk) and chunk.content:
                 # content 可能是 str 或分段 list，统一成文本

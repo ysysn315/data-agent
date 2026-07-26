@@ -61,6 +61,13 @@ class Settings(BaseSettings):
     tavily_api_key: str = ""
     tavily_base_url: str = "https://api.tavily.com"
 
+    # Langfuse 调用链追踪（可选，默认关闭）
+    # enabled=False 或 key 为空时完全跳过，不 import langfuse，不影响主流程
+    langfuse_enabled: bool = False
+    langfuse_public_key: str = ""
+    langfuse_secret_key: str = ""
+    langfuse_host: str = "https://cloud.langfuse.com"  # 云端；自建填自己的实例地址
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
