@@ -4,7 +4,7 @@ v2 要点：
 - skill 是目录（dir_path），SKILL.md 正文按需读取（渐进式披露）
 - 目录导入：copytree → 临时目录 → 原子 rename，失败回滚（参考 Yuxi service.py:680-717）
 - 依赖展开：分支内 stack 判环 + 全局 seen 去重（菱形依赖不再误报为环）
-- 语义匹配：jieba 分词，支持中文查询
+- 语义匹配：委托 SkillMatcher（embedding 向量召回，未配置/失败回退 jieba 关键词）
 """
 from __future__ import annotations
 
@@ -13,9 +13,9 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-import jieba
 from loguru import logger
 
+from app.skills.matching import SkillMatcher
 from app.skills.models import (
     ExpandedSkills,
     Skill,
@@ -32,15 +32,18 @@ class SkillService:
         self,
         repository: Optional[SkillRepository] = None,
         save_dir: Optional[str | Path] = None,
+        matcher: Optional[SkillMatcher] = None,
     ):
         """
         Args:
             repository: 数据访问层（当前为内存实现）
             save_dir: 用户/远程 skills 的落盘根目录（None=不落盘，仅内存）
+            matcher: 语义匹配器（None=首次匹配时按全局 settings 惰性构建；测试可注入假 embed）
         """
         self.repository = repository
         self.save_dir = Path(save_dir) if save_dir else None
         self._builtin_skills_cache: dict[str, Skill] = {}
+        self._matcher = matcher
 
     # ========== 加载 ==========
 
@@ -189,15 +192,32 @@ class SkillService:
         expanded.deduplicate()
         return expanded
 
-    # ========== 语义匹配 ==========
+    # ========== 语义匹配（委托 SkillMatcher） ==========
+
+    def _get_matcher(self) -> SkillMatcher:
+        """惰性构建语义匹配器：未注入则按全局 settings 判定策略（auto）"""
+        if self._matcher is None:
+            from app.core.settings import get_settings
+
+            self._matcher = SkillMatcher(settings=get_settings())
+        return self._matcher
+
+    def _invalidate_match_cache(self, slug: str) -> None:
+        """技能增/删/改后失效其匹配向量缓存。
+
+        matcher 未构建则无缓存可失效（首次匹配时才建、届时缓存本就为空），直接跳过。
+        """
+        if self._matcher is not None:
+            self._matcher.invalidate(slug)
 
     @staticmethod
     def _tokenize(text: str) -> set[str]:
-        """jieba 分词（中英文皆可），过滤单字符标点"""
-        return {
-            token for token in jieba.lcut(text.lower())
-            if token.strip() and (len(token) > 1 or token.isalnum())
-        }
+        """jieba 分词（中英文皆可），过滤单字符标点
+
+        分词实现已迁入 matching.py，这里委托保持单一口径；
+        app/text2sql/examples.py 仍按 `SkillService._tokenize` 调用，签名与语义不变。
+        """
+        return SkillMatcher._tokenize(text)
 
     async def match_skills_by_query(
         self,
@@ -205,9 +225,11 @@ class SkillService:
         candidate_slugs: Optional[list[str]] = None,
         top_k: int = 3
     ) -> list[Skill]:
-        """根据用户查询匹配 skills（关键词匹配，jieba 分词）
+        """根据用户查询匹配 skills
 
-        二期可升级为 embedding 语义召回（复用 app/rag 的向量化能力）。
+        候选集解析（candidate_slugs 或全部启用）后，打分/排序委托 SkillMatcher：
+        embedding 配置可用则向量召回，否则（或调用失败）回退 jieba 关键词。
+        签名与返回值保持与 v1 一致（middleware 的 auto_match 依赖此契约）。
         """
         if candidate_slugs:
             skills = []
@@ -218,25 +240,7 @@ class SkillService:
         else:
             skills = await self.list_skills(enabled_only=True)
 
-        query_lower = query.lower()
-        query_tokens = self._tokenize(query)
-        scored_skills = []
-
-        for skill in skills:
-            score = 0.0
-            # slug 直接出现在查询里（如用户明确点名）
-            if skill.slug in query_lower:
-                score += 10
-            # name 词元重叠
-            score += 2 * len(self._tokenize(skill.name) & query_tokens)
-            # description 词元重叠
-            score += len(self._tokenize(skill.description) & query_tokens)
-
-            if score > 0:
-                scored_skills.append((skill, score))
-
-        scored_skills.sort(key=lambda x: x[1], reverse=True)
-        return [skill for skill, _ in scored_skills[:top_k]]
+        return await self._get_matcher().match(query, skills, top_k=top_k)
 
     # ========== 目录导入（v2 核心） ==========
 
@@ -302,6 +306,8 @@ class SkillService:
             shutil.rmtree(final_dir, ignore_errors=True)
             raise
 
+        # slug 若曾被删后重建，清掉可能残留的旧向量
+        self._invalidate_match_cache(slug)
         logger.info(f"导入 skill 目录成功: {slug} -> {final_dir}")
         return skill
 
@@ -341,6 +347,7 @@ class SkillService:
         if self.repository:
             skill = await self.repository.create(skill)
 
+        self._invalidate_match_cache(slug)
         return skill
 
     async def update_skill(
@@ -378,6 +385,8 @@ class SkillService:
         if self.repository:
             existing = await self.repository.update(existing)
 
+        # name/description 可能已变，失效旧向量，下次匹配按新文本重算
+        self._invalidate_match_cache(slug)
         return existing
 
     async def delete_skill(self, slug: str, user_id: Optional[int] = None) -> bool:
@@ -405,4 +414,6 @@ class SkillService:
             except ValueError:
                 logger.warning(f"skill 目录不在 save_dir 内，跳过删除: {dir_path}")
 
+        if deleted:
+            self._invalidate_match_cache(slug)
         return deleted

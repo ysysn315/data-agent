@@ -35,12 +35,15 @@ dependencies = [
     "loguru>=0.7",
     # 调用链追踪（可选）
     "langfuse>=2",
+    # 异步任务（ARQ + Redis 事件流）
+    "arq>=0.26",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
+    "fakeredis>=2",
 ]
 
 # 本地 BGE 重排/向量（重依赖，按需安装）：uv pip install torch FlagEmbedding
