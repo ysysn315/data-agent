@@ -19,6 +19,7 @@ TaskEvent 进度（复用 app/tasks/events.py 的事件模型，异步任务侧�
 """
 from __future__ import annotations
 
+import inspect
 import json
 import re
 from typing import Any, Awaitable, Callable, List, Optional, TypedDict
@@ -122,9 +123,14 @@ class AnalysisAgent:
         if self.on_event is None:
             return
         payload = {"phase": phase, **payload}
-        await self.on_event(
-            TaskEvent(type=event_type, message=message, progress=progress, payload=payload)
-        )
+        event = TaskEvent(type=event_type, message=message, progress=progress, payload=payload)
+        # 兼容同步/异步回调；事件上报是辅助路径，失败只告警不打断分析主流程
+        try:
+            result = self.on_event(event)
+            if inspect.isawaitable(result):
+                await result
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"分析进度事件上报失败（忽略继续）: {e}")
 
     # ========== 阶段 1：Planner ==========
 
