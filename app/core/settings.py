@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     save_dir: str = "./saves"          # 持久化目录（skills / mcp 配置等）
     debug: bool = False
 
+    # 持久化数据库（SQLAlchemy 2.0 async）。SQLite 起步、PostgreSQL 就绪：
+    # 切 PG 只改这一行，如 "postgresql+asyncpg://user:pwd@host:5432/data_agent"
+    database_url: str = "sqlite+aiosqlite:///./data/app.db"
+
     # CORS 配置
     CORS_ORIGINS: list[str] = ["*"]
 
