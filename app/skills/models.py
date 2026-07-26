@@ -86,12 +86,18 @@ class SkillContent(BaseModel):
 
 @dataclass
 class Skill:
-    """Skill 领域模型（数据库实体）"""
+    """Skill 领域模型（数据库实体）
+
+    v2：skill 是一个目录而不是一个字符串（对齐 Yuxi）。
+    dir_path 指向 skill 目录（内含 SKILL.md 和可选的 scripts/ 等随附文件），
+    content 仅作为根 SKILL.md 的缓存，供 API 详情展示。
+    """
     id: Optional[int] = None
     slug: str = ""
     name: str = ""
     description: str = ""
-    content: str = ""                    # SKILL.md 完整内容
+    content: str = ""                    # 根 SKILL.md 内容（缓存）
+    dir_path: Optional[str] = None       # skill 目录路径（v2 新增）
     source_type: SkillSourceType = SkillSourceType.BUILTIN
     enabled: bool = True
     user_id: Optional[int] = None        # 创建者，NULL=系统内置
@@ -145,47 +151,57 @@ class Skill:
 
 
 @dataclass
-class SkillDependencyNode:
-    """Skill 依赖节点（用于依赖展开）"""
-    slug: str
-    tools: list[str] = field(default_factory=list)
-    mcps: list[str] = field(default_factory=list)
-    skills: list[str] = field(default_factory=list)
-    depth: int = 0                        # 依赖深度（防止循环）
-
-
-@dataclass
 class ExpandedSkills:
-    """依赖展开结果"""
+    """依赖展开结果
+
+    v2 渐进式披露（对齐 Yuxi/Anthropic 模式）：
+    system prompt 只注入每个 skill 的名称 + 描述 + 读取指引，
+    正文由模型调用 read_skill(slug) 按需加载 —— 注入成本与正文长度无关。
+    """
     skills: list[Skill] = field(default_factory=list)           # 所有 skills（含依赖）
-    tools: list[str] = field(default_factory=list)               # 所有工具（去重）
-    mcps: list[str] = field(default_factory=list)                # 所有 MCP（去重）
-    prompt_sections: list[str] = field(default_factory=list)     # 提示词片段
+    tools: list[str] = field(default_factory=list)               # 所有声明的工具（去重）
+    mcps: list[str] = field(default_factory=list)                # 所有声明的 MCP（去重）
 
     def add_skill(self, skill: Skill) -> None:
         """添加 skill 并收集其依赖"""
         self.skills.append(skill)
         self.tools.extend(skill.get_tools())
         self.mcps.extend(skill.get_mcps())
-        self.prompt_sections.append(
-            f"## Skill: {skill.name}\n\n{skill.parsed.body}"
-        )
 
     def deduplicate(self) -> None:
         """去重工具和 MCP"""
         self.tools = list(dict.fromkeys(self.tools))
         self.mcps = list(dict.fromkeys(self.mcps))
 
+    def tools_of(self, slugs: set[str]) -> set[str]:
+        """指定 slug 集合（通常是已激活的 skills）直接声明的工具名"""
+        names: set[str] = set()
+        for skill in self.skills:
+            if skill.slug in slugs:
+                names.update(skill.get_tools())
+        return names
+
+    def mcps_of(self, slugs: set[str]) -> list[str]:
+        """指定 slug 集合直接声明的 MCP server slug（保序去重）"""
+        result: list[str] = []
+        for skill in self.skills:
+            if skill.slug in slugs:
+                result.extend(skill.get_mcps())
+        return list(dict.fromkeys(result))
+
     def build_system_prompt(self) -> str:
-        """构建 system message 提示词"""
-        if not self.prompt_sections:
+        """构建 system message 提示词（渐进式披露：只列名称+描述）"""
+        if not self.skills:
             return ""
 
-        sections = [
+        lines = [
             "# 可用技能（Skills）",
             "",
-            "你可以使用以下技能来完成任务：",
-            ""
+            "以下技能可用。技能的完整说明尚未加载：",
+            "**使用某个技能前，必须先调用 `read_skill(slug)` 读取其完整说明**，"
+            "这会同时解锁该技能声明的专用工具。",
+            "",
         ]
-        sections.extend(self.prompt_sections)
-        return "\n".join(sections)
+        for skill in self.skills:
+            lines.append(f"- **{skill.name}**（slug: `{skill.slug}`）：{skill.description}")
+        return "\n".join(lines)

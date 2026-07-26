@@ -3,14 +3,13 @@ from app.skills.models import (
     ExpandedSkills,
     Skill,
     SkillContent,
-    SkillDependencyNode,
     SkillFrontmatter,
     SkillSourceType,
     SkillStatus,
 )
 from app.skills.repository import SkillRepository
 from app.skills.service import SkillService
-from app.skills.middleware import SkillsMiddleware, SkillsToolFilter
+from app.skills.middleware import SkillsMiddleware, SkillsState
 from app.skills.remote_install import (
     RemoteInstallError,
     install_remote_skill,
@@ -23,7 +22,6 @@ __all__ = [
     "Skill",
     "SkillContent",
     "SkillFrontmatter",
-    "SkillDependencyNode",
     "ExpandedSkills",
     "SkillSourceType",
     "SkillStatus",
@@ -33,7 +31,7 @@ __all__ = [
     "SkillService",
     # Middleware
     "SkillsMiddleware",
-    "SkillsToolFilter",
+    "SkillsState",
     # 远程安装
     "RemoteInstallError",
     "install_remote_skill",
