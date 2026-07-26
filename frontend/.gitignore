@@ -1,0 +1,13 @@
+# 依赖与构建产物不入库
+node_modules/
+dist/
+
+# 本地环境与日志
+.env
+.env.local
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+.vite/
