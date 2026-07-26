@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_base_url: Optional[str] = None  # 自定义 endpoint，如 "https://aigc.sankuai.com/v1/openai/native"
     llm_temperature: float = 0.1
+    llm_request_timeout: float = 60.0  # 单次请求超时（秒）
     llm_streaming: bool = False
 
     # Embedding 配置（支持本地 Ollama 或 OpenAI 兼容接口）

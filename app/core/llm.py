@@ -40,6 +40,9 @@ class LLMFactory:
             base_url=base_url or settings.llm_base_url,
             temperature=temperature or settings.llm_temperature,
             streaming=streaming or settings.llm_streaming,
+            # 显式超时与重试：端点不可达时快速失败（曾因无超时挂满 5 分钟）
+            timeout=kwargs.pop("timeout", settings.llm_request_timeout),
+            max_retries=kwargs.pop("max_retries", 2),
             **kwargs
         )
 
