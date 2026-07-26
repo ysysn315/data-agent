@@ -14,11 +14,14 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from app.core.dependencies import get_example_store, get_term_store
+from app.core.dependencies import get_current_user, get_example_store, get_term_store
 from app.text2sql.examples import ExampleStore
 from app.text2sql.terminology import TermStore
 
 router = APIRouter(tags=["knowledge"])
+
+# 写口守卫：auth_enabled=True 时需登录；demo 下 get_current_user 恒放行（见 dependencies.py）。
+# 读口（list_*）不挂守卫，保持开放。受保护清单集中在 app/core/auth.PROTECTED_ENDPOINTS。
 
 
 # ========== 请求/响应模型 ==========
@@ -64,6 +67,7 @@ async def list_sql_examples(store: ExampleStore = Depends(get_example_store)):
     "/sql-examples",
     response_model=SQLExampleResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(get_current_user)],
 )
 async def create_sql_example(
     req: SQLExampleCreate, store: ExampleStore = Depends(get_example_store)
@@ -75,7 +79,11 @@ async def create_sql_example(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.delete("/sql-examples/{example_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/sql-examples/{example_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(get_current_user)],
+)
 async def delete_sql_example(
     example_id: str, store: ExampleStore = Depends(get_example_store)
 ):
@@ -98,6 +106,7 @@ async def list_terms(store: TermStore = Depends(get_term_store)):
     "/terminology",
     response_model=TermResponse,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(get_current_user)],
 )
 async def create_term(req: TermCreate, store: TermStore = Depends(get_term_store)):
     """新增/更新业务术语（term 为唯一键）"""
@@ -107,7 +116,11 @@ async def create_term(req: TermCreate, store: TermStore = Depends(get_term_store
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.delete("/terminology/{term}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/terminology/{term}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(get_current_user)],
+)
 async def delete_term(term: str, store: TermStore = Depends(get_term_store)):
     """按 term 删除业务术语"""
     if not store.delete(term):

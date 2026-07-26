@@ -6,7 +6,13 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
-from app.core.dependencies import get_current_user_optional, get_skill_service
+from app.core.dependencies import (
+    get_admin_user,
+    get_current_user,
+    get_current_user_optional,
+    get_skill_service,
+)
+from app.core.settings import settings
 from app.skills.models import SkillSourceType
 from app.skills.remote_install import (
     RemoteInstallError,
@@ -18,6 +24,32 @@ from app.skills.service import SkillService
 
 
 router = APIRouter(prefix="/skills", tags=["skills"])
+
+# 鉴权守卫（auth_enabled=True 时生效；demo 下恒放行）：
+# 增删改 / 远程安装 => get_current_user（登录）；启停 => get_admin_user（管理员）。
+# 读口（list/get/remote list）不挂守卫，保持开放。清单集中在 app/core/auth.PROTECTED_ENDPOINTS。
+
+
+async def _tag_workspace(
+    slug: str,
+    current_user: Optional[dict],
+    skill_service: SkillService,
+) -> None:
+    """工作空间隔离（lite）：把技能标记到当前用户的 workspace（复用 share_config，Yuxi 同款）。
+
+    demo 下 current_user 为 None 或 workspace_id 为 None => 不打标（行为与从前一致）；
+    auth 下写入 share_config["workspace_id"]，供 list_skills 过滤。内置技能不落库、不打标。
+    选择复用 share_config JSON 而非给 skills 表加列：零迁移、与 D 轮 skills 表结构解耦，
+    且 share_config 本就是"可见范围"语义的载体（对齐 yuxi-reference share_config.py 的 access_level 思路）。
+    """
+    ws = current_user.get("workspace_id") if current_user else None
+    if ws is None or not skill_service.repository:
+        return
+    skill = await skill_service.get_skill(slug)
+    if not skill or skill.source_type == SkillSourceType.BUILTIN:
+        return
+    skill.share_config = {**(skill.share_config or {}), "workspace_id": ws}
+    await skill_service.repository.update(skill)
 
 
 # ========== 请求/响应模型 ==========
@@ -88,13 +120,26 @@ async def list_skills(
     """
     列出所有 Skills
 
-    支持按启用状态、来源类型过滤
+    支持按启用状态、来源类型过滤。auth 模式下按工作空间隔离：admin 全见；
+    非 admin 仅见「本 workspace + 内置」。demo（auth_enabled=False）行为与从前完全一致。
     """
-    user_id = current_user.get("id") if current_user else None
-    skills = await skill_service.list_skills(
-        enabled_only=enabled_only,
-        user_id=user_id
-    )
+    if not settings.auth_enabled:
+        # demo：完全保持现状（user_id 维度：无 header=>None=>list_all；Bearer=>dev_user 可见集）
+        user_id = current_user.get("id") if current_user else None
+        skills = await skill_service.list_skills(
+            enabled_only=enabled_only,
+            user_id=user_id,
+        )
+    else:
+        # auth：取全部启用技能，再按角色/工作空间收窄
+        skills = await skill_service.list_skills(enabled_only=enabled_only, user_id=None)
+        if current_user and current_user.get("role") != "admin":
+            ws = current_user.get("workspace_id")
+            skills = [
+                s for s in skills
+                if s.source_type == SkillSourceType.BUILTIN
+                or (s.share_config or {}).get("workspace_id") == ws
+            ]
 
     # 按 source_type 过滤
     if source_type:
@@ -151,7 +196,12 @@ async def get_skill(
     )
 
 
-@router.post("", response_model=SkillResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=SkillResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(get_current_user)],
+)
 async def create_skill(
     request: SkillCreateRequest,
     skill_service: SkillService = Depends(get_skill_service),
@@ -171,6 +221,8 @@ async def create_skill(
             detail=str(e)
         )
 
+    await _tag_workspace(skill.slug, current_user, skill_service)
+
     return SkillResponse(
         id=skill.id,
         slug=skill.slug,
@@ -184,7 +236,7 @@ async def create_skill(
     )
 
 
-@router.put("/{slug}", response_model=SkillResponse)
+@router.put("/{slug}", response_model=SkillResponse, dependencies=[Depends(get_current_user)])
 async def update_skill(
     slug: str,
     request: SkillUpdateRequest,
@@ -224,7 +276,11 @@ async def update_skill(
     )
 
 
-@router.delete("/{slug}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{slug}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(get_current_user)],
+)
 async def delete_skill(
     slug: str,
     skill_service: SkillService = Depends(get_skill_service),
@@ -253,13 +309,13 @@ async def delete_skill(
         )
 
 
-@router.post("/{slug}/enable", response_model=SkillResponse)
+@router.post("/{slug}/enable", response_model=SkillResponse, dependencies=[Depends(get_admin_user)])
 async def enable_skill(
     slug: str,
     skill_service: SkillService = Depends(get_skill_service),
     current_user: Optional[dict] = Depends(get_current_user_optional),
 ):
-    """启用 Skill"""
+    """启用 Skill（触及"哪些技能对模型可见"，需 admin）"""
     # TODO: 实现启用逻辑
     skill = await skill_service.get_skill(slug)
     if not skill:
@@ -285,13 +341,13 @@ async def enable_skill(
     )
 
 
-@router.post("/{slug}/disable", response_model=SkillResponse)
+@router.post("/{slug}/disable", response_model=SkillResponse, dependencies=[Depends(get_admin_user)])
 async def disable_skill(
     slug: str,
     skill_service: SkillService = Depends(get_skill_service),
     current_user: Optional[dict] = Depends(get_current_user_optional),
 ):
-    """禁用 Skill"""
+    """禁用 Skill（触及"哪些技能对模型可见"，需 admin）"""
     # TODO: 实现禁用逻辑
     skill = await skill_service.get_skill(slug)
     if not skill:
@@ -338,7 +394,12 @@ async def list_remote(
     ]
 
 
-@router.post("/remote/install", response_model=SkillResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/remote/install",
+    response_model=SkillResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(get_current_user)],
+)
 async def install_remote(
     request: RemoteInstallRequest,
     skill_service: SkillService = Depends(get_skill_service),
@@ -360,6 +421,8 @@ async def install_remote(
             detail=str(e)
         )
 
+    await _tag_workspace(skill.slug, current_user, skill_service)
+
     return SkillResponse(
         id=skill.id,
         slug=skill.slug,
@@ -373,7 +436,11 @@ async def install_remote(
     )
 
 
-@router.post("/remote/install-batch", response_model=list[BatchInstallResult])
+@router.post(
+    "/remote/install-batch",
+    response_model=list[BatchInstallResult],
+    dependencies=[Depends(get_current_user)],
+)
 async def install_remote_batch(
     request: RemoteBatchInstallRequest,
     skill_service: SkillService = Depends(get_skill_service),
@@ -388,6 +455,11 @@ async def install_remote_batch(
         skill_service=skill_service,
         user_id=user_id
     )
+
+    # 安装成功的逐个打工作空间标记（auth 模式生效；demo 下 current_user 为 None 时跳过）
+    for result in results:
+        if result.get("success"):
+            await _tag_workspace(result["slug"], current_user, skill_service)
 
     return [
         BatchInstallResult(

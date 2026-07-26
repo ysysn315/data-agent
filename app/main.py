@@ -13,6 +13,7 @@ from app.api import (
 )
 from app.api import routes_tasks  # D 轮：异步任务
 from app.api import routes_analysis  # E 轮：分析 Agent（P-O-R）
+from app.api import routes_auth  # F 轮：用户体系 + API Key 鉴权
 from app.core.settings import settings
 
 app = FastAPI(
@@ -36,6 +37,10 @@ async def startup_event():
     # 持久化建表初始化（幂等；SQLite 首启会自动建 ./data 目录与库文件）
     from app.db import ensure_initialized
     ensure_initialized()
+    # F 轮：启用鉴权且库中无用户时，自动 bootstrap default 工作空间 + admin，
+    # 明文 API Key 打进 warning 日志一次（auth_enabled=False 时此调用直接返回 None）
+    from app.core.auth import bootstrap
+    await bootstrap()
 
 # 关闭事件
 @app.on_event("shutdown")
@@ -57,6 +62,7 @@ app.include_router(routes_graph.router, prefix="/api")  # noqa: E402,E702 ——
 app.include_router(routes_knowledge.router, prefix="/api")
 app.include_router(routes_tasks.router, prefix="/api")
 app.include_router(routes_analysis.router, prefix="/api")
+app.include_router(routes_auth.router, prefix="/api")  # F 轮：用户体系 + API Key 鉴权
 
 
 
