@@ -11,6 +11,9 @@
 
 - **Skills 三段式（渐进式披露 → 激活门控 → 工具解锁）**：一个技能是一个目录（`SKILL.md` + 可选 `scripts/`）。system prompt 只注入每个技能的**名称 + 描述**，正文由模型 `read_skill(slug)` 按需读取；激活后其声明的门控工具才对模型可见。注入成本与技能正文长度、技能数量解耦——4 个内置技能全文注入约 **1183 tokens**，改为名称+描述后约 **150 tokens/请求**。
 - **Text-to-SQL 全链路**：M-Schema（SQLBot 风格、带中文注释的表结构）+ 分层提示词（主规则/SQLite 方言/零容忍规则，写在 `SKILL.md` 里而非硬编码）+ sqlglot AST 校验（语法/只读/表列存在性/自动补 LIMIT）+ 引擎级只读（SQLite `mode=ro`）三层防护。
+- **Analysis Agent（P-O-R 工作流）**：Planner 拆解 → 每步复用完整技能三段式 → Reflection 缺口补充（至多一次防循环）→ 结构化 Markdown 报告（SQL 清单取自真实工具轨迹）
+- **容器沙箱**：技能脚本可切 Docker 一次性容器执行（断网/只读/资源限额/超时防孤儿），真机实测全绿；与"远程技能默认禁用"构成纵深防御
+- **知识图谱**：LLM 三元组抽取 + SQLite/NetworkX 轻量图存储，`graph_search` 技能支持指标口径溯源（`GMV -[计算自]-> 订单项价格`）
 - **持久化层**：SQLAlchemy 2.0 async 四表入库（skills/MCP/SQL示例/术语），对齐 Yuxi 的"内容存文件系统、索引存数据库"设计；`database_url` 一行切 PostgreSQL
 - **异步执行**：ARQ + Redis Streams 事件流，长任务提交 / 状态查询 / SSE 进度订阅（断连续读、迟到回放）
 - **技能语义匹配**：embedding 余弦召回 + jieba 自动回退（"帮我画个销售走势的图"这类关键词零交集的查询也能命中）
@@ -229,6 +232,9 @@ data-agent/
 | [app/db/IMPLEMENTATION.md](app/db/IMPLEMENTATION.md) | 持久化层：async SQLAlchemy 四表、JSON 迁移、种子幂等 |
 | [app/tasks/IMPLEMENTATION.md](app/tasks/IMPLEMENTATION.md) | 异步任务：ARQ + Redis Streams + SSE |
 | [app/skills/IMPLEMENTATION-matching.md](app/skills/IMPLEMENTATION-matching.md) | 技能语义匹配：embedding 召回 + jieba 回退 |
+| [app/agents/IMPLEMENTATION-analysis.md](app/agents/IMPLEMENTATION-analysis.md) | Analysis Agent：P-O-R 状态机与防循环设计 |
+| [app/skills/IMPLEMENTATION-sandbox.md](app/skills/IMPLEMENTATION-sandbox.md) | 容器沙箱：隔离 flag 威胁模型 + macOS/colima 实测记录 |
+| [app/graph/IMPLEMENTATION.md](app/graph/IMPLEMENTATION.md) | 知识图谱：抽取容错、双层存储、Neo4j 升级路径 |
 | [evals/IMPLEMENTATION.md](evals/IMPLEMENTATION.md) | 评估体系：Text-to-SQL 执行准确率 + RAG 检索/生成评估 |
 | [frontend/IMPLEMENTATION.md](frontend/IMPLEMENTATION.md) | Web 前端：Vue3 迁移 + Skills/MCP 管理页 |
 | [scripts/IMPLEMENTATION.md](scripts/IMPLEMENTATION.md) | 演示数据导入（Kaggle CSV / 合成数据分布设计） |

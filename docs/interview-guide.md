@@ -414,3 +414,19 @@
 ---
 
 > 收尾话术：这个项目我最想传达的不是"功能多"，而是**每个设计都有取舍、每个取舍都能追问、每个坑都留了记录**。想深入拷问任一子系统，可以用配套的 `/mock-interview` 技能。
+
+
+## 附录：E 轮补充踩坑（2026-07-26）
+
+**踩坑 9 —— colima 挂载范围与 /var 软链**：装 Docker 实测沙箱时 4 个真容器用例全挂。
+排障两层：① colima 默认只挂 $HOME 进 VM，pytest 临时目录（/private/var/folders）容器不可见，
+/skill 挂进去是空的（表象：超时用例 DID NOT RAISE）；② macOS 的 /var 是 /private/var 软链，
+Linux VM 无此链，传 docker -v 的路径必须先 resolve()。修好挂载后代码零改动全绿 ——
+DockerRunner 早就内置了 resolve()。教训：**被 skip 的测试等于没有测试**（用户拍板装依赖真测，
+立刻暴露环境问题）。佐证：PR #18 评论、IMPLEMENTATION-sandbox.md 附录。
+
+**踩坑 10 —— 事件回调的 await 假设**：AnalysisAgent._emit 无条件 await on_event，
+同步回调（返回 None）直接 TypeError 崩掉整个分析。离线测试恰好全用异步回调，
+真实 LLM 集成验证（传了个 lambda）才暴露。修复：isawaitable 分流 + 失败告警降级 ——
+事件上报是辅助路径，无权中断主流程。佐证：PR #21。教训：回调契约要么文档写死要么两者兼容；
+集成验证与单测的盲区互补。

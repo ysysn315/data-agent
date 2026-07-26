@@ -76,8 +76,9 @@ dependencies:
 
 ## 5. 安全边界
 
-- 脚本执行 = 无隔离 subprocess（REQUIREMENTS §9 决策），防护为：
-  路径包含校验（必须在 `<skill>/scripts/` 内）+ 30s 超时 + 输出截断
+- 脚本执行默认 subprocess（路径包含校验 + 30s 超时 + 输出截断）；
+  **E 轮起可切 Docker 一次性容器**（`SKILL_SANDBOX_MODE=docker`：断网/只读/资源限额/超时防孤儿，
+  详见 app/skills/IMPLEMENTATION-sandbox.md，含 macOS/colima 部署实测记录）
 - 因此**远程安装的 skill 默认 enabled=False**，人工审查后经 API 启用
 - execute_sql：SQLite URI `mode=ro` 引擎级只读 + SELECT/WITH 单语句校验（双保险）
 
