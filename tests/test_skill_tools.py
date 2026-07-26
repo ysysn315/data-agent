@@ -50,6 +50,7 @@ async def test_execute_sql_select_only(demo_db):
         result = execute_sql.invoke({"sql": bad})
         assert "拒绝执行" in result, f"未拦截: {bad}"
 
-    # 引擎级只读兜底：即使关键词校验被绕过，写操作也会失败
+    # WITH ... INSERT：首词是 WITH 骗过关键词校验，但 AST 校验（第 2 层）会识破
+    # 最外层是 Insert 并拦下；引擎级只读（第 3 层）仍是最终兜底。三种拦截文案均可接受。
     result = execute_sql.invoke({"sql": "WITH x AS (SELECT 1) INSERT INTO orders SELECT 4,'MG',1 FROM x"})
-    assert "拒绝执行" in result or "SQL 执行失败" in result
+    assert "拒绝执行" in result or "SQL 执行失败" in result or "SQL 校验失败" in result
