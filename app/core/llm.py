@@ -29,9 +29,14 @@ class LLMFactory:
             temperature: 温度，默认从配置读取
             streaming: 是否流式，默认从配置读取
         """
+        resolved_api_key = api_key or settings.llm_api_key
+        if not resolved_api_key:
+            # 显式失败：不要让空 key 在第一次真实调用时才以 401 暴露
+            raise ValueError("LLM_API_KEY 未配置，请在 .env 中设置")
+
         return ChatOpenAI(
             model=model or settings.llm_model,
-            api_key=api_key or settings.llm_api_key,
+            api_key=resolved_api_key,
             base_url=base_url or settings.llm_base_url,
             temperature=temperature or settings.llm_temperature,
             streaming=streaming or settings.llm_streaming,

@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
-from app.core.dependencies import get_current_user_optional
+from app.core.dependencies import get_current_user_optional, get_skill_service
 from app.skills.models import SkillSourceType
 from app.skills.remote_install import (
     RemoteInstallError,
@@ -74,14 +74,6 @@ class BatchInstallResult(BaseModel):
     slug: str
     success: bool
     error: Optional[str] = None
-
-
-# ========== 依赖注入 ==========
-
-async def get_skill_service() -> SkillService:
-    """获取 SkillService 实例（依赖注入）"""
-    # TODO: 从容器/依赖注入框架获取，当前简化实现
-    return SkillService()
 
 
 # ========== API 接口 ==========
