@@ -61,27 +61,41 @@ _init_lock = asyncio.Lock()
 
 
 def get_example_store():
-    """SQL 示例库单例（持久化：save_dir/sql_examples.json）"""
+    """SQL 示例库单例（DB 版；save_dir/sql_examples.json 作历史 JSON 迁移源）"""
     global _example_store
     if _example_store is None:
+        from app.db import ensure_initialized, get_sessionmaker, run_sync
+        from app.db.repositories import SQLExampleRepository
         from app.text2sql.examples import ExampleStore
 
-        _example_store = ExampleStore(Path(settings.save_dir) / "sql_examples.json")
+        ensure_initialized()
+        _example_store = ExampleStore(
+            Path(settings.save_dir) / "sql_examples.json",
+            repo=SQLExampleRepository(get_sessionmaker()),
+            runner=run_sync,
+        )
     return _example_store
 
 
 def get_term_store():
-    """业务术语库单例（持久化：save_dir/terminology.json）"""
+    """业务术语库单例（DB 版；save_dir/terminology.json 作历史 JSON 迁移源）"""
     global _term_store
     if _term_store is None:
+        from app.db import ensure_initialized, get_sessionmaker, run_sync
+        from app.db.repositories import TerminologyRepository
         from app.text2sql.terminology import TermStore
 
-        _term_store = TermStore(Path(settings.save_dir) / "terminology.json")
+        ensure_initialized()
+        _term_store = TermStore(
+            Path(settings.save_dir) / "terminology.json",
+            repo=TerminologyRepository(get_sessionmaker()),
+            runner=run_sync,
+        )
     return _term_store
 
 
 async def get_skill_service():
-    """SkillService 单例（启动时加载内置 Skills）"""
+    """SkillService 单例（DB 版仓储；启动时从文件系统加载内置 Skills 进缓存）"""
     global _skill_service
     if _skill_service is not None:
         return _skill_service
@@ -90,11 +104,13 @@ async def get_skill_service():
         if _skill_service is not None:
             return _skill_service
 
-        from app.skills.repository import InMemorySkillRepository
+        from app.db import ensure_initialized, get_sessionmaker
+        from app.db.repositories import SqlAlchemySkillRepository
         from app.skills.service import SkillService
 
+        ensure_initialized()
         service = SkillService(
-            repository=InMemorySkillRepository(),
+            repository=SqlAlchemySkillRepository(get_sessionmaker()),
             save_dir=settings.save_dir,
         )
 
@@ -106,13 +122,18 @@ async def get_skill_service():
 
 
 def get_mcp_service():
-    """MCPService 单例（注册表：save_dir/mcp_servers.json）"""
+    """MCPService 单例（DB 版；save_dir/mcp_servers.json 作历史 JSON 迁移源）"""
     global _mcp_service
     if _mcp_service is None:
+        from app.db import ensure_initialized, get_sessionmaker, run_sync
+        from app.db.repositories import MCPRepository
         from app.mcp.service import MCPService
 
+        ensure_initialized()
         _mcp_service = MCPService(
-            config_path=Path(settings.save_dir) / "mcp_servers.json"
+            config_path=Path(settings.save_dir) / "mcp_servers.json",
+            repo=MCPRepository(get_sessionmaker()),
+            runner=run_sync,
         )
     return _mcp_service
 
@@ -188,11 +209,18 @@ async def get_chat_agent():
 
 
 def reset_singletons() -> None:
-    """重置单例（测试用）"""
-    global _skill_service, _mcp_service, _chat_agent
+    """重置单例（测试用）
+
+    只清业务单例引用；持久化 engine/后台循环是进程级、守护线程常驻，
+    NullPool 无常驻连接，不随单例重置销毁（如需换库调 app.db.reset_engine）。
+    """
+    global _skill_service, _mcp_service, _chat_agent, _example_store, _term_store, _task_service
     _skill_service = None
     _mcp_service = None
     _chat_agent = None
+    _example_store = None
+    _term_store = None
+    _task_service = None
 
 
 # ========== 异步任务（arq + Redis Streams），D 轮追加 ==========

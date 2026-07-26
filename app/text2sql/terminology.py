@@ -45,13 +45,20 @@ class TermStore:
         self,
         save_path: Optional[str | Path] = None,
         seed: bool = True,
+        repo=None,
+        runner=None,
     ):
         """
         Args:
             save_path: 持久化 JSON 文件路径（None=纯内存，测试用）
-            seed: 首次初始化（无持久化文件时）是否写入内置种子术语
+            seed: 首次初始化（无持久化数据时）是否写入内置种子术语
+            repo: 数据库存储后端（app.db.repositories.TerminologyRepository）。
+                  传入即启用「DB 版」：术语从数据库读写，save_path 仅作历史 JSON 迁移源。
+            runner: sync→async 桥（app.db.run_sync），DB 版必传。
         """
         self.save_path = Path(save_path) if save_path else None
+        self._repo = repo
+        self._run = runner
         self._terms: list[dict] = []
         loaded = self._load()
 
@@ -63,6 +70,8 @@ class TermStore:
     # ========== 持久化 ==========
 
     def _load(self) -> bool:
+        if self._repo is not None:
+            return self._load_db()
         if self.save_path is None or not self.save_path.exists():
             return False
         try:
@@ -73,7 +82,30 @@ class TermStore:
         except Exception as e:
             raise ValueError(f"术语库解析失败 {self.save_path}: {e}")
 
+    def _load_db(self) -> bool:
+        """DB 版加载：表空且有历史 JSON 时一次性迁移入库，否则交由种子逻辑处理。"""
+        rows = self._run(self._repo.list_all())
+        if rows:
+            self._terms = [self._normalize(t) for t in rows]
+            return True
+        if self.save_path is not None and self.save_path.exists():
+            try:
+                data = json.loads(self.save_path.read_text(encoding="utf-8"))
+            except Exception as e:
+                raise ValueError(f"术语库解析失败 {self.save_path}: {e}")
+            legacy = [self._normalize(t) for t in data.get("terms", [])]
+            if legacy:
+                self._terms = legacy
+                self._run(self._repo.replace_all(legacy))
+                logger.info(f"术语库 JSON→DB 一次性迁移: {len(legacy)} 条")
+                return True
+        return False
+
     def _save(self) -> None:
+        if self._repo is not None:
+            # 整表替换，对应 JSON 版的整文件原子重写（术语规模小，代价可忽略）
+            self._run(self._repo.replace_all(self._terms))
+            return
         if self.save_path is None:
             return
         self.save_path.parent.mkdir(parents=True, exist_ok=True)
