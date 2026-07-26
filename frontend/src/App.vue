@@ -31,6 +31,12 @@
       <div v-if="currentView === 'chat'" class="view-container">
         <ChatView />
       </div>
+      <div v-if="currentView === 'skills'" class="view-container">
+        <SkillsView />
+      </div>
+      <div v-if="currentView === 'mcp'" class="view-container">
+        <McpView />
+      </div>
       <div v-if="currentView === 'upload'" class="view-container">
         <UploadView />
       </div>
@@ -44,6 +50,8 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import ChatView from './views/ChatView.vue'
+import SkillsView from './views/SkillsView.vue'
+import McpView from './views/McpView.vue'
 import UploadView from './views/UploadView.vue'
 import StatusView from './views/StatusView.vue'
 
@@ -52,6 +60,8 @@ const connectionStatus = ref('disconnected')
 
 const navItems = [
   { id: 'chat', name: '智能对话', icon: '💬' },
+  { id: 'skills', name: 'Skills 管理', icon: '🧩' },
+  { id: 'mcp', name: 'MCP 管理', icon: '🔌' },
   { id: 'upload', name: '知识库管理', icon: '📁' },
   { id: 'status', name: '系统状态', icon: '📊' }
 ]
