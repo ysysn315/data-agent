@@ -21,6 +21,9 @@
 | 持久化层（四表入库，内容存 FS/索引存 DB） | Yuxi | ✅（D 轮）|
 | 异步执行（ARQ + Redis Streams + SSE） | Yuxi | ✅（D 轮）|
 | 技能语义匹配（embedding + jieba 回退） | 自研增量 | ✅（D 轮）|
+| Analysis Agent（P-O-R 工作流 + Markdown 报告） | my-agent | ✅（E 轮）|
+| 技能脚本容器沙箱（Docker 一次性容器，真机实测） | Yuxi | ✅（E 轮）|
+| 知识图谱（三元组抽取 + graph_search 技能） | Yuxi | ✅（E 轮）|
 
 ## 1. P0 —— demo 跑通闭环（必做，约 1 周）
 
@@ -77,9 +80,9 @@
 | D ✅ | feat/persistence | SQLAlchemy 2.0 async + SQLite（PG 就绪），skills/mcp/SQL示例/术语统一入库 | 大 |
 | D ✅ | feat/async-tasks | ARQ + Redis 事件流，长任务提交与进度 SSE | 中 |
 | D ✅ | feat/skill-embedding-match | skills 匹配升级 embedding 召回（复用 app/rag），可回退 jieba | 小 |
-| E | feat/analysis-agent | P-O-R 工作流 + Markdown 分析报告，长任务走异步通道 | 中大 |
-| E | feat/script-sandbox | 技能脚本执行升级容器沙箱（只读挂载/资源限制/超时，可切回 subprocess）；远程技能从此可安全启用 | 难⭐ |
-| E | feat/knowledge-graph | LLM 三元组抽取 + 轻量图存储（SQLite 边表 + NetworkX，Neo4j 留接口）+ 图查询技能 | 难⭐ |
+| E ✅ | feat/analysis-agent | P-O-R 工作流 + Markdown 分析报告，长任务走异步通道 | 中大 |
+| E ✅ | feat/script-sandbox | 技能脚本执行升级容器沙箱（只读挂载/资源限制/超时，可切回 subprocess）；远程技能从此可安全启用 | 难⭐ |
+| E ✅ | feat/knowledge-graph | LLM 三元组抽取 + 轻量图存储（SQLite 边表 + NetworkX，Neo4j 留接口）+ 图查询技能 | 难⭐ |
 | F | feat/auth-workspace | 用户体系 + API Key 真鉴权 + 工作空间（多租户-lite） | 中大 |
 | F | feat/frontend-v2 | 前端补页：分析报告 / 任务进度 / 图谱 / 示例与术语管理 | 中 |
 | G | feat/row-col-permission | 行列级数据权限（JSONB 规则引擎，作用于 execute_sql 与数据源层），依赖 F | 中大 |
