@@ -11,6 +11,9 @@
 
 - **Skills 三段式（渐进式披露 → 激活门控 → 工具解锁）**：一个技能是一个目录（`SKILL.md` + 可选 `scripts/`）。system prompt 只注入每个技能的**名称 + 描述**，正文由模型 `read_skill(slug)` 按需读取；激活后其声明的门控工具才对模型可见。注入成本与技能正文长度、技能数量解耦——4 个内置技能全文注入约 **1183 tokens**，改为名称+描述后约 **150 tokens/请求**。
 - **Text-to-SQL 全链路**：M-Schema（SQLBot 风格、带中文注释的表结构）+ 分层提示词（主规则/SQLite 方言/零容忍规则，写在 `SKILL.md` 里而非硬编码）+ sqlglot AST 校验（语法/只读/表列存在性/自动补 LIMIT）+ 引擎级只读（SQLite `mode=ro`）三层防护。
+- **持久化层**：SQLAlchemy 2.0 async 四表入库（skills/MCP/SQL示例/术语），对齐 Yuxi 的"内容存文件系统、索引存数据库"设计；`database_url` 一行切 PostgreSQL
+- **异步执行**：ARQ + Redis Streams 事件流，长任务提交 / 状态查询 / SSE 进度订阅（断连续读、迟到回放）
+- **技能语义匹配**：embedding 余弦召回 + jieba 自动回退（"帮我画个销售走势的图"这类关键词零交集的查询也能命中）
 - **评估体系（可量化准确率）**：Text-to-SQL **执行准确率（execution accuracy）92.86%（26/28，qwen3.7-max）**，按 SQL 能力难度分桶；另有从 my-agent 迁回的 RAG 检索/生成双评估（Hit@k / Recall@k / MRR / NDCG + 基线对比）。大多数简历项目做不到"能量化自己的 Agent 有多准"。
 - **工具熔断/重试/降级**：`ToolRuntimeMiddleware` 把每个工具包成独立断路器（closed → open → half_open 三态），按工具性质差异化超时与重试策略；外部依赖故障时不崩断 Agent 循环，而是回喂降级文案让 Agent 续跑。
 - **MCP 标准化工具接入**：任意 MCP server 注册进平台，其工具经 langchain-mcp-adapters 转成 LangChain 工具；与 Skills 联动——**技能激活后才懒加载**对应 server 的工具，不激活一次连接都不发起。
@@ -223,6 +226,9 @@ data-agent/
 | [app/mcp/IMPLEMENTATION.md](app/mcp/IMPLEMENTATION.md) | MCP：注册表 → 工具加载 → 技能懒加载（修正 Yuxi 四个问题） |
 | [app/text2sql/IMPLEMENTATION.md](app/text2sql/IMPLEMENTATION.md) | Text-to-SQL 核心：M-Schema + schema_search 门控工具 |
 | [app/text2sql/IMPLEMENTATION-knowledge.md](app/text2sql/IMPLEMENTATION-knowledge.md) | SQL 示例库 + 术语库（"越问越准"知识闭环） |
+| [app/db/IMPLEMENTATION.md](app/db/IMPLEMENTATION.md) | 持久化层：async SQLAlchemy 四表、JSON 迁移、种子幂等 |
+| [app/tasks/IMPLEMENTATION.md](app/tasks/IMPLEMENTATION.md) | 异步任务：ARQ + Redis Streams + SSE |
+| [app/skills/IMPLEMENTATION-matching.md](app/skills/IMPLEMENTATION-matching.md) | 技能语义匹配：embedding 召回 + jieba 回退 |
 | [evals/IMPLEMENTATION.md](evals/IMPLEMENTATION.md) | 评估体系：Text-to-SQL 执行准确率 + RAG 检索/生成评估 |
 | [frontend/IMPLEMENTATION.md](frontend/IMPLEMENTATION.md) | Web 前端：Vue3 迁移 + Skills/MCP 管理页 |
 | [scripts/IMPLEMENTATION.md](scripts/IMPLEMENTATION.md) | 演示数据导入（Kaggle CSV / 合成数据分布设计） |
