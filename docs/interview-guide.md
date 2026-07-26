@@ -324,7 +324,7 @@
 - **教训**
   - **任何跨网络调用都必须有显式超时**，永远不要信底层库的默认值——它们通常为吞吐而非交互式体验而设。
   - 这和 MCP `load_tools` 用 `asyncio.wait_for` 包 `get_tools()`（§2.4）、以及工具熔断的 per-tool 超时（§2.3）是**同一条纪律**：外部依赖一律"快速失败优于无限等待"。面试时可以把这三处串成一个"超时纪律"主题讲。
-- **佐证**：commit `9e9f2577`（`fix(llm): LLMFactory 增加显式超时与重试`，位于分支 `fix/sql-guard-select-alias`，该 commit 尚未并入 main）；`app/core/settings.py::llm_request_timeout`；`app/core/llm.py`（`timeout` / `max_retries` 参数）。
+- **佐证**：commit `9e9f2577`（`fix(llm): LLMFactory 增加显式超时与重试`，该提交曾因 #5 先被合并而成为孤儿提交，后经文档溯源发现、已 cherry-pick 进 PR #10 —— 这个'账目错误被溯源抓住'的过程本身也是可讲的工程故事）；`app/core/settings.py::llm_request_timeout`；`app/core/llm.py`（`timeout` / `max_retries` 参数）。
 
 ### ⑦ FastAPI 依赖遮蔽：路由本地 get_skill_service 覆盖单例 → 列表恒空
 
@@ -390,7 +390,7 @@
 | 开发史 | 10 个 PR（#1–#9 入 main，#10 待合并），中文 Conventional Commits | `git log` |
 | 核心版本 | langchain 1.3.14 / langgraph 1.2.9 / FastAPI 0.139.2 / sqlglot 30.13 / Vue 3.4 | 实测已安装版本 |
 | MCP 修正 Yuxi 问题 | 4 个（stdio 超时 / 禁用可测 / 缓存不重连 / bool） | `app/mcp/IMPLEMENTATION.md` ③ |
-| LLM 超时 | 60s + 2 retries（曾无超时挂 5 分钟） | commit `9e9f2577` |
+| LLM 超时 | 60s + 2 retries（曾无超时挂 5 分钟） | PR #10（cherry-pick 9e9f257）|
 
 ---
 
