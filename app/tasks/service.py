@@ -26,6 +26,7 @@ from app.tasks.events import TERMINAL_EVENT_TYPES, TaskEvent
 TASK_REGISTRY: dict[str, str] = {
     "chat": "run_chat_task",
     "eval": "run_eval_task",
+    "run_analysis_task": "run_analysis_task",  # E 轮：P-O-R 分析工作流（type 即函数名）
 }
 
 # 任务元数据/事件流的 TTL（秒）：24h，避免历史任务无限堆积。arq 专属配置走默认，不进 settings。

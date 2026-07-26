@@ -164,9 +164,48 @@ async def run_eval_task(ctx, limit: Optional[int] = None, model: Optional[str] =
         raise
 
 
+# ========== 任务 3：后台跑 P-O-R 分析工作流，产出 Markdown 报告 ==========
+
+
+async def run_analysis_task(ctx, question: str) -> dict:
+    """后台跑 AnalysisAgent（Plan-Operation-Reflection），阶段事件透传给 SSE：
+    started → planning → step 1/N … → reflecting →（补充则再 step/reflecting）→ reporting → done。
+
+    每阶段的进度由 AnalysisAgent 通过 on_event 回调上报，这里直接接到 publish_event；
+    任务结果（完整报告 + 各步摘要）落到状态 Hash 供 GET /api/tasks/{id} 取回。
+    """
+    task_id = ctx["job_id"]
+    svc = _svc(ctx)
+    await svc.mark_running(task_id)
+    await svc.publish_event(task_id, TaskEvent(type="started", message=f"开始分析: {question[:50]}"))
+    try:
+        # 延迟导入：避免 worker 导入期就构建 Agent（含 LLM/技能加载）
+        from app.agents.analysis_agent import AnalysisAgent
+        from app.core.dependencies import get_chat_agent
+
+        chat_agent = await get_chat_agent()
+        llm = LLMFactory.create_llm(temperature=0.0, streaming=False)
+
+        async def _on_event(event: TaskEvent) -> None:
+            await svc.publish_event(task_id, event)
+
+        agent = AnalysisAgent(llm=llm, chat_agent=chat_agent, on_event=_on_event)
+        result = await agent.analyze(question)  # done 事件已由 agent 通过 on_event 上报
+
+        await svc.mark_done(
+            task_id, {"report": result["report"], "steps": result["step_summaries"]}
+        )
+        return {"report": result["report"]}
+    except Exception as e:  # noqa: BLE001 —— 同前：标失败 + error 事件后上抛给 arq 记账
+        logger.exception(f"run_analysis_task 失败: {e}")
+        await svc.publish_event(task_id, TaskEvent(type="error", message=f"分析失败: {e}"))
+        await svc.mark_failed(task_id, str(e))
+        raise
+
+
 # ========== arq WorkerSettings ==========
 
-WORKER_FUNCTIONS = [run_chat_task, run_eval_task]
+WORKER_FUNCTIONS = [run_chat_task, run_eval_task, run_analysis_task]
 
 
 async def _on_startup(ctx) -> None:
