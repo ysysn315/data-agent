@@ -10,14 +10,16 @@ class Settings(BaseSettings):
     # 应用配置
     app_port: int = 9900
     upload_dir: str = "./uploads"
+    save_dir: str = "./saves"          # 持久化目录（skills / mcp 配置等）
     debug: bool = False
 
     # CORS 配置
     CORS_ORIGINS: list[str] = ["*"]
 
     # LLM 配置（支持自定义 base_url，如美团 FRIDAY API）
+    # api_key 允许为空以便离线测试，真正创建 LLM 时校验（显式失败）
     llm_model: str = "qwen3-max"
-    llm_api_key: str
+    llm_api_key: str = ""
     llm_base_url: Optional[str] = None  # 自定义 endpoint，如 "https://aigc.sankuai.com/v1/openai/native"
     llm_temperature: float = 0.1
     llm_streaming: bool = False
@@ -41,6 +43,12 @@ class Settings(BaseSettings):
     doc_chunk_max_size: int = 800
     doc_chunk_overlap: int = 100
     rag_top_k: int = 3
+
+    # 知识库工具开关：Milvus 未部署时设为 False，chat 不再依赖 Milvus
+    enable_kb_tool: bool = False
+
+    # 演示数据源（Kaggle Brazilian E-Commerce 导入的 SQLite）
+    sqlite_db_path: str = "./data/ecommerce.db"
 
     # Redis 配置
     redis_host: str = "localhost"

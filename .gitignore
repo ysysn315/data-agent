@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# 环境与本地数据
+.env
+uploads/
+saves/
+models/
+data/*.db
+
+# 测试与缓存
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# IDE
+.idea/
+.vscode/
+.DS_Store
