@@ -128,3 +128,47 @@ class GraphTripleModel(Base):
     # 来源标记：seed（首启种子）/ manual（API 手动补录）/ llm（LLM 抽取）
     source: Mapped[str] = mapped_column(String(64), nullable=False, default="manual")
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
+
+
+# ========== 用户体系 + 工作空间（F 轮追加；就近声明，不改动文件头部） ==========
+
+
+class WorkspaceModel(Base):
+    """workspaces 表：多租户-lite 的资源隔离单元（对齐 SQLBot sys_workspace）。
+
+    lite 版只保留最小三列：slug（人类可读唯一键，如 default）/ name / created_at；
+    不做部门树、不做成员关系表（一个用户属于一个工作空间，见 UserModel.workspace_id）。
+    参考 sqlbot-reference alembic/versions/020_workspace_ddl.py 的 sys_workspace(id/name/create_time)。
+    """
+
+    __tablename__ = "workspaces"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    slug: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(256), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
+
+
+class UserModel(Base):
+    """users 表：API Key 鉴权的最小用户模型（对齐 Yuxi User + APIKey 的收敛版）。
+
+    Yuxi 把 User 与 APIKey 拆两张表（一个用户可多把 Key、含 expires_at/last_used_at）；
+    本项目 lite 版**一个用户一把 Key**，直接内联在 users 表，省一张关联表与一次 join：
+    - api_key_hash：sha256(明文) 的 64 位 hex，**只存哈希**（对齐 Yuxi APIKey.key_hash）。
+      明文 Key 仅在创建响应/bootstrap 日志里出现一次，库里永不留明文。
+    - api_key_prefix：明文前 8 位（da- + 5 hex），便于在 UI/日志里识别是哪把 Key（对齐 Yuxi key_prefix）。
+    - role：admin | member（对齐 Yuxi role，但砍掉 superadmin 层）。
+    - workspace_id：用户所属工作空间（裸 Integer + index，不设 FK，与既有 skills.user_id 同风格，
+      SQLite 起步免 FK 建表顺序/级联的心智负担；PG 化时再补 FK）。
+    """
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
+    role: Mapped[str] = mapped_column(String(32), nullable=False, default="member")
+    workspace_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    api_key_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    api_key_prefix: Mapped[str] = mapped_column(String(16), nullable=False, default="")
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)

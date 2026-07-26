@@ -472,3 +472,163 @@ class GraphTripleRepository:
         async with self._sm() as session:
             stmt = select(func.count()).select_from(GraphTripleModel)
             return int((await session.execute(stmt)).scalar_one())
+
+
+# ========== 用户体系 + 工作空间仓储（F 轮追加；import 就近声明，不改动文件头部） ==========
+
+from app.db.models import UserModel, WorkspaceModel  # noqa: E402
+
+
+class WorkspaceRepository:
+    """工作空间存储后端（供鉴权服务 app/core/auth.py）。
+
+    薄仓储、autocommit-per-operation，收发 dict（与示例/术语/图谱仓储同风格）。
+    """
+
+    def __init__(self, sessionmaker: async_sessionmaker):
+        self._sm = sessionmaker
+
+    @staticmethod
+    def _to_dict(row: WorkspaceModel) -> dict:
+        return {"id": row.id, "slug": row.slug, "name": row.name}
+
+    async def get_by_slug(self, slug: str) -> Optional[dict]:
+        async with self._sm() as session:
+            stmt = select(WorkspaceModel).where(WorkspaceModel.slug == slug)
+            row = (await session.execute(stmt)).scalar_one_or_none()
+            return self._to_dict(row) if row else None
+
+    async def get_by_id(self, workspace_id: int) -> Optional[dict]:
+        async with self._sm() as session:
+            row = await session.get(WorkspaceModel, workspace_id)
+            return self._to_dict(row) if row else None
+
+    async def create(self, slug: str, name: str = "") -> dict:
+        async with self._sm() as session:
+            exists = (
+                await session.execute(select(WorkspaceModel.id).where(WorkspaceModel.slug == slug))
+            ).first()
+            if exists:
+                raise ValueError(f"工作空间 slug 已存在: {slug}")
+            row = WorkspaceModel(slug=slug, name=name or slug)
+            session.add(row)
+            await session.commit()
+            await session.refresh(row)
+            return self._to_dict(row)
+
+    async def get_or_create(self, slug: str, name: str = "") -> dict:
+        """按 slug 取，不存在则建（bootstrap / 建用户时保证工作空间存在）。"""
+        existing = await self.get_by_slug(slug)
+        if existing:
+            return existing
+        try:
+            return await self.create(slug, name)
+        except ValueError:
+            # 并发下他人抢先建了：回读即可（slug 唯一约束兜底）
+            return await self.get_by_slug(slug)
+
+    async def list_all(self) -> list[dict]:
+        async with self._sm() as session:
+            stmt = select(WorkspaceModel).order_by(WorkspaceModel.id)
+            rows = (await session.execute(stmt)).scalars().all()
+            return [self._to_dict(r) for r in rows]
+
+    async def count(self) -> int:
+        async with self._sm() as session:
+            stmt = select(func.count()).select_from(WorkspaceModel)
+            return int((await session.execute(stmt)).scalar_one())
+
+
+class UserRepository:
+    """用户存储后端（供鉴权服务 app/core/auth.py）。
+
+    一个用户内联一把 API Key（api_key_hash/prefix）。**对外一律返回不含哈希的安全 dict**
+    （_to_public）；只有 verify_api_key 需要拿哈希做 constant-time 复核，专走 get_by_api_key_hash，
+    该方法返回含哈希的内部 dict，调用点用完即弃、不外泄。
+    """
+
+    def __init__(self, sessionmaker: async_sessionmaker):
+        self._sm = sessionmaker
+
+    @staticmethod
+    def _to_public(row: UserModel) -> dict:
+        """安全投影：不含 api_key_hash（列表/详情/鉴权成功后统一用这个）。"""
+        return {
+            "id": row.id,
+            "username": row.username,
+            "role": row.role,
+            "workspace_id": row.workspace_id,
+            "api_key_prefix": row.api_key_prefix,
+            "enabled": row.enabled,
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+        }
+
+    async def create(
+        self,
+        username: str,
+        role: str,
+        workspace_id: Optional[int],
+        api_key_hash: str,
+        api_key_prefix: str,
+    ) -> dict:
+        async with self._sm() as session:
+            exists = (
+                await session.execute(select(UserModel.id).where(UserModel.username == username))
+            ).first()
+            if exists:
+                raise ValueError(f"用户名已存在: {username}")
+            row = UserModel(
+                username=username,
+                role=role,
+                workspace_id=workspace_id,
+                api_key_hash=api_key_hash,
+                api_key_prefix=api_key_prefix,
+                enabled=True,
+            )
+            session.add(row)
+            await session.commit()
+            await session.refresh(row)
+            return self._to_public(row)
+
+    async def get_by_id(self, user_id: int) -> Optional[dict]:
+        async with self._sm() as session:
+            row = await session.get(UserModel, user_id)
+            return self._to_public(row) if row else None
+
+    async def get_by_username(self, username: str) -> Optional[dict]:
+        async with self._sm() as session:
+            stmt = select(UserModel).where(UserModel.username == username)
+            row = (await session.execute(stmt)).scalar_one_or_none()
+            return self._to_public(row) if row else None
+
+    async def get_by_api_key_hash(self, api_key_hash: str) -> Optional[dict]:
+        """按哈希取用户（含哈希的内部 dict，仅供 verify_api_key 复核，勿外泄）。"""
+        async with self._sm() as session:
+            stmt = select(UserModel).where(UserModel.api_key_hash == api_key_hash)
+            row = (await session.execute(stmt)).scalar_one_or_none()
+            if row is None:
+                return None
+            pub = self._to_public(row)
+            pub["api_key_hash"] = row.api_key_hash
+            return pub
+
+    async def list_all(self) -> list[dict]:
+        async with self._sm() as session:
+            stmt = select(UserModel).order_by(UserModel.id)
+            rows = (await session.execute(stmt)).scalars().all()
+            return [self._to_public(r) for r in rows]
+
+    async def set_enabled(self, user_id: int, enabled: bool) -> Optional[dict]:
+        async with self._sm() as session:
+            row = await session.get(UserModel, user_id)
+            if row is None:
+                return None
+            row.enabled = enabled
+            await session.commit()
+            await session.refresh(row)
+            return self._to_public(row)
+
+    async def count(self) -> int:
+        async with self._sm() as session:
+            stmt = select(func.count()).select_from(UserModel)
+            return int((await session.execute(stmt)).scalar_one())
