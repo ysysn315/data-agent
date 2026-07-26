@@ -1,0 +1,175 @@
+{
+  "summary": {
+    "num_cases": 8,
+    "keyword_recall": 0.975,
+    "source_hit": 0.9375
+  },
+  "cases": [
+    {
+      "id": "gen_001",
+      "question": "CPU 告警持续触发，给我一个排查方案",
+      "expected_keywords": [
+        "CPU",
+        "负载",
+        "进程",
+        "线程",
+        "排查"
+      ],
+      "expected_sources": [
+        "cpu_high_usage.md"
+      ],
+      "pred_sources": [
+        "slow_response.md",
+        "cpu_high_usage.md"
+      ],
+      "keyword_recall": 0.8,
+      "source_hit": 1.0,
+      "answer_preview": "针对 **CPU 告警持续触发** 的情况，结合提供的文档信息，以下是系统化、可执行的排查与处理方案：\n\n---\n\n### ✅ 一、确认告警时间范围（第一步）\n使用 `get_current_time` 工具获取当前时间，确定告警发生的时间窗口（如：2024-01-20 14:00 至现在），用于后续日志查询。\n\n---\n\n### ✅ 二、查询系统日志（第二步）\n使用 `query_logs` 工具，定位高CPU期间的异常记录：\n\n- **地域**：`ap-guangzhou`\n- **日志主题**：`system-metrics`\n- **时间范围**：最近30分钟（或与告警一致）\n- **"
+    },
+    {
+      "id": "gen_002",
+      "question": "服务发生 OOM，应该如何定位和缓解",
+      "expected_keywords": [
+        "OOM",
+        "内存",
+        "GC",
+        "堆",
+        "缓解"
+      ],
+      "expected_sources": [
+        "memory_high_usage.md"
+      ],
+      "pred_sources": [
+        "memory_high_usage.md"
+      ],
+      "keyword_recall": 1.0,
+      "source_hit": 1.0,
+      "answer_preview": "当服务发生 OOM（Out Of Memory）时，应按照以下步骤进行**定位与缓解**，结合文档信息总结如下：\n\n---\n\n### ✅ 一、紧急缓解措施（立即执行）\n\n1. **重启应用**  \n   - 紧急恢复服务，释放已占用的内存。\n   - 注意：在重启前务必**先生成堆转储文件（heap dump）**，用于后续分析。\n\n2. **生成堆转储文件（Heap Dump）**\n   ```bash\n   jmap -dump:format=b,file=heap.hprof <pid>\n   ```\n   - 执行该命令需在应用运行期间，确保能获取到完整的内存快照。\n   - 堆转储文"
+    },
+    {
+      "id": "gen_003",
+      "question": "接口慢响应，怎么区分是应用问题还是数据库问题",
+      "expected_keywords": [
+        "慢响应",
+        "数据库",
+        "日志",
+        "指标",
+        "延迟"
+      ],
+      "expected_sources": [
+        "slow_response.md"
+      ],
+      "pred_sources": [
+        "slow_response.md"
+      ],
+      "keyword_recall": 1.0,
+      "source_hit": 1.0,
+      "answer_preview": "要区分接口慢响应是**应用问题**还是**数据库问题**，可以通过以下步骤结合日志和指标进行排查：\n\n---\n\n### ✅ 1. **查看慢查询日志（判断是否为数据库问题）**\n- **工具**: `query_logs`\n- **日志主题**: `database-slow-query`\n- **查询条件**: `query_time > 1000`（即执行时间超过1秒）\n- **分析重点**：\n  - 是否在告警时间段内有大量慢查询记录？\n  - 是否存在特定的SQL语句执行时间特别长？\n  - 数据库CPU使用率是否高？连接池是否接近满载？\n\n> 🔍 **如果存在大量慢查询且数据库负载高"
+    },
+    {
+      "id": "gen_004",
+      "question": "磁盘使用率告警后需要做哪些动作",
+      "expected_keywords": [
+        "磁盘",
+        "容量",
+        "清理",
+        "扩容",
+        "告警"
+      ],
+      "expected_sources": [
+        "disk_high_usage.md"
+      ],
+      "pred_sources": [
+        "disk_high_usage.md"
+      ],
+      "keyword_recall": 1.0,
+      "source_hit": 1.0,
+      "answer_preview": "磁盘使用率告警后，应按照以下步骤采取行动，以快速恢复系统稳定性并防止问题复发：\n\n---\n\n### **一、紧急响应（30分钟内）**\n\n1. **确认告警信息**\n   - 使用 `get_current_time` 获取当前时间，记录告警发生时间。\n   - 确认告警级别：>80%为警告，>90%为严重。\n\n2. **查询系统磁盘使用情况**\n   - 使用 `query_logs` 工具，查询最近30分钟内的日志：\n     - 地域：`ap-guangzhou`\n     - 日志主题：`system-metrics`\n     - 查询条件：`disk_usage > 80 OR f"
+    },
+    {
+      "id": "gen_005",
+      "question": "服务不可用时的标准排查顺序是什么",
+      "expected_keywords": [
+        "不可用",
+        "依赖",
+        "网络",
+        "恢复",
+        "回滚"
+      ],
+      "expected_sources": [
+        "service_unavailable.md"
+      ],
+      "pred_sources": [
+        "service_unavailable.md"
+      ],
+      "keyword_recall": 1.0,
+      "source_hit": 1.0,
+      "answer_preview": "服务不可用时的标准排查顺序如下，依据文档1、2、3中的内容整理：\n\n### 1. **第一时间（1分钟内）**\n- 确认故障：通过监控和日志确认服务确实不可用。\n- 启动应急响应流程，通知相关人员。\n- 执行止损措施：\n  - 若为部分实例故障，立即摘除故障实例。\n  - 若为全部实例故障，启用备用服务或展示维护页面。\n\n### 2. **5分钟内：快速定位问题原因**\n- **步骤1：获取当前时间**  \n  使用 `get_current_time` 工具记录故障发生时间，用于后续分析。\n\n- **步骤2：查询服务状态日志**  \n  使用 `query_logs` 工具，查询以下信息：\n"
+    },
+    {
+      "id": "gen_006",
+      "question": "CPU高 + 响应慢，给一个联合诊断思路",
+      "expected_keywords": [
+        "CPU",
+        "响应",
+        "瓶颈",
+        "链路",
+        "优化"
+      ],
+      "expected_sources": [
+        "cpu_high_usage.md",
+        "slow_response.md"
+      ],
+      "pred_sources": [
+        "slow_response.md",
+        "cpu_high_usage.md"
+      ],
+      "keyword_recall": 1.0,
+      "source_hit": 1.0,
+      "answer_preview": "当遇到 **CPU使用率过高（HighCPUUsage）** 且伴随 **系统响应变慢** 的问题时，应采取联合诊断思路，结合告警特征、日志分析与多维度资源监控，快速定位根本原因。以下是基于提供的三份文档信息整理的**联合诊断思路**：\n\n---\n\n### ✅ 联合诊断思路：CPU高 + 响应慢\n\n#### 第一步：确认告警时间与范围（基础定位）\n- 使用 `get_current_time` 工具获取当前时间，明确告警发生的时间窗口。\n- 确定是瞬时波动还是持续性问题，用于后续日志查询的时间范围设定。\n\n> 📌 目标：锁定问题发生的时间段，缩小排查范围。\n\n---\n\n#### 第二步：查询系"
+    },
+    {
+      "id": "gen_007",
+      "question": "内存高水位且频繁 Full GC，该怎么判断根因",
+      "expected_keywords": [
+        "内存",
+        "Full GC",
+        "泄漏",
+        "对象",
+        "分析"
+      ],
+      "expected_sources": [
+        "memory_high_usage.md"
+      ],
+      "pred_sources": [
+        "memory_high_usage.md"
+      ],
+      "keyword_recall": 1.0,
+      "source_hit": 1.0,
+      "answer_preview": "当出现**内存高水位且频繁 Full GC**的情况时，可以通过以下步骤系统性地判断根因：\n\n---\n\n### ✅ 一、快速确认现象特征（初步判断方向）\n\n结合文档中提供的特征，对比以下几点：\n\n| 特征 | 可能原因 |\n|------|----------|\n| 内存使用率持续缓慢上升，重启后下降但再次上涨 | **内存泄漏**（原因1） |\n| 内存突然飙升，与流量或大任务操作同步 | **流量突增**（原因2） 或 **大文件/大数据处理**（原因4） |\n| 缓存占用过高，命中率低，数据长期不释放 | **缓存配置不当**（原因3） |\n| 堆内存配置过小，元空间溢出，GC耗时长 |"
+    },
+    {
+      "id": "gen_008",
+      "question": "数据库超时导致接口500时，先查什么",
+      "expected_keywords": [
+        "超时",
+        "500",
+        "数据库",
+        "连接池",
+        "慢查询"
+      ],
+      "expected_sources": [
+        "slow_response.md",
+        "service_unavailable.md"
+      ],
+      "pred_sources": [
+        "slow_response.md",
+        "cpu_high_usage.md",
+        "cache_tuning_playbook.md"
+      ],
+      "keyword_recall": 1.0,
+      "source_hit": 0.5,
+      "answer_preview": "当数据库超时导致接口返回500错误时，应优先查询以下内容以定位问题：\n\n1. **慢查询日志**：检查是否存在大量慢查询记录，特别是执行时间过长的SQL语句。  \n2. **数据库连接池使用情况**：确认连接池是否接近或达到上限，是否存在连接耗尽现象。  \n3. **系统资源使用情况**（如CPU、内存、磁盘IO）：通过 `query_logs` 工具查询 `ap-guangzhou` 地域下 `system-metrics` 日志主题中 `cpu_usage OR memory_usage OR disk_io` 的指标，判断是否存在资源瓶颈。  \n4. **外部API调用日志**：排查是否"
+    }
+  ]
+}
