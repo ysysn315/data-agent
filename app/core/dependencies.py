@@ -108,6 +108,7 @@ async def get_chat_agent():
         from app.agents.chat_agent import ChatAgent
         from app.agents.middlewares import ToolRuntimeMiddleware
         from app.agents.tools.datetime_tool import get_current_datetime
+        from app.agents.tools.schema_tool import create_schema_search_tool
         from app.agents.tools.sql_tool import create_execute_sql_tool
         from app.core.llm import LLMFactory
         from app.skills.middleware import SkillsMiddleware
@@ -140,7 +141,10 @@ async def get_chat_agent():
             base_tools.append(create_docs_tool(vector_store))
 
         # 技能声明的门控工具：构建期注册，read_skill 激活后才对模型可见
-        gated_tools = [create_execute_sql_tool(settings.sqlite_db_path)]
+        gated_tools = [
+            create_execute_sql_tool(settings.sqlite_db_path),
+            create_schema_search_tool(settings.sqlite_db_path),
+        ]
 
         _chat_agent = ChatAgent(
             llm=LLMFactory.create_llm(),
