@@ -393,3 +393,40 @@ def test_route_analysis_planner_failure_returns_400():
         assert "无法生成合法 JSON 计划" in resp.json()["detail"]
     finally:
         app.dependency_overrides.clear()
+
+
+async def test_emit_accepts_sync_callback_and_survives_failure():
+    """回归：_emit 曾无条件 await 回调，同步回调（返回 None）直接 TypeError 崩掉分析。
+
+    事件上报是辅助路径：① 同步/异步回调都要兼容；② 回调抛异常只告警不中断。
+    """
+    def scripted():
+        return FakeScriptedLLM(scripted=[
+            _plan_msg([
+                {"goal": "查订单量", "tool_hint": "sqlite-query"},
+                {"goal": "查金额", "tool_hint": ""},
+            ]),
+            _reflect_msg("已回答", "结论若干", need_more=False),
+        ])
+
+    def chat():
+        return FakeChatAgent(io=[
+            {"answer": "订单量 3", "sql": "SELECT COUNT(*) FROM orders"},
+            {"answer": "金额 180", "sql": None},
+        ])
+
+    sync_events = []
+    agent = AnalysisAgent(
+        llm=scripted(), chat_agent=chat(),
+        on_event=lambda e: sync_events.append(e.type),  # 同步回调
+    )
+    result = await agent.analyze("测试问题")
+    assert result["report"].startswith("# 数据分析报告")
+    assert sync_events, "同步回调应收到事件"
+
+    def bomb(_e):
+        raise RuntimeError("回调故障")
+
+    agent2 = AnalysisAgent(llm=scripted(), chat_agent=chat(), on_event=bomb)
+    result2 = await agent2.analyze("测试问题")  # 回调故障不应中断分析
+    assert result2["report"].startswith("# 数据分析报告")
