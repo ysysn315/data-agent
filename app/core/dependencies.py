@@ -10,36 +10,35 @@ import asyncio
 from pathlib import Path
 from typing import Optional
 
-from fastapi import Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 
 from app.core.settings import settings
 
 
-async def get_current_user(
-    authorization: str = Header(..., description="Bearer token")
-) -> dict:
-    """获取当前用户（必须登录）"""
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authorization header format"
-        )
+# ========== 鉴权依赖（F 轮：API Key + 工作空间；开关见 settings.auth_enabled） ==========
+#
+# 兼容铁律：auth_enabled=False（默认 demo）时，这三个依赖的行为与鉴权落地前完全一致——
+# 占位 dev_user、不要求 header、写口全开。鉴权行为仅在 auth_enabled=True 时生效。
+#
+# 依赖链（get_current_user 依赖 get_current_user_optional，get_admin_user 依赖 get_current_user）
+# 复用 FastAPI 的 per-request 依赖缓存：同一请求里 get_current_user_optional 只解析一次，
+# 因此"守卫 + 取用户"叠加在同一路由上也只做一次 verify_api_key（一次查库）。
+#
+# dev_user 在 demo 里 role=admin，故 admin 守卫在 demo 下同样放行（保持写口全开）。
 
-    token = authorization.removeprefix("Bearer ").strip()
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token is empty"
-        )
-
-    # TODO: 二期实现真实 token 验证
-    return {"id": 1, "username": "dev_user", "token": token}
+def _dev_user(token: str = "") -> dict:
+    """demo 占位用户。保留既有键 id/username（增补 role/workspace_id/token，不减键）。"""
+    return {"id": 1, "username": "dev_user", "role": "admin", "workspace_id": None, "token": token}
 
 
 async def get_current_user_optional(
     authorization: str = Header(None, description="Bearer token")
 ) -> Optional[dict]:
-    """获取当前用户（可选登录）"""
+    """获取当前用户（可选登录）。
+
+    demo：无 header 或非 Bearer -> None；Bearer -> dev_user 占位（行为与从前一致）。
+    auth：Bearer + 合法/启用 Key -> 真实用户 dict；否则 None（可选语义，不抛 401）。
+    """
     if not authorization or not authorization.startswith("Bearer "):
         return None
 
@@ -47,7 +46,41 @@ async def get_current_user_optional(
     if not token:
         return None
 
-    return {"id": 1, "username": "dev_user", "token": token}
+    if not settings.auth_enabled:
+        return _dev_user(token)
+
+    from app.core.auth import verify_api_key
+    return await verify_api_key(token)
+
+
+async def get_current_user(
+    user: Optional[dict] = Depends(get_current_user_optional),
+) -> dict:
+    """获取当前用户（必须登录）——写口的登录守卫。
+
+    demo：恒返回 dev_user 占位（无 header 也放行，写口保持全开）。
+    auth：未带/非法/禁用 Key -> 401。
+    """
+    if not settings.auth_enabled:
+        return user or _dev_user()
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="需要有效的 API Key（Authorization: Bearer da-...）",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return user
+
+
+async def get_admin_user(user: dict = Depends(get_current_user)) -> dict:
+    """管理员守卫（role=admin）。demo 下 dev_user 即 admin，直接放行；auth 下非 admin -> 403。"""
+    if user.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="需要管理员权限",
+        )
+    return user
 
 
 # ========== 单例 ==========

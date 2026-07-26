@@ -54,6 +54,13 @@ class Settings(BaseSettings):
     # 演示数据源（Kaggle Brazilian E-Commerce 导入的 SQLite）
     sqlite_db_path: str = "./data/ecommerce.db"
 
+    # API Key 鉴权 + 工作空间隔离（F 轮，详见 app/core/IMPLEMENTATION-auth.md）
+    # False = demo 模式：占位 dev_user、读写全开，行为与鉴权落地前完全一致（默认）。
+    # True  = 启用鉴权：写操作需 Bearer API Key（da- 前缀），MCP/技能启停需 admin；
+    #         首次启动无用户时自动 bootstrap 一个 default 工作空间 + admin 用户，
+    #         并把明文 API Key 打进 warning 日志一次（务必立即保存）。
+    auth_enabled: bool = False
+
     # Redis 配置
     redis_host: str = "localhost"
     redis_port: int = 6379
