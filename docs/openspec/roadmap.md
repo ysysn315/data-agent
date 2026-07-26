@@ -17,7 +17,10 @@
 | 只读 SQL 执行（execute_sql，引擎级只读） | SQLBot 思路 | ✅（demo 级）|
 | pytest 测试体系（118 用例，随批次持续增长） | — | ✅ |
 | Text-to-SQL 执行准确率评估 92.9%（28 例）+ 4 模型对比 | my-agent 思路扩展 | ✅ |
-| Langfuse 调用链追踪（默认关闭） | Yuxi | ✅（PR #11）|
+| Langfuse 调用链追踪（默认关闭） | Yuxi | ✅ |
+| 持久化层（四表入库，内容存 FS/索引存 DB） | Yuxi | ✅（D 轮）|
+| 异步执行（ARQ + Redis Streams + SSE） | Yuxi | ✅（D 轮）|
+| 技能语义匹配（embedding + jieba 回退） | 自研增量 | ✅（D 轮）|
 
 ## 1. P0 —— demo 跑通闭环（必做，约 1 周）
 
@@ -71,9 +74,9 @@
 
 | 轮次 | 分支 | 内容 | 难度 |
 |---|---|---|---|
-| D | feat/persistence | SQLAlchemy 2.0 async + SQLite（PG 就绪），skills/mcp/SQL示例/术语统一入库 | 大 |
-| D | feat/async-tasks | ARQ + Redis 事件流，长任务提交与进度 SSE | 中 |
-| D | feat/skill-embedding-match | skills 匹配升级 embedding 召回（复用 app/rag），可回退 jieba | 小 |
+| D ✅ | feat/persistence | SQLAlchemy 2.0 async + SQLite（PG 就绪），skills/mcp/SQL示例/术语统一入库 | 大 |
+| D ✅ | feat/async-tasks | ARQ + Redis 事件流，长任务提交与进度 SSE | 中 |
+| D ✅ | feat/skill-embedding-match | skills 匹配升级 embedding 召回（复用 app/rag），可回退 jieba | 小 |
 | E | feat/analysis-agent | P-O-R 工作流 + Markdown 分析报告，长任务走异步通道 | 中大 |
 | E | feat/script-sandbox | 技能脚本执行升级容器沙箱（只读挂载/资源限制/超时，可切回 subprocess）；远程技能从此可安全启用 | 难⭐ |
 | E | feat/knowledge-graph | LLM 三元组抽取 + 轻量图存储（SQLite 边表 + NetworkX，Neo4j 留接口）+ 图查询技能 | 难⭐ |
