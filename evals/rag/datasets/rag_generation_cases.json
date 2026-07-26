@@ -1,0 +1,50 @@
+[
+  {
+    "id":"gen_001",
+    "question":"CPU 告警持续触发，给我一个排查方案",
+    "expected_keywords":["CPU","负载","进程","线程","排查"],
+    "expected_sources":["cpu_high_usage.md"]
+  },
+  {
+    "id":"gen_002",
+    "question":"服务发生 OOM，应该如何定位和缓解",
+    "expected_keywords":["OOM","内存","GC","堆","缓解"],
+    "expected_sources":["memory_high_usage.md"]
+  },
+  {
+    "id":"gen_003",
+    "question":"接口慢响应，怎么区分是应用问题还是数据库问题",
+    "expected_keywords":["慢响应","数据库","日志","指标","延迟"],
+    "expected_sources":["slow_response.md"]
+  },
+  {
+    "id":"gen_004",
+    "question":"磁盘使用率告警后需要做哪些动作",
+    "expected_keywords":["磁盘","容量","清理","扩容","告警"],
+    "expected_sources":["disk_high_usage.md"]
+  },
+  {
+    "id":"gen_005",
+    "question":"服务不可用时的标准排查顺序是什么",
+    "expected_keywords":["不可用","依赖","网络","恢复","回滚"],
+    "expected_sources":["service_unavailable.md"]
+  },
+  {
+    "id":"gen_006",
+    "question":"CPU高 + 响应慢，给一个联合诊断思路",
+    "expected_keywords":["CPU","响应","瓶颈","链路","优化"],
+    "expected_sources":["cpu_high_usage.md","slow_response.md"]
+  },
+  {
+    "id":"gen_007",
+    "question":"内存高水位且频繁 Full GC，该怎么判断根因",
+    "expected_keywords":["内存","Full GC","泄漏","对象","分析"],
+    "expected_sources":["memory_high_usage.md"]
+  },
+  {
+    "id":"gen_008",
+    "question":"数据库超时导致接口500时，先查什么",
+    "expected_keywords":["超时","500","数据库","连接池","慢查询"],
+    "expected_sources":["slow_response.md","service_unavailable.md"]
+  }
+]

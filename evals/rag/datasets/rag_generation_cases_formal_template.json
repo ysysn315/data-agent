@@ -1,0 +1,3149 @@
+[
+  {
+    "id": "formal_gen_001",
+    "question": "CPU 告警持续 5 分钟超过 80% 时，标准排查的第一步应该做什么？",
+    "question_type": "single_hop",
+    "difficulty": "easy",
+    "expected_keywords": [
+      "CPU",
+      "80%",
+      "5分钟",
+      "system-metrics",
+      "query_logs",
+      "当前时间"
+    ],
+    "expected_sources": [
+      "cpu_high_usage.md"
+    ],
+    "expected_sources_all": [
+      "cpu_high_usage.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "CPU 阈值",
+        "all_of": [
+          "CPU",
+          "80",
+          "5分钟"
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      {
+        "name": "先确认时间范围",
+        "all_of": [],
+        "any_of": [
+          "get_current_time",
+          "获取当前时间",
+          "当前时间"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "系统指标日志主题",
+        "all_of": [],
+        "any_of": [
+          "system-metrics",
+          "system metrics"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [
+      {
+        "name": "误把 CPU 阈值说成 85%",
+        "all_of": [
+          "CPU",
+          "85"
+        ],
+        "any_of": [],
+        "none_of": []
+      }
+    ],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_002",
+    "question": "请给出 CPU 高告警时的日志查询要点，至少说出日志主题、时间窗口和过滤条件。",
+    "question_type": "single_hop",
+    "difficulty": "medium",
+    "expected_keywords": [
+      "CPU",
+      "80%",
+      "5分钟",
+      "system-metrics",
+      "query_logs",
+      "当前时间"
+    ],
+    "expected_sources": [
+      "cpu_high_usage.md"
+    ],
+    "expected_sources_all": [
+      "cpu_high_usage.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "系统指标日志主题",
+        "all_of": [],
+        "any_of": [
+          "system-metrics",
+          "system metrics"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "默认回看窗口",
+        "all_of": [
+          "30分钟"
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      {
+        "name": "CPU 查询条件",
+        "all_of": [],
+        "any_of": [
+          "cpu_usage > 80",
+          "cpu_usage:>80",
+          "cpuusage>80"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_003",
+    "question": "CPU 高的时候，为什么要重点看进程名和 PID？",
+    "question_type": "single_hop",
+    "difficulty": "easy",
+    "expected_keywords": [
+      "CPU",
+      "80%",
+      "5分钟",
+      "system-metrics",
+      "query_logs",
+      "当前时间"
+    ],
+    "expected_sources": [
+      "cpu_high_usage.md"
+    ],
+    "expected_sources_all": [
+      "cpu_high_usage.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "关注进程或 PID",
+        "all_of": [],
+        "any_of": [
+          "PID",
+          "进程"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "CPU 影响",
+        "all_of": [],
+        "any_of": [
+          "响应变慢",
+          "请求超时",
+          "雪崩"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_004",
+    "question": "如果我只记得 HighCPUUsage 这个告警名，你会怎么往下展开排查？",
+    "question_type": "single_hop",
+    "difficulty": "medium",
+    "expected_keywords": [
+      "CPU",
+      "80%",
+      "5分钟",
+      "system-metrics",
+      "query_logs",
+      "当前时间"
+    ],
+    "expected_sources": [
+      "cpu_high_usage.md"
+    ],
+    "expected_sources_all": [
+      "cpu_high_usage.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "CPU 告警名",
+        "all_of": [],
+        "any_of": [
+          "HighCPUUsage",
+          "CPU告警",
+          "CPU 告警"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "先确认时间范围",
+        "all_of": [],
+        "any_of": [
+          "get_current_time",
+          "获取当前时间",
+          "当前时间"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "CPU 查询条件",
+        "all_of": [],
+        "any_of": [
+          "cpu_usage > 80",
+          "cpu_usage:>80",
+          "cpuusage>80"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_005",
+    "question": "CPU 告警排查时，日志为什么默认回看最近 30 分钟？",
+    "question_type": "single_hop",
+    "difficulty": "medium",
+    "expected_keywords": [
+      "CPU",
+      "80%",
+      "5分钟",
+      "system-metrics",
+      "query_logs",
+      "当前时间"
+    ],
+    "expected_sources": [
+      "cpu_high_usage.md"
+    ],
+    "expected_sources_all": [
+      "cpu_high_usage.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "默认回看窗口",
+        "all_of": [
+          "30分钟"
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      {
+        "name": "先确认时间范围",
+        "all_of": [],
+        "any_of": [
+          "get_current_time",
+          "获取当前时间",
+          "当前时间"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_006",
+    "question": "请把 CPU 告警的风险影响总结成三点，不要只给操作步骤。",
+    "question_type": "single_hop",
+    "difficulty": "easy",
+    "expected_keywords": [
+      "CPU",
+      "80%",
+      "5分钟",
+      "system-metrics",
+      "query_logs",
+      "当前时间"
+    ],
+    "expected_sources": [
+      "cpu_high_usage.md"
+    ],
+    "expected_sources_all": [
+      "cpu_high_usage.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "CPU 阈值",
+        "all_of": [
+          "CPU",
+          "80",
+          "5分钟"
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      {
+        "name": "CPU 影响",
+        "all_of": [],
+        "any_of": [
+          "响应变慢",
+          "请求超时",
+          "雪崩"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_007",
+    "question": "容量规划文档里也提到 CPU 百分比，如果线上收到 CPU 高告警，应该优先参考哪类文档？为什么？",
+    "question_type": "confusable",
+    "difficulty": "hard",
+    "expected_keywords": [
+      "CPU",
+      "80%",
+      "5分钟",
+      "system-metrics",
+      "query_logs",
+      "当前时间"
+    ],
+    "expected_sources": [
+      "cpu_high_usage.md"
+    ],
+    "expected_sources_all": [
+      "cpu_high_usage.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "CPU 阈值",
+        "all_of": [
+          "CPU",
+          "80",
+          "5分钟"
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      {
+        "name": "容量规划不是线上根因文档",
+        "all_of": [],
+        "any_of": [
+          "不是线上故障根因",
+          "容量规划",
+          "告警处置方案"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_008",
+    "question": "CPU 高但还没有超时错误时，你会先解释现象、还是先给日志排查动作？请按文档回答。",
+    "question_type": "single_hop",
+    "difficulty": "hard",
+    "expected_keywords": [
+      "CPU",
+      "80%",
+      "5分钟",
+      "system-metrics",
+      "query_logs",
+      "当前时间"
+    ],
+    "expected_sources": [
+      "cpu_high_usage.md"
+    ],
+    "expected_sources_all": [
+      "cpu_high_usage.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "CPU 影响",
+        "all_of": [],
+        "any_of": [
+          "响应变慢",
+          "请求超时",
+          "雪崩"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "先确认时间范围",
+        "all_of": [],
+        "any_of": [
+          "get_current_time",
+          "获取当前时间",
+          "当前时间"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "系统指标日志主题",
+        "all_of": [],
+        "any_of": [
+          "system-metrics",
+          "system metrics"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_009",
+    "question": "内存使用率连续 5 分钟超过 85% 时，标准处置从哪一步开始？",
+    "question_type": "single_hop",
+    "difficulty": "easy",
+    "expected_keywords": [
+      "内存",
+      "85%",
+      "OOM",
+      "GC",
+      "system-metrics",
+      "application-logs"
+    ],
+    "expected_sources": [
+      "memory_high_usage.md"
+    ],
+    "expected_sources_all": [
+      "memory_high_usage.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "内存阈值",
+        "all_of": [
+          "内存",
+          "85",
+          "5分钟"
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      {
+        "name": "先确认时间范围",
+        "all_of": [],
+        "any_of": [
+          "get_current_time",
+          "获取当前时间",
+          "当前时间"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "系统指标日志主题",
+        "all_of": [],
+        "any_of": [
+          "system-metrics",
+          "system metrics"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [
+      {
+        "name": "误把内存阈值说成 80%",
+        "all_of": [
+          "内存",
+          "80"
+        ],
+        "any_of": [],
+        "none_of": []
+      }
+    ],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_010",
+    "question": "请概括内存高告警最典型的三个症状。",
+    "question_type": "single_hop",
+    "difficulty": "easy",
+    "expected_keywords": [
+      "内存",
+      "85%",
+      "OOM",
+      "GC",
+      "system-metrics",
+      "application-logs"
+    ],
+    "expected_sources": [
+      "memory_high_usage.md"
+    ],
+    "expected_sources_all": [
+      "memory_high_usage.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "内存高的典型表现",
+        "all_of": [],
+        "any_of": [
+          "OOM",
+          "GC",
+          "swap"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "可能导致重启或崩溃",
+        "all_of": [],
+        "any_of": [
+          "重启",
+          "崩溃"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_011",
+    "question": "处理 OOM 风险时，系统指标日志和应用日志分别为什么要查？",
+    "question_type": "single_hop",
+    "difficulty": "medium",
+    "expected_keywords": [
+      "内存",
+      "85%",
+      "OOM",
+      "GC",
+      "system-metrics",
+      "application-logs"
+    ],
+    "expected_sources": [
+      "memory_high_usage.md"
+    ],
+    "expected_sources_all": [
+      "memory_high_usage.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "系统指标日志主题",
+        "all_of": [],
+        "any_of": [
+          "system-metrics",
+          "system metrics"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "应用日志主题",
+        "all_of": [],
+        "any_of": [
+          "application-logs",
+          "application logs"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "内存高的典型表现",
+        "all_of": [],
+        "any_of": [
+          "OOM",
+          "GC",
+          "swap"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_012",
+    "question": "如果我想直接搜日志，内存高告警建议的过滤条件是什么？",
+    "question_type": "single_hop",
+    "difficulty": "medium",
+    "expected_keywords": [
+      "内存",
+      "85%",
+      "OOM",
+      "GC",
+      "system-metrics",
+      "application-logs"
+    ],
+    "expected_sources": [
+      "memory_high_usage.md"
+    ],
+    "expected_sources_all": [
+      "memory_high_usage.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "内存查询条件",
+        "all_of": [],
+        "any_of": [
+          "memory_usage>85",
+          "memory_usage:>85",
+          "event:oom",
+          "oom_kill:true"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "默认回看窗口",
+        "all_of": [
+          "30分钟"
+        ],
+        "any_of": [],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_013",
+    "question": "为什么内存高会伴随 Full GC、OOM 或 swap？请按知识库解释。",
+    "question_type": "single_hop",
+    "difficulty": "medium",
+    "expected_keywords": [
+      "内存",
+      "85%",
+      "OOM",
+      "GC",
+      "system-metrics",
+      "application-logs"
+    ],
+    "expected_sources": [
+      "memory_high_usage.md"
+    ],
+    "expected_sources_all": [
+      "memory_high_usage.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "内存高的典型表现",
+        "all_of": [],
+        "any_of": [
+          "OOM",
+          "GC",
+          "swap"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "可能导致重启或崩溃",
+        "all_of": [],
+        "any_of": [
+          "重启",
+          "崩溃"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_014",
+    "question": "内存高告警和慢响应告警都可能影响体验，如何先区分你现在面对的是哪一种？",
+    "question_type": "multi_hop",
+    "difficulty": "hard",
+    "expected_keywords": [
+      "内存",
+      "85%",
+      "OOM",
+      "GC",
+      "system-metrics",
+      "application-logs"
+    ],
+    "expected_sources": [
+      "memory_high_usage.md",
+      "slow_response.md"
+    ],
+    "expected_sources_all": [
+      "memory_high_usage.md",
+      "slow_response.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "内存阈值",
+        "all_of": [
+          "内存",
+          "85",
+          "5分钟"
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      {
+        "name": "慢响应阈值",
+        "all_of": [
+          "P99",
+          "3秒",
+          "5分钟"
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      {
+        "name": "两类告警的日志主题不同",
+        "all_of": [],
+        "any_of": [
+          "system-metrics",
+          "application-logs"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_015",
+    "question": "监控术语词典里解释了 OOM，这能直接替代内存高告警处置文档吗？",
+    "question_type": "confusable",
+    "difficulty": "hard",
+    "expected_keywords": [
+      "内存",
+      "85%",
+      "OOM",
+      "GC",
+      "system-metrics",
+      "application-logs"
+    ],
+    "expected_sources": [
+      "memory_high_usage.md"
+    ],
+    "expected_sources_all": [
+      "memory_high_usage.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "应用日志主题",
+        "all_of": [],
+        "any_of": [
+          "application-logs",
+          "application logs"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "术语词典不是处置方案",
+        "all_of": [],
+        "any_of": [
+          "不是处置步骤",
+          "术语词典",
+          "手册"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_016",
+    "question": "请用一段话说明：内存高告警至少需要确认哪些日志主题、时间窗口和异常现象。",
+    "question_type": "single_hop",
+    "difficulty": "hard",
+    "expected_keywords": [
+      "内存",
+      "85%",
+      "OOM",
+      "GC",
+      "system-metrics",
+      "application-logs"
+    ],
+    "expected_sources": [
+      "memory_high_usage.md"
+    ],
+    "expected_sources_all": [
+      "memory_high_usage.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "系统指标日志主题",
+        "all_of": [],
+        "any_of": [
+          "system-metrics",
+          "system metrics"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "应用日志主题",
+        "all_of": [],
+        "any_of": [
+          "application-logs",
+          "application logs"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "默认回看窗口",
+        "all_of": [
+          "30分钟"
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      {
+        "name": "内存高的典型表现",
+        "all_of": [],
+        "any_of": [
+          "OOM",
+          "GC",
+          "swap"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_017",
+    "question": "P99 连续 5 分钟超过 3 秒时，标准慢响应排查从哪里开始？",
+    "question_type": "single_hop",
+    "difficulty": "easy",
+    "expected_keywords": [
+      "P99",
+      "3秒",
+      "慢响应",
+      "application-logs",
+      "slow_query",
+      "数据库"
+    ],
+    "expected_sources": [
+      "slow_response.md"
+    ],
+    "expected_sources_all": [
+      "slow_response.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "慢响应阈值",
+        "all_of": [
+          "P99",
+          "3秒",
+          "5分钟"
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      {
+        "name": "先确认时间范围",
+        "all_of": [],
+        "any_of": [
+          "get_current_time",
+          "获取当前时间",
+          "当前时间"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "应用日志主题",
+        "all_of": [],
+        "any_of": [
+          "application-logs",
+          "application logs"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_018",
+    "question": "慢响应告警要查哪些日志条件？请至少回答时间窗口和过滤表达式。",
+    "question_type": "single_hop",
+    "difficulty": "medium",
+    "expected_keywords": [
+      "P99",
+      "3秒",
+      "慢响应",
+      "application-logs",
+      "slow_query",
+      "数据库"
+    ],
+    "expected_sources": [
+      "slow_response.md"
+    ],
+    "expected_sources_all": [
+      "slow_response.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "默认回看窗口",
+        "all_of": [
+          "30分钟"
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      {
+        "name": "慢响应查询条件",
+        "all_of": [],
+        "any_of": [
+          "response_time>3000",
+          "response_time:>3000",
+          "slow_query:true"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_019",
+    "question": "为什么慢响应场景下还要查数据库慢查询日志？",
+    "question_type": "single_hop",
+    "difficulty": "easy",
+    "expected_keywords": [
+      "P99",
+      "3秒",
+      "慢响应",
+      "application-logs",
+      "slow_query",
+      "数据库"
+    ],
+    "expected_sources": [
+      "slow_response.md"
+    ],
+    "expected_sources_all": [
+      "slow_response.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "要查数据库慢查询",
+        "all_of": [],
+        "any_of": [
+          "慢查询",
+          "slow query",
+          "数据库"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "慢响应影响",
+        "all_of": [],
+        "any_of": [
+          "用户体验下降",
+          "请求堆积",
+          "超时"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_020",
+    "question": "如果接口变慢但还没有 500 错误，按知识库应该优先看什么？",
+    "question_type": "single_hop",
+    "difficulty": "medium",
+    "expected_keywords": [
+      "P99",
+      "3秒",
+      "慢响应",
+      "application-logs",
+      "slow_query",
+      "数据库"
+    ],
+    "expected_sources": [
+      "slow_response.md"
+    ],
+    "expected_sources_all": [
+      "slow_response.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "应用日志主题",
+        "all_of": [],
+        "any_of": [
+          "application-logs",
+          "application logs"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "慢响应阈值",
+        "all_of": [
+          "P99",
+          "3秒",
+          "5分钟"
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      {
+        "name": "要查数据库慢查询",
+        "all_of": [],
+        "any_of": [
+          "慢查询",
+          "slow query",
+          "数据库"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_021",
+    "question": "请对比说明：慢响应和服务不可用的触发条件分别是什么？",
+    "question_type": "multi_hop",
+    "difficulty": "medium",
+    "expected_keywords": [
+      "P99",
+      "3秒",
+      "慢响应",
+      "application-logs",
+      "slow_query",
+      "数据库"
+    ],
+    "expected_sources": [
+      "slow_response.md",
+      "service_unavailable.md"
+    ],
+    "expected_sources_all": [
+      "slow_response.md",
+      "service_unavailable.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "慢响应阈值",
+        "all_of": [
+          "P99",
+          "3秒",
+          "5分钟"
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      {
+        "name": "不可用触发条件",
+        "all_of": [],
+        "any_of": [
+          "健康检查失败",
+          "错误率超过50%",
+          "error rate"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_022",
+    "question": "缓存调优手册也写了慢响应，你会怎么避免把缓存建议误当成故障根因结论？",
+    "question_type": "confusable",
+    "difficulty": "hard",
+    "expected_keywords": [
+      "P99",
+      "3秒",
+      "慢响应",
+      "application-logs",
+      "slow_query",
+      "数据库"
+    ],
+    "expected_sources": [
+      "slow_response.md"
+    ],
+    "expected_sources_all": [
+      "slow_response.md"
+    ],
+    "expected_sources_any": [
+      "cache_tuning_playbook.md"
+    ],
+    "expected_facts": [
+      {
+        "name": "要查数据库慢查询",
+        "all_of": [],
+        "any_of": [
+          "慢查询",
+          "slow query",
+          "数据库"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "缓存手册只是调优建议",
+        "all_of": [],
+        "any_of": [
+          "缓存调优",
+          "不是根因文档",
+          "缓存层"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_023",
+    "question": "慢响应文档里为什么强调先取当前时间再查应用日志？",
+    "question_type": "single_hop",
+    "difficulty": "easy",
+    "expected_keywords": [
+      "P99",
+      "3秒",
+      "慢响应",
+      "application-logs",
+      "slow_query",
+      "数据库"
+    ],
+    "expected_sources": [
+      "slow_response.md"
+    ],
+    "expected_sources_all": [
+      "slow_response.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "先确认时间范围",
+        "all_of": [],
+        "any_of": [
+          "get_current_time",
+          "获取当前时间",
+          "当前时间"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "应用日志主题",
+        "all_of": [],
+        "any_of": [
+          "application-logs",
+          "application logs"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_024",
+    "question": "请把慢响应场景里的用户影响和下游影响一起概括出来。",
+    "question_type": "single_hop",
+    "difficulty": "easy",
+    "expected_keywords": [
+      "P99",
+      "3秒",
+      "慢响应",
+      "application-logs",
+      "slow_query",
+      "数据库"
+    ],
+    "expected_sources": [
+      "slow_response.md"
+    ],
+    "expected_sources_all": [
+      "slow_response.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "慢响应影响",
+        "all_of": [],
+        "any_of": [
+          "用户体验下降",
+          "请求堆积",
+          "超时"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_025",
+    "question": "磁盘使用率告警触发后，第一步应该做什么？",
+    "question_type": "single_hop",
+    "difficulty": "easy",
+    "expected_keywords": [
+      "磁盘",
+      "80%",
+      "90%",
+      "disk_full",
+      "system-metrics",
+      "写入"
+    ],
+    "expected_sources": [
+      "disk_high_usage.md"
+    ],
+    "expected_sources_all": [
+      "disk_high_usage.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "先确认时间范围",
+        "all_of": [],
+        "any_of": [
+          "get_current_time",
+          "获取当前时间",
+          "当前时间"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "系统指标日志主题",
+        "all_of": [],
+        "any_of": [
+          "system-metrics",
+          "system metrics"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_026",
+    "question": "磁盘告警里 warning 和严重阈值是怎么划分的？",
+    "question_type": "single_hop",
+    "difficulty": "easy",
+    "expected_keywords": [
+      "磁盘",
+      "80%",
+      "90%",
+      "disk_full",
+      "system-metrics",
+      "写入"
+    ],
+    "expected_sources": [
+      "disk_high_usage.md"
+    ],
+    "expected_sources_all": [
+      "disk_high_usage.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "磁盘阈值",
+        "all_of": [],
+        "any_of": [
+          "80%",
+          "90%",
+          ">80",
+          ">90"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "区分 warning 和 critical",
+        "all_of": [],
+        "any_of": [
+          "警告",
+          "严重",
+          "warning",
+          "critical"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_027",
+    "question": "磁盘高时建议怎么查系统日志？请说出日志主题、时间窗口和查询条件。",
+    "question_type": "single_hop",
+    "difficulty": "medium",
+    "expected_keywords": [
+      "磁盘",
+      "80%",
+      "90%",
+      "disk_full",
+      "system-metrics",
+      "写入"
+    ],
+    "expected_sources": [
+      "disk_high_usage.md"
+    ],
+    "expected_sources_all": [
+      "disk_high_usage.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "系统指标日志主题",
+        "all_of": [],
+        "any_of": [
+          "system-metrics",
+          "system metrics"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "默认回看窗口",
+        "all_of": [
+          "30分钟"
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      {
+        "name": "磁盘查询条件",
+        "all_of": [],
+        "any_of": [
+          "disk_usage>80",
+          "disk_usage:>80",
+          "disk_full:true",
+          "filesystem:full"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_028",
+    "question": "为什么磁盘打满会影响日志记录和数据库稳定性？",
+    "question_type": "single_hop",
+    "difficulty": "easy",
+    "expected_keywords": [
+      "磁盘",
+      "80%",
+      "90%",
+      "disk_full",
+      "system-metrics",
+      "写入"
+    ],
+    "expected_sources": [
+      "disk_high_usage.md"
+    ],
+    "expected_sources_all": [
+      "disk_high_usage.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "磁盘高的影响",
+        "all_of": [],
+        "any_of": [
+          "无法写入",
+          "日志无法记录",
+          "数据库损坏"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_029",
+    "question": "如果磁盘高和 500 错误同时出现，按知识库你会联想到哪两类文档？",
+    "question_type": "multi_hop",
+    "difficulty": "medium",
+    "expected_keywords": [
+      "磁盘",
+      "80%",
+      "90%",
+      "disk_full",
+      "system-metrics",
+      "写入"
+    ],
+    "expected_sources": [
+      "disk_high_usage.md",
+      "service_unavailable.md"
+    ],
+    "expected_sources_all": [
+      "disk_high_usage.md",
+      "service_unavailable.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "磁盘高的影响",
+        "all_of": [],
+        "any_of": [
+          "无法写入",
+          "日志无法记录",
+          "数据库损坏"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "服务不可用查询条件",
+        "all_of": [],
+        "any_of": [
+          "level:error",
+          "level:fatal",
+          "status:500",
+          "500"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_030",
+    "question": "性能容量规划文档里也提到磁盘增长率，这能直接替代磁盘告警处置方案吗？",
+    "question_type": "confusable",
+    "difficulty": "hard",
+    "expected_keywords": [
+      "磁盘",
+      "80%",
+      "90%",
+      "disk_full",
+      "system-metrics",
+      "写入"
+    ],
+    "expected_sources": [
+      "disk_high_usage.md"
+    ],
+    "expected_sources_all": [
+      "disk_high_usage.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "磁盘查询条件",
+        "all_of": [],
+        "any_of": [
+          "disk_usage>80",
+          "disk_usage:>80",
+          "disk_full:true",
+          "filesystem:full"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "容量规划不是告警处置方案",
+        "all_of": [],
+        "any_of": [
+          "容量规划",
+          "不是处置方案",
+          "不是线上根因"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_031",
+    "question": "磁盘告警时，为什么还是要先记录故障时间而不是直接删日志？",
+    "question_type": "single_hop",
+    "difficulty": "medium",
+    "expected_keywords": [
+      "磁盘",
+      "80%",
+      "90%",
+      "disk_full",
+      "system-metrics",
+      "写入"
+    ],
+    "expected_sources": [
+      "disk_high_usage.md"
+    ],
+    "expected_sources_all": [
+      "disk_high_usage.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "先确认时间范围",
+        "all_of": [],
+        "any_of": [
+          "get_current_time",
+          "获取当前时间",
+          "当前时间"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "默认回看窗口",
+        "all_of": [
+          "30分钟"
+        ],
+        "any_of": [],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_032",
+    "question": "请把磁盘高告警的典型影响总结成一句排障提醒。",
+    "question_type": "single_hop",
+    "difficulty": "easy",
+    "expected_keywords": [
+      "磁盘",
+      "80%",
+      "90%",
+      "disk_full",
+      "system-metrics",
+      "写入"
+    ],
+    "expected_sources": [
+      "disk_high_usage.md"
+    ],
+    "expected_sources_all": [
+      "disk_high_usage.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "磁盘阈值",
+        "all_of": [],
+        "any_of": [
+          "80%",
+          "90%",
+          ">80",
+          ">90"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "磁盘高的影响",
+        "all_of": [],
+        "any_of": [
+          "无法写入",
+          "日志无法记录",
+          "数据库损坏"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_033",
+    "question": "服务不可用告警最常见的触发条件是什么？",
+    "question_type": "single_hop",
+    "difficulty": "easy",
+    "expected_keywords": [
+      "服务不可用",
+      "健康检查",
+      "错误率50%",
+      "application-logs",
+      "500",
+      "ERROR"
+    ],
+    "expected_sources": [
+      "service_unavailable.md"
+    ],
+    "expected_sources_all": [
+      "service_unavailable.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "不可用触发条件",
+        "all_of": [],
+        "any_of": [
+          "健康检查失败",
+          "错误率超过50%",
+          "error rate"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "故障级别",
+        "all_of": [],
+        "any_of": [
+          "紧急",
+          "P1"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_034",
+    "question": "服务不可用的标准排查为什么先要拿到故障时间？",
+    "question_type": "single_hop",
+    "difficulty": "easy",
+    "expected_keywords": [
+      "服务不可用",
+      "健康检查",
+      "错误率50%",
+      "application-logs",
+      "500",
+      "ERROR"
+    ],
+    "expected_sources": [
+      "service_unavailable.md"
+    ],
+    "expected_sources_all": [
+      "service_unavailable.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "先确认故障时间",
+        "all_of": [],
+        "any_of": [
+          "get_current_time",
+          "获取当前时间",
+          "当前时间"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "默认回看窗口",
+        "all_of": [
+          "15分钟"
+        ],
+        "any_of": [],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_035",
+    "question": "服务不可用场景建议怎么查应用日志？请给出时间范围和过滤条件。",
+    "question_type": "single_hop",
+    "difficulty": "medium",
+    "expected_keywords": [
+      "服务不可用",
+      "健康检查",
+      "错误率50%",
+      "application-logs",
+      "500",
+      "ERROR"
+    ],
+    "expected_sources": [
+      "service_unavailable.md"
+    ],
+    "expected_sources_all": [
+      "service_unavailable.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "应用日志主题",
+        "all_of": [],
+        "any_of": [
+          "application-logs",
+          "application logs"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "默认回看窗口",
+        "all_of": [
+          "15分钟"
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      {
+        "name": "服务不可用查询条件",
+        "all_of": [],
+        "any_of": [
+          "level:error",
+          "level:fatal",
+          "status:500",
+          "500"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_036",
+    "question": "为什么服务不可用会被定义成紧急级别？",
+    "question_type": "single_hop",
+    "difficulty": "easy",
+    "expected_keywords": [
+      "服务不可用",
+      "健康检查",
+      "错误率50%",
+      "application-logs",
+      "500",
+      "ERROR"
+    ],
+    "expected_sources": [
+      "service_unavailable.md"
+    ],
+    "expected_sources_all": [
+      "service_unavailable.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "故障级别",
+        "all_of": [],
+        "any_of": [
+          "紧急",
+          "P1"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "不可用影响",
+        "all_of": [],
+        "any_of": [
+          "无法访问",
+          "业务中断",
+          "经济损失"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_037",
+    "question": "如果同时看到健康检查失败和 status 500，你会先参考哪一份文档？",
+    "question_type": "single_hop",
+    "difficulty": "medium",
+    "expected_keywords": [
+      "服务不可用",
+      "健康检查",
+      "错误率50%",
+      "application-logs",
+      "500",
+      "ERROR"
+    ],
+    "expected_sources": [
+      "service_unavailable.md"
+    ],
+    "expected_sources_all": [
+      "service_unavailable.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "不可用触发条件",
+        "all_of": [],
+        "any_of": [
+          "健康检查失败",
+          "错误率超过50%",
+          "error rate"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "服务不可用查询条件",
+        "all_of": [],
+        "any_of": [
+          "level:error",
+          "level:fatal",
+          "status:500",
+          "500"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_038",
+    "question": "服务不可用和慢响应都可能影响用户，如何先区分它们？",
+    "question_type": "multi_hop",
+    "difficulty": "medium",
+    "expected_keywords": [
+      "服务不可用",
+      "健康检查",
+      "错误率50%",
+      "application-logs",
+      "500",
+      "ERROR"
+    ],
+    "expected_sources": [
+      "service_unavailable.md",
+      "slow_response.md"
+    ],
+    "expected_sources_all": [
+      "service_unavailable.md",
+      "slow_response.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "不可用触发条件",
+        "all_of": [],
+        "any_of": [
+          "健康检查失败",
+          "错误率超过50%",
+          "error rate"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "慢响应阈值",
+        "all_of": [
+          "P99",
+          "3秒",
+          "5分钟"
+        ],
+        "any_of": [],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_039",
+    "question": "如果回答里只说这是 warning 级别，为什么不符合知识库？",
+    "question_type": "single_hop",
+    "difficulty": "hard",
+    "expected_keywords": [
+      "服务不可用",
+      "健康检查",
+      "错误率50%",
+      "application-logs",
+      "500",
+      "ERROR"
+    ],
+    "expected_sources": [
+      "service_unavailable.md"
+    ],
+    "expected_sources_all": [
+      "service_unavailable.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "故障级别",
+        "all_of": [],
+        "any_of": [
+          "紧急",
+          "P1"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [
+      {
+        "name": "误说只是警告级别",
+        "all_of": [],
+        "any_of": [
+          "只是警告",
+          "warning 级别"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_040",
+    "question": "请把服务不可用的排查输入至少概括成三项：时间、日志和业务影响。",
+    "question_type": "single_hop",
+    "difficulty": "medium",
+    "expected_keywords": [
+      "服务不可用",
+      "健康检查",
+      "错误率50%",
+      "application-logs",
+      "500",
+      "ERROR"
+    ],
+    "expected_sources": [
+      "service_unavailable.md"
+    ],
+    "expected_sources_all": [
+      "service_unavailable.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "先确认故障时间",
+        "all_of": [],
+        "any_of": [
+          "get_current_time",
+          "获取当前时间",
+          "当前时间"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "应用日志主题",
+        "all_of": [],
+        "any_of": [
+          "application-logs",
+          "application logs"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "不可用影响",
+        "all_of": [],
+        "any_of": [
+          "无法访问",
+          "业务中断",
+          "经济损失"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_041",
+    "question": "CPU 高且响应慢时，联合诊断至少要覆盖哪两类告警和哪两类日志？",
+    "question_type": "multi_hop",
+    "difficulty": "hard",
+    "expected_keywords": [
+      "CPU",
+      "80%",
+      "5分钟",
+      "system-metrics",
+      "query_logs",
+      "当前时间"
+    ],
+    "expected_sources": [
+      "cpu_high_usage.md",
+      "slow_response.md"
+    ],
+    "expected_sources_all": [
+      "cpu_high_usage.md",
+      "slow_response.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "CPU 阈值",
+        "all_of": [
+          "CPU",
+          "80",
+          "5分钟"
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      {
+        "name": "慢响应阈值",
+        "all_of": [
+          "P99",
+          "3秒",
+          "5分钟"
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      {
+        "name": "系统指标日志主题",
+        "all_of": [],
+        "any_of": [
+          "system-metrics",
+          "system metrics"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "应用日志主题",
+        "all_of": [],
+        "any_of": [
+          "application-logs",
+          "application logs"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_042",
+    "question": "数据库超时导致接口 500 时，知识库里建议优先联看哪些文档？",
+    "question_type": "multi_hop",
+    "difficulty": "hard",
+    "expected_keywords": [
+      "P99",
+      "3秒",
+      "慢响应",
+      "application-logs",
+      "slow_query",
+      "数据库"
+    ],
+    "expected_sources": [
+      "slow_response.md",
+      "service_unavailable.md"
+    ],
+    "expected_sources_all": [
+      "slow_response.md",
+      "service_unavailable.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "要查数据库慢查询",
+        "all_of": [],
+        "any_of": [
+          "慢查询",
+          "slow query",
+          "数据库"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "服务不可用查询条件",
+        "all_of": [],
+        "any_of": [
+          "level:error",
+          "level:fatal",
+          "status:500",
+          "500"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_043",
+    "question": "磁盘打满引发服务不可用时，回答里至少应该覆盖哪些事实点？",
+    "question_type": "multi_hop",
+    "difficulty": "hard",
+    "expected_keywords": [
+      "磁盘",
+      "80%",
+      "90%",
+      "disk_full",
+      "system-metrics",
+      "写入"
+    ],
+    "expected_sources": [
+      "disk_high_usage.md",
+      "service_unavailable.md"
+    ],
+    "expected_sources_all": [
+      "disk_high_usage.md",
+      "service_unavailable.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "磁盘高的影响",
+        "all_of": [],
+        "any_of": [
+          "无法写入",
+          "日志无法记录",
+          "数据库损坏"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "不可用触发条件",
+        "all_of": [],
+        "any_of": [
+          "健康检查失败",
+          "错误率超过50%",
+          "error rate"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "故障级别",
+        "all_of": [],
+        "any_of": [
+          "紧急",
+          "P1"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_044",
+    "question": "缓存穿透导致数据库压力上升并拖慢接口时，主诊断文档和辅助调优文档分别是哪类？",
+    "question_type": "multi_hop",
+    "difficulty": "hard",
+    "expected_keywords": [
+      "P99",
+      "3秒",
+      "慢响应",
+      "application-logs",
+      "slow_query",
+      "数据库"
+    ],
+    "expected_sources": [
+      "slow_response.md"
+    ],
+    "expected_sources_all": [
+      "slow_response.md"
+    ],
+    "expected_sources_any": [
+      "cache_tuning_playbook.md"
+    ],
+    "expected_facts": [
+      {
+        "name": "要查数据库慢查询",
+        "all_of": [],
+        "any_of": [
+          "慢查询",
+          "slow query",
+          "数据库"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "缓存文档是调优补充",
+        "all_of": [],
+        "any_of": [
+          "缓存调优",
+          "回源",
+          "命中率"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_045",
+    "question": "如果入口层 HTTPS 握手异常，同时你怀疑有恶意攻击流量，知识库里应该联看哪两类文档？",
+    "question_type": "multi_hop",
+    "difficulty": "hard",
+    "expected_keywords": [
+      "Ingress",
+      "TLS",
+      "证书",
+      "secret",
+      "CN",
+      "SAN"
+    ],
+    "expected_sources": [
+      "k8s_ingress_tls_guide.md",
+      "security_waf_playbook.md"
+    ],
+    "expected_sources_all": [
+      "k8s_ingress_tls_guide.md",
+      "security_waf_playbook.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "需要 TLS Secret",
+        "all_of": [],
+        "any_of": [
+          "TLS Secret",
+          "secretName",
+          "tls.hosts"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "证书校验点",
+        "all_of": [],
+        "any_of": [
+          "CN",
+          "SAN",
+          "证书有效期"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "速率限制",
+        "all_of": [],
+        "any_of": [
+          "按 IP",
+          "限流",
+          "请求频次"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "cpu_high_usage.md",
+      "memory_high_usage.md",
+      "slow_response.md",
+      "service_unavailable.md",
+      "disk_high_usage.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_046",
+    "question": "如果一边做数据库恢复演练，一边担心入口 HTTPS 故障，应该分别参考哪两份手册？",
+    "question_type": "multi_hop",
+    "difficulty": "medium",
+    "expected_keywords": [
+      "MySQL",
+      "xtrabackup",
+      "binlog",
+      "GTID",
+      "恢复",
+      "校验"
+    ],
+    "expected_sources": [
+      "mysql_backup_restore.md",
+      "k8s_ingress_tls_guide.md"
+    ],
+    "expected_sources_all": [
+      "mysql_backup_restore.md",
+      "k8s_ingress_tls_guide.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "GTID 校验",
+        "all_of": [],
+        "any_of": [
+          "GTID"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "控制器检查",
+        "all_of": [],
+        "any_of": [
+          "Ingress Controller",
+          "IngressClass"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "cpu_high_usage.md",
+      "memory_high_usage.md",
+      "slow_response.md",
+      "service_unavailable.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_047",
+    "question": "监控术语手册里解释了 P99，但如果线上慢响应告警触发，真正该参考哪份文档？",
+    "question_type": "confusable",
+    "difficulty": "medium",
+    "expected_keywords": [
+      "P99",
+      "3秒",
+      "慢响应",
+      "application-logs",
+      "slow_query",
+      "数据库"
+    ],
+    "expected_sources": [
+      "slow_response.md"
+    ],
+    "expected_sources_all": [
+      "slow_response.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "慢响应阈值",
+        "all_of": [
+          "P99",
+          "3秒",
+          "5分钟"
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      {
+        "name": "术语手册不是处置方案",
+        "all_of": [],
+        "any_of": [
+          "术语手册",
+          "不是处置方案"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_048",
+    "question": "演练脚本里出现了 OOM 文本，这能不能直接当成线上内存泄漏证据？",
+    "question_type": "confusable",
+    "difficulty": "hard",
+    "expected_keywords": [
+      "内存",
+      "85%",
+      "OOM",
+      "GC",
+      "system-metrics",
+      "application-logs"
+    ],
+    "expected_sources": [
+      "memory_high_usage.md"
+    ],
+    "expected_sources_all": [
+      "memory_high_usage.md"
+    ],
+    "expected_sources_any": [
+      "mock_incident_drill_script.md"
+    ],
+    "expected_facts": [
+      {
+        "name": "内存高的典型表现",
+        "all_of": [],
+        "any_of": [
+          "OOM",
+          "GC",
+          "swap"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "演练脚本不是线上根因证据",
+        "all_of": [],
+        "any_of": [
+          "模拟数据",
+          "不应作为真实根因",
+          "演练脚本"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "mock_incident_drill_script.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_049",
+    "question": "容量预算里提到 OOM 和 Full GC，这能直接说明线上已经发生内存故障吗？",
+    "question_type": "confusable",
+    "difficulty": "hard",
+    "expected_keywords": [
+      "内存",
+      "85%",
+      "OOM",
+      "GC",
+      "system-metrics",
+      "application-logs"
+    ],
+    "expected_sources": [
+      "memory_high_usage.md"
+    ],
+    "expected_sources_all": [
+      "memory_high_usage.md"
+    ],
+    "expected_sources_any": [
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "expected_facts": [
+      {
+        "name": "内存阈值",
+        "all_of": [
+          "内存",
+          "85",
+          "5分钟"
+        ],
+        "any_of": [],
+        "none_of": []
+      },
+      {
+        "name": "容量预算不是线上事故报告",
+        "all_of": [],
+        "any_of": [
+          "预算",
+          "不是线上事故",
+          "不是根因分析"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_050",
+    "question": "缓存调优手册里提到 500 错误，但如果问题是服务不可用，主参考文档应该是哪一份？",
+    "question_type": "confusable",
+    "difficulty": "hard",
+    "expected_keywords": [
+      "服务不可用",
+      "健康检查",
+      "错误率50%",
+      "application-logs",
+      "500",
+      "ERROR"
+    ],
+    "expected_sources": [
+      "service_unavailable.md"
+    ],
+    "expected_sources_all": [
+      "service_unavailable.md"
+    ],
+    "expected_sources_any": [
+      "cache_tuning_playbook.md"
+    ],
+    "expected_facts": [
+      {
+        "name": "故障级别",
+        "all_of": [],
+        "any_of": [
+          "紧急",
+          "P1"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "缓存手册不是服务不可用恢复编排",
+        "all_of": [],
+        "any_of": [
+          "不是服务不可用恢复",
+          "缓存调优"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_051",
+    "question": "术语词典提到 CPU 高不一定等于故障，那收到 HighCPUUsage 告警后还要不要按告警文档走？",
+    "question_type": "confusable",
+    "difficulty": "medium",
+    "expected_keywords": [
+      "CPU",
+      "80%",
+      "5分钟",
+      "system-metrics",
+      "query_logs",
+      "当前时间"
+    ],
+    "expected_sources": [
+      "cpu_high_usage.md"
+    ],
+    "expected_sources_all": [
+      "cpu_high_usage.md"
+    ],
+    "expected_sources_any": [
+      "monitoring_glossary_noise.md"
+    ],
+    "expected_facts": [
+      {
+        "name": "CPU 告警名",
+        "all_of": [],
+        "any_of": [
+          "HighCPUUsage",
+          "CPU告警",
+          "CPU 告警"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "术语解释不能替代告警处置",
+        "all_of": [],
+        "any_of": [
+          "不能替代",
+          "告警处置",
+          "术语解释"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "monitoring_glossary_noise.md",
+      "mock_incident_drill_script.md",
+      "perf_capacity_planning_false_friend.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_052",
+    "question": "如果回答大量引用演练脚本和术语词典，而不引用真正排障文档，这种回答应该判好吗？",
+    "question_type": "confusable",
+    "difficulty": "hard",
+    "expected_keywords": [
+      "排障文档",
+      "演练脚本",
+      "术语词典",
+      "真实处置"
+    ],
+    "expected_sources": [
+      "service_unavailable.md"
+    ],
+    "expected_sources_all": [
+      "service_unavailable.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "真正排障要引用真实处置文档",
+        "all_of": [],
+        "any_of": [
+          "真实处置文档",
+          "排障文档",
+          "根因"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "mock_incident_drill_script.md",
+      "monitoring_glossary_noise.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_053",
+    "question": "WAF 手册里提到的三类主要防护对象是什么？",
+    "question_type": "single_hop",
+    "difficulty": "easy",
+    "expected_keywords": [
+      "WAF",
+      "SQL注入",
+      "XSS",
+      "CC",
+      "限流",
+      "白名单"
+    ],
+    "expected_sources": [
+      "security_waf_playbook.md"
+    ],
+    "expected_sources_all": [
+      "security_waf_playbook.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "WAF 防护对象",
+        "all_of": [],
+        "any_of": [
+          "SQL 注入",
+          "XSS",
+          "CC"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "cpu_high_usage.md",
+      "memory_high_usage.md",
+      "slow_response.md",
+      "disk_high_usage.md",
+      "service_unavailable.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_054",
+    "question": "MySQL 备份恢复流程里，为什么要校验 GTID 一致性？",
+    "question_type": "single_hop",
+    "difficulty": "medium",
+    "expected_keywords": [
+      "MySQL",
+      "xtrabackup",
+      "binlog",
+      "GTID",
+      "恢复",
+      "校验"
+    ],
+    "expected_sources": [
+      "mysql_backup_restore.md"
+    ],
+    "expected_sources_all": [
+      "mysql_backup_restore.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "备份方式",
+        "all_of": [],
+        "any_of": [
+          "xtrabackup",
+          "全量备份",
+          "binlog"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "GTID 校验",
+        "all_of": [],
+        "any_of": [
+          "GTID"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "恢复步骤",
+        "all_of": [],
+        "any_of": [
+          "恢复到新实例",
+          "回放 binlog",
+          "校验"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "cpu_high_usage.md",
+      "memory_high_usage.md",
+      "slow_response.md",
+      "service_unavailable.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_055",
+    "question": "Ingress TLS 排障时，证书和控制器两个方向各要查什么？",
+    "question_type": "single_hop",
+    "difficulty": "medium",
+    "expected_keywords": [
+      "Ingress",
+      "TLS",
+      "证书",
+      "secret",
+      "CN",
+      "SAN"
+    ],
+    "expected_sources": [
+      "k8s_ingress_tls_guide.md"
+    ],
+    "expected_sources_all": [
+      "k8s_ingress_tls_guide.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "证书校验点",
+        "all_of": [],
+        "any_of": [
+          "CN",
+          "SAN",
+          "证书有效期"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "控制器检查",
+        "all_of": [],
+        "any_of": [
+          "Ingress Controller",
+          "IngressClass"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "cpu_high_usage.md",
+      "memory_high_usage.md",
+      "slow_response.md",
+      "service_unavailable.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_056",
+    "question": "如果用户访问链路是 CDN 到 Pod，中间关键入口层有哪些？",
+    "question_type": "single_hop",
+    "difficulty": "easy",
+    "expected_keywords": [
+      "Ingress",
+      "TLS",
+      "证书",
+      "secret",
+      "CN",
+      "SAN"
+    ],
+    "expected_sources": [
+      "k8s_ingress_tls_guide.md"
+    ],
+    "expected_sources_all": [
+      "k8s_ingress_tls_guide.md"
+    ],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "链路路径",
+        "all_of": [],
+        "any_of": [
+          "CDN",
+          "WAF",
+          "Ingress",
+          "Service",
+          "Pod"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [],
+    "forbidden_sources": [
+      "cpu_high_usage.md",
+      "memory_high_usage.md",
+      "slow_response.md",
+      "service_unavailable.md"
+    ],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_057",
+    "question": "Redis Sentinel 主从切换失败时，知识库里有没有现成的标准处置方案？",
+    "question_type": "no_answer",
+    "difficulty": "hard",
+    "expected_keywords": [
+      "知识库",
+      "没有",
+      "无法确定",
+      "补充信息"
+    ],
+    "expected_sources": [],
+    "expected_sources_all": [],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "应明确知识库不足",
+        "all_of": [],
+        "any_of": [
+          "当前知识库",
+          "没有",
+          "无法从现有文档确定"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "建议补充上下文",
+        "all_of": [],
+        "any_of": [
+          "补充文档",
+          "补充更多信息",
+          "需要更多上下文"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [
+      {
+        "name": "不要编造 Redis 细节",
+        "all_of": [],
+        "any_of": [
+          "Sentinel",
+          "主从切换命令",
+          "redis-cli",
+          "cluster failover"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_sources": [],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_058",
+    "question": "Kafka 分区倾斜导致消费堆积时，按照当前知识库应该怎么处理？",
+    "question_type": "no_answer",
+    "difficulty": "hard",
+    "expected_keywords": [
+      "知识库",
+      "没有",
+      "无法确定",
+      "补充信息"
+    ],
+    "expected_sources": [],
+    "expected_sources_all": [],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "应明确知识库不足",
+        "all_of": [],
+        "any_of": [
+          "当前知识库",
+          "没有",
+          "无法从现有文档确定"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "建议补充上下文",
+        "all_of": [],
+        "any_of": [
+          "补充文档",
+          "补充更多信息",
+          "需要更多上下文"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [
+      {
+        "name": "不要编造 Kafka 调优步骤",
+        "all_of": [],
+        "any_of": [
+          "rebalance",
+          "partition",
+          "consumer lag"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_sources": [],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_059",
+    "question": "Nginx 热升级失败后连接中断，知识库里是否有直接对应的操作手册？",
+    "question_type": "no_answer",
+    "difficulty": "hard",
+    "expected_keywords": [
+      "知识库",
+      "没有",
+      "无法确定",
+      "补充信息"
+    ],
+    "expected_sources": [],
+    "expected_sources_all": [],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "应明确知识库不足",
+        "all_of": [],
+        "any_of": [
+          "当前知识库",
+          "没有",
+          "无法从现有文档确定"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "建议补充上下文",
+        "all_of": [],
+        "any_of": [
+          "补充文档",
+          "补充更多信息",
+          "需要更多上下文"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [
+      {
+        "name": "不要虚构 Nginx 命令",
+        "all_of": [],
+        "any_of": [
+          "nginx -s reload",
+          "热升级",
+          "worker process"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_sources": [],
+    "notes": ""
+  },
+  {
+    "id": "formal_gen_060",
+    "question": "Redis 缓存雪崩后的主从复制延迟怎么处理？当前知识库能不能直接回答？",
+    "question_type": "no_answer",
+    "difficulty": "hard",
+    "expected_keywords": [
+      "知识库",
+      "没有",
+      "无法确定",
+      "补充信息"
+    ],
+    "expected_sources": [],
+    "expected_sources_all": [],
+    "expected_sources_any": [],
+    "expected_facts": [
+      {
+        "name": "应明确知识库不足",
+        "all_of": [],
+        "any_of": [
+          "当前知识库",
+          "没有",
+          "无法从现有文档确定"
+        ],
+        "none_of": []
+      },
+      {
+        "name": "建议补充上下文",
+        "all_of": [],
+        "any_of": [
+          "补充文档",
+          "补充更多信息",
+          "需要更多上下文"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_claims": [
+      {
+        "name": "不要编造 Redis 主从细节",
+        "all_of": [],
+        "any_of": [
+          "主从复制",
+          "redis sentinel",
+          "缓存雪崩恢复脚本"
+        ],
+        "none_of": []
+      }
+    ],
+    "forbidden_sources": [],
+    "notes": ""
+  }
+]
