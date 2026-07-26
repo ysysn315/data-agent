@@ -24,6 +24,8 @@ dependencies = [
     "langchain-text-splitters>=0.3",
     "rank-bm25>=0.2.2",
     "jieba>=0.42",
+    # 知识图谱（轻量版：SQLite 三元组表 + 内存图查询）
+    "networkx>=3",
     # 持久化（SQLAlchemy 2.0 async；SQLite 起步、PG 就绪）
     "sqlalchemy>=2.0",
     "aiosqlite>=0.20",
