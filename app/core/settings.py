@@ -1,7 +1,7 @@
 # 使用 pydantic-settings 进行配置管理
 # 支持自定义 base_url 和 api_key，兼容 OpenAI 接口规范
 from functools import lru_cache
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic_settings import BaseSettings
 
@@ -64,6 +64,14 @@ class Settings(BaseSettings):
     # 外部工具 API
     tavily_api_key: str = ""
     tavily_base_url: str = "https://api.tavily.com"
+
+    # 技能脚本执行沙箱（app/skills/sandbox.py，详见 app/skills/IMPLEMENTATION-sandbox.md）
+    # subprocess = 本地进程直跑（默认，零额外依赖，行为与容器化前一致）
+    # docker     = 每次执行拉起一次性容器：断网 + 只读挂载 + 内存/CPU/进程数限额
+    skill_sandbox_mode: Literal["subprocess", "docker"] = "subprocess"
+    skill_sandbox_image: str = "python:3.11-slim"  # 容器镜像（需提前 docker pull）
+    skill_sandbox_memory: str = "256m"             # 容器内存上限（docker --memory 语法）
+    skill_sandbox_cpus: float = 0.5                # 容器 CPU 配额（docker --cpus）
 
     # Langfuse 调用链追踪（可选，默认关闭）
     # enabled=False 或 key 为空时完全跳过，不 import langfuse，不影响主流程
