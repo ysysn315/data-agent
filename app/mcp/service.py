@@ -29,14 +29,21 @@ class MCPService:
         self,
         config_path: Optional[str | Path] = None,
         load_timeout: float = DEFAULT_LOAD_TIMEOUT_SECONDS,
+        repo=None,
+        runner=None,
     ):
         """
         Args:
             config_path: 注册表 JSON 文件路径（None=纯内存，测试用）
             load_timeout: 单个 server 工具加载超时秒数
+            repo: 数据库存储后端（app.db.repositories.MCPRepository）。
+                  传入即启用「DB 版」：注册表从数据库读写，config_path 仅作历史 JSON 迁移源。
+            runner: sync→async 桥（app.db.run_sync），DB 版必传。
         """
         self.config_path = Path(config_path) if config_path else None
         self.load_timeout = load_timeout
+        self._repo = repo
+        self._run = runner
         self._servers: dict[str, MCPServer] = {}
         # 工具缓存：f"{slug}:{config_hash}" -> list[BaseTool]（存未过滤的全量）
         self._tools_cache: dict[str, list] = {}
@@ -45,6 +52,9 @@ class MCPService:
     # ========== 注册表持久化 ==========
 
     def _load_registry(self) -> None:
+        if self._repo is not None:
+            self._load_registry_db()
+            return
         if self.config_path is None or not self.config_path.exists():
             return
         try:
@@ -57,7 +67,29 @@ class MCPService:
             # 配置文件损坏应显式暴露而不是静默清空
             raise ValueError(f"MCP 注册表解析失败 {self.config_path}: {e}")
 
+    def _load_registry_db(self) -> None:
+        """DB 版加载：表空且有历史 JSON 时一次性迁移入库（之后 DB 为唯一真源）。"""
+        servers = self._run(self._repo.list_all())
+        if not servers and self.config_path is not None and self.config_path.exists():
+            try:
+                data = json.loads(self.config_path.read_text(encoding="utf-8"))
+            except Exception as e:
+                raise ValueError(f"MCP 注册表解析失败 {self.config_path}: {e}")
+            legacy = [MCPServer(**item) for item in data.get("servers", [])]
+            if legacy:
+                self._run(self._repo.replace_all(legacy))
+                logger.info(f"MCP 注册表 JSON→DB 一次性迁移: {len(legacy)} 个 server")
+                servers = legacy
+        for server in servers:
+            self._servers[server.slug] = server
+        if servers:
+            logger.info(f"加载 MCP 注册表(DB): {len(servers)} 个 server")
+
     def _save_registry(self) -> None:
+        if self._repo is not None:
+            # 整表替换，对应 JSON 版的整文件原子重写（注册表规模小，代价可忽略）
+            self._run(self._repo.replace_all(list(self._servers.values())))
+            return
         if self.config_path is None:
             return
         self.config_path.parent.mkdir(parents=True, exist_ok=True)

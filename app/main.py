@@ -22,6 +22,9 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event():
     print("Data Agent starting...")
+    # 持久化建表初始化（幂等；SQLite 首启会自动建 ./data 目录与库文件）
+    from app.db import ensure_initialized
+    ensure_initialized()
 
 # 关闭事件
 @app.on_event("shutdown")
