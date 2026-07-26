@@ -2,6 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import routes_chat, routes_knowledge, routes_mcp, routes_milvus, routes_session, routes_skills, routes_upload
+from app.api import routes_tasks  # D 轮：异步任务
 from app.core.settings import settings
 
 app = FastAPI(
@@ -40,6 +41,7 @@ app.include_router(routes_upload.router, prefix="/api")
 app.include_router(routes_skills.router, prefix="/api")
 app.include_router(routes_mcp.router, prefix="/api")
 app.include_router(routes_knowledge.router, prefix="/api")
+app.include_router(routes_tasks.router, prefix="/api")
 
 
 

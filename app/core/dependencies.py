@@ -193,3 +193,32 @@ def reset_singletons() -> None:
     _skill_service = None
     _mcp_service = None
     _chat_agent = None
+
+
+# ========== 异步任务（arq + Redis Streams），D 轮追加 ==========
+
+_task_service = None
+
+
+async def get_task_service():
+    """TaskService 单例（异步任务入队 + 事件流）。
+
+    元数据/事件流用 decode_responses=True 的异步 Redis；入队用 arq 连接池。
+    连接惰性建立在首次请求（导入本模块不触发 Redis 连接）；测试通过
+    dependency_overrides 注入 fakeredis 版本，不走这里。
+    """
+    global _task_service
+    if _task_service is not None:
+        return _task_service
+
+    async with _init_lock:
+        if _task_service is not None:
+            return _task_service
+
+        from app.tasks.service import TaskService, create_arq_pool, create_task_redis
+
+        _task_service = TaskService(
+            redis=create_task_redis(settings),
+            arq_pool=await create_arq_pool(settings),
+        )
+    return _task_service
