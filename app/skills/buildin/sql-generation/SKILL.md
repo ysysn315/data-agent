@@ -7,6 +7,8 @@ author: "data-agent"
 dependencies:
   skills:
     - schema-retrieval
+  tools:
+    - sql_context_search
 ---
 
 # SQL 生成技能
@@ -53,6 +55,18 @@ dependencies:
 - **不编造**：绝不使用 M-Schema 中不存在的表或字段。拿不准时**先用 `schema_search` 确认**，
   而不是猜测。宁可少查也不虚构。
 - **标识符原样**：无论回复用什么语言，SQL 中的表名/字段名必须与 M-Schema 逐字一致。
+
+## ④ 生成前先取业务上下文（术语库 + 示例库）
+
+在检索 schema 之后、动笔写 SQL 之前，调用 `sql_context_search(question)`，它一次返回：
+
+- **命中的业务术语**：如"复购率""GMV""客单价"的**统一计算口径**。指标类问题必须按此口径算，
+  不要自行发挥（例如"复购率"固定为「下单≥2 次的客户占比」，不要算成订单复购）。
+- **相似历史 SQL 示例**：以往同类问题的 question→SQL，作为 few-shot 参考。
+  借鉴其写法与字段用法，但要按当前问题调整过滤/聚合，**不要照抄**。
+
+两段为空时说明库里没有相关沉淀，直接依据 M-Schema 生成即可。术语口径与示例仅作参考，
+表名/字段名仍以 `schema_search` 返回的真实 M-Schema 为准（示例可能基于旧结构）。
 
 ## 交付
 

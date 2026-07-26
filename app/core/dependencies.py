@@ -55,7 +55,29 @@ async def get_current_user_optional(
 _skill_service = None
 _mcp_service = None
 _chat_agent = None
+_example_store = None
+_term_store = None
 _init_lock = asyncio.Lock()
+
+
+def get_example_store():
+    """SQL 示例库单例（持久化：save_dir/sql_examples.json）"""
+    global _example_store
+    if _example_store is None:
+        from app.text2sql.examples import ExampleStore
+
+        _example_store = ExampleStore(Path(settings.save_dir) / "sql_examples.json")
+    return _example_store
+
+
+def get_term_store():
+    """业务术语库单例（持久化：save_dir/terminology.json）"""
+    global _term_store
+    if _term_store is None:
+        from app.text2sql.terminology import TermStore
+
+        _term_store = TermStore(Path(settings.save_dir) / "terminology.json")
+    return _term_store
 
 
 async def get_skill_service():
@@ -109,6 +131,7 @@ async def get_chat_agent():
         from app.agents.middlewares import ToolRuntimeMiddleware
         from app.agents.tools.datetime_tool import get_current_datetime
         from app.agents.tools.schema_tool import create_schema_search_tool
+        from app.agents.tools.sql_context_tool import create_sql_context_tool
         from app.agents.tools.sql_tool import create_execute_sql_tool
         from app.core.llm import LLMFactory
         from app.skills.middleware import SkillsMiddleware
@@ -144,6 +167,7 @@ async def get_chat_agent():
         gated_tools = [
             create_execute_sql_tool(settings.sqlite_db_path),
             create_schema_search_tool(settings.sqlite_db_path),
+            create_sql_context_tool(get_example_store(), get_term_store()),
         ]
 
         _chat_agent = ChatAgent(
