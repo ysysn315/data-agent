@@ -95,11 +95,18 @@ class ChatAgent:
             stream_mode="messages",
             config={"callbacks": get_langfuse_callbacks()},
         ):
-            if isinstance(chunk, AIMessageChunk) and chunk.content:
-                # content 可能是 str 或分段 list，统一成文本
-                if isinstance(chunk.content, str):
-                    yield chunk.content
-                else:
-                    for part in chunk.content:
-                        if isinstance(part, dict) and part.get("type") == "text":
-                            yield part.get("text", "")
+            if isinstance(chunk, AIMessageChunk):
+                # 优先读 content，如果为空则尝试 reasoning_content（glm-5.2 等推理模型）
+                text = ""
+                if chunk.content:
+                    if isinstance(chunk.content, str):
+                        text = chunk.content
+                    else:
+                        for part in chunk.content:
+                            if isinstance(part, dict) and part.get("type") == "text":
+                                text += part.get("text", "")
+                elif hasattr(chunk, "reasoning_content") and getattr(chunk, "reasoning_content"):
+                    text = getattr(chunk, "reasoning_content")
+
+                if text:
+                    yield text

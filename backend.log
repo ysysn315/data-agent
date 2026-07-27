@@ -1,99 +1,47 @@
-INFO:     Started server process [29063]
+INFO:     Started server process [49794]
 INFO:     Waiting for application startup.
 Data Agent starting...
-2026-07-27 20:25:15.097 | INFO     | app.db.engine:get_engine:94 - 初始化持久化 engine: sqlite+aiosqlite:///./data/app.db
-2026-07-27 20:25:15.100 | INFO     | app.db.engine:ensure_initialized:163 - 持久化建表完成（create_all）
+2026-07-27 21:05:51.554 | INFO     | app.db.engine:get_engine:94 - 初始化持久化 engine: sqlite+aiosqlite:///./data/app.db
+2026-07-27 21:05:51.559 | INFO     | app.db.engine:ensure_initialized:163 - 持久化建表完成（create_all）
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://0.0.0.0:9900 (Press CTRL+C to quit)
-INFO:     127.0.0.1:57195 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56839 - "GET /health HTTP/1.1" 200 OK
 /Users/ysn/projects/data-agent/app/clients/milvus_client.py:33: PyMilvusDeprecationWarning: `connections.has_connection` is an ORM-style PyMilvus API and will be removed in PyMilvus 3.1. Use `MilvusClient` instead.
   if connections.has_connection("default"):
 /Users/ysn/projects/data-agent/app/clients/milvus_client.py:36: PyMilvusDeprecationWarning: `connections.connect` is an ORM-style PyMilvus API and will be removed in PyMilvus 3.1. Use `MilvusClient` instead.
   connections.connect(
-2026-07-27 20:25:41.613 | INFO     | app.clients.milvus_client:connect:41 - 连接注册成功
+2026-07-27 21:06:19.725 | INFO     | app.clients.milvus_client:connect:41 - 连接注册成功
 /Users/ysn/projects/data-agent/app/clients/milvus_client.py:48: PyMilvusDeprecationWarning: `connections.has_connection` is an ORM-style PyMilvus API and will be removed in PyMilvus 3.1. Use `MilvusClient` instead.
   if not connections.has_connection("default"):
 /Users/ysn/projects/data-agent/app/clients/milvus_client.py:51: PyMilvusDeprecationWarning: `utility.list_collections` is an ORM-style PyMilvus API and will be removed in PyMilvus 3.1. Use `MilvusClient` instead.
   utility.list_collections()
-2026-07-27 20:25:41.617 | DEBUG    | app.clients.milvus_client:health_check:52 - milvus健康检查通过
-INFO:     127.0.0.1:57197 - "GET /api/milvus/health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58964 - "GET /health HTTP/1.1" 200 OK
-2026-07-27 20:30:05.907 | INFO     | app.services.session_store:__init__:29 - 会话存储初始化完成，最大历史轮数: 6
-2026-07-27 20:30:05.917 | INFO     | app.skills.service:load_builtin_skills:73 - 加载内置 skill: data-visualization
-2026-07-27 20:30:05.919 | INFO     | app.skills.service:load_builtin_skills:73 - 加载内置 skill: knowledge-graph
-2026-07-27 20:30:05.920 | INFO     | app.skills.service:load_builtin_skills:73 - 加载内置 skill: schema-retrieval
-2026-07-27 20:30:05.921 | INFO     | app.skills.service:load_builtin_skills:73 - 加载内置 skill: sql-generation
-2026-07-27 20:30:05.921 | INFO     | app.skills.service:load_builtin_skills:73 - 加载内置 skill: sqlite-query
+2026-07-27 21:06:19.727 | DEBUG    | app.clients.milvus_client:health_check:52 - milvus健康检查通过
+INFO:     127.0.0.1:56841 - "GET /api/milvus/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57008 - "GET /health HTTP/1.1" 200 OK
+2026-07-27 21:07:47.726 | INFO     | app.services.session_store:__init__:29 - 会话存储初始化完成，最大历史轮数: 6
+2026-07-27 21:07:47.730 | INFO     | app.skills.service:load_builtin_skills:73 - 加载内置 skill: data-visualization
+2026-07-27 21:07:47.731 | INFO     | app.skills.service:load_builtin_skills:73 - 加载内置 skill: knowledge-graph
+2026-07-27 21:07:47.732 | INFO     | app.skills.service:load_builtin_skills:73 - 加载内置 skill: schema-retrieval
+2026-07-27 21:07:47.733 | INFO     | app.skills.service:load_builtin_skills:73 - 加载内置 skill: sql-generation
+2026-07-27 21:07:47.734 | INFO     | app.skills.service:load_builtin_skills:73 - 加载内置 skill: sqlite-query
 /Users/ysn/projects/data-agent/app/clients/milvus_client.py:33: PyMilvusDeprecationWarning: `connections.has_connection` is an ORM-style PyMilvus API and will be removed in PyMilvus 3.1. Use `MilvusClient` instead.
   if connections.has_connection("default"):
-2026-07-27 20:30:06.324 | INFO     | app.clients.milvus_client:connect:34 - milvus连接
+2026-07-27 21:07:48.151 | INFO     | app.clients.milvus_client:connect:34 - milvus连接
 /Users/ysn/projects/data-agent/app/clients/milvus_client.py:59: PyMilvusDeprecationWarning: `utility.has_collection` is an ORM-style PyMilvus API and will be removed in PyMilvus 3.1. Use `MilvusClient` instead.
   if utility.has_collection(self.collection_name):
-2026-07-27 20:30:06.328 | INFO     | app.clients.milvus_client:ensure_collection:64 - Collection 'knowledge_base' 不存在，
-/Users/ysn/projects/data-agent/app/clients/milvus_client.py:73: PyMilvusDeprecationWarning: `utility.has_collection` is an ORM-style PyMilvus API and will be removed in PyMilvus 3.1. Use `MilvusClient` instead.
-  if utility.has_collection(self.collection_name):
-/Users/ysn/projects/data-agent/app/clients/milvus_client.py:87: PyMilvusDeprecationWarning: `Collection` is an ORM-style PyMilvus API and will be removed in PyMilvus 3.1. Use `MilvusClient` instead.
-  self.collection=Collection(
-/Users/ysn/projects/data-agent/app/clients/milvus_client.py:95: PyMilvusDeprecationWarning: `Collection.create_index` is an ORM-style PyMilvus API and will be removed in PyMilvus 3.1. Use `MilvusClient` instead.
-  self.collection.create_index(
-/Users/ysn/projects/data-agent/app/clients/milvus_client.py:99: PyMilvusDeprecationWarning: `Collection.load` is an ORM-style PyMilvus API and will be removed in PyMilvus 3.1. Use `MilvusClient` instead.
+2026-07-27 21:07:48.153 | INFO     | app.clients.milvus_client:ensure_collection:60 - Collection 'knowledge_base' 已存在
+/Users/ysn/projects/data-agent/app/clients/milvus_client.py:61: PyMilvusDeprecationWarning: `Collection` is an ORM-style PyMilvus API and will be removed in PyMilvus 3.1. Use `MilvusClient` instead.
+  self.collection=Collection(self.collection_name)
+/Users/ysn/projects/data-agent/app/clients/milvus_client.py:62: PyMilvusDeprecationWarning: `Collection.load` is an ORM-style PyMilvus API and will be removed in PyMilvus 3.1. Use `MilvusClient` instead.
   self.collection.load()
-2026-07-27 20:30:07.293 | INFO     | app.clients.milvus_client:create_collection:100 - Collection 'knowledge_base' 创建成功
-2026-07-27 20:30:07.568 | INFO     | app.rag.vector_store:__init__:33 - 向量存储初始化完成
-INFO:     127.0.0.1:58972 - "POST /api/chat_stream HTTP/1.1" 200 OK
-2026-07-27 20:30:07.589 | INFO     | app.api.routes_chat:generate:57 - 收到流式对话请求 - Session: session-1785155403463
-2026-07-27 20:30:12.226 | ERROR    | app.api.routes_chat:generate:70 - 流式对话失败: Error 61 connecting to localhost:6379. Connection refused.
-INFO:     127.0.0.1:59039 - "GET /api/mcp/servers HTTP/1.1" 200 OK
-INFO:     127.0.0.1:59046 - "GET /health HTTP/1.1" 200 OK
-2026-07-27 20:30:21.933 | ERROR    | app.api.routes_session:list_session:63 - 获取会话列表失败: Error 61 connecting to localhost:6379. Connection refused.
-INFO:     127.0.0.1:59048 - "GET /api/chat/sessions HTTP/1.1" 200 OK
-/Users/ysn/projects/data-agent/app/clients/milvus_client.py:33: PyMilvusDeprecationWarning: `connections.has_connection` is an ORM-style PyMilvus API and will be removed in PyMilvus 3.1. Use `MilvusClient` instead.
-  if connections.has_connection("default"):
-2026-07-27 20:30:21.935 | INFO     | app.clients.milvus_client:connect:34 - milvus连接
-/Users/ysn/projects/data-agent/app/clients/milvus_client.py:48: PyMilvusDeprecationWarning: `connections.has_connection` is an ORM-style PyMilvus API and will be removed in PyMilvus 3.1. Use `MilvusClient` instead.
-  if not connections.has_connection("default"):
-/Users/ysn/projects/data-agent/app/clients/milvus_client.py:51: PyMilvusDeprecationWarning: `utility.list_collections` is an ORM-style PyMilvus API and will be removed in PyMilvus 3.1. Use `MilvusClient` instead.
-  utility.list_collections()
-2026-07-27 20:30:21.944 | DEBUG    | app.clients.milvus_client:health_check:52 - milvus健康检查通过
-INFO:     127.0.0.1:59047 - "GET /api/milvus/health HTTP/1.1" 200 OK
-2026-07-27 20:30:26.592 | ERROR    | app.api.routes_session:list_session:63 - 获取会话列表失败: Error 61 connecting to localhost:6379. Connection refused.
-INFO:     127.0.0.1:59088 - "GET /api/chat/sessions HTTP/1.1" 200 OK
-INFO:     127.0.0.1:61062 - "GET /health HTTP/1.1" 200 OK
-2026-07-27 20:35:16.215 | INFO     | app.clients.milvus_client:connect:34 - milvus连接
-2026-07-27 20:35:16.218 | DEBUG    | app.clients.milvus_client:health_check:52 - milvus健康检查通过
-INFO:     127.0.0.1:61064 - "GET /api/milvus/health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:61308 - "POST /api/chat_stream HTTP/1.1" 200 OK
-2026-07-27 20:35:52.139 | INFO     | app.api.routes_chat:generate:57 - 收到流式对话请求 - Session: session-1785155750199
-2026-07-27 20:35:52.148 | DEBUG    | app.services.session_store:get_history:53 - 获取会话 session-1785155750199 历史: 0 条消息
-2026-07-27 20:35:52.171 | DEBUG    | app.skills.middleware:awrap_model_call:141 - Skills 注入: 5 skills, 已激活 [], 隐藏工具 ['execute_sql', 'graph_search', 'schema_search', 'sql_context_search']
-2026-07-27 20:35:55.133 | INFO     | app.skills.middleware:_maybe_activate:169 - 技能已激活: schema-retrieval
-2026-07-27 20:35:55.133 | INFO     | app.skills.middleware:_maybe_activate:169 - 技能已激活: sqlite-query
-2026-07-27 20:35:55.136 | DEBUG    | app.skills.middleware:awrap_model_call:141 - Skills 注入: 5 skills, 已激活 ['schema-retrieval', 'sqlite-query'], 隐藏工具 ['graph_search', 'sql_context_search']
-2026-07-27 20:35:57.083 | DEBUG    | app.skills.middleware:awrap_model_call:141 - Skills 注入: 5 skills, 已激活 ['schema-retrieval', 'sqlite-query'], 隐藏工具 ['graph_search', 'sql_context_search']
-2026-07-27 20:36:01.200 | DEBUG    | app.skills.middleware:awrap_model_call:141 - Skills 注入: 5 skills, 已激活 ['schema-retrieval', 'sqlite-query'], 隐藏工具 ['graph_search', 'sql_context_search']
-2026-07-27 20:36:08.335 | INFO     | app.services.chat_service:chat_stream:50 - 流式对话完成 - Session: session-1785155750199, 长度: 0
-INFO:     127.0.0.1:61569 - "POST /api/chat_stream HTTP/1.1" 200 OK
-2026-07-27 20:36:39.907 | INFO     | app.api.routes_chat:generate:57 - 收到流式对话请求 - Session: session-1785155793437
-2026-07-27 20:36:39.909 | DEBUG    | app.services.session_store:get_history:53 - 获取会话 session-1785155793437 历史: 0 条消息
-2026-07-27 20:36:39.928 | DEBUG    | app.skills.middleware:awrap_model_call:141 - Skills 注入: 5 skills, 已激活 [], 隐藏工具 ['execute_sql', 'graph_search', 'schema_search', 'sql_context_search']
-2026-07-27 20:36:43.808 | INFO     | app.skills.middleware:_maybe_activate:169 - 技能已激活: schema-retrieval
-2026-07-27 20:36:43.808 | INFO     | app.skills.middleware:_maybe_activate:169 - 技能已激活: sqlite-query
-2026-07-27 20:36:43.815 | DEBUG    | app.skills.middleware:awrap_model_call:141 - Skills 注入: 5 skills, 已激活 ['schema-retrieval', 'sqlite-query'], 隐藏工具 ['graph_search', 'sql_context_search']
-2026-07-27 20:36:45.819 | DEBUG    | app.skills.middleware:awrap_model_call:141 - Skills 注入: 5 skills, 已激活 ['schema-retrieval', 'sqlite-query'], 隐藏工具 ['graph_search', 'sql_context_search']
-2026-07-27 20:36:57.649 | DEBUG    | app.skills.middleware:awrap_model_call:141 - Skills 注入: 5 skills, 已激活 ['schema-retrieval', 'sqlite-query'], 隐藏工具 ['graph_search', 'sql_context_search']
-2026-07-27 20:37:04.753 | INFO     | app.skills.middleware:_maybe_activate:169 - 技能已激活: data-visualization
-2026-07-27 20:37:04.760 | WARNING  | app.mcp.service:_load_one:167 - MCP server 不存在: chart-mcp
-2026-07-27 20:37:04.760 | DEBUG    | app.skills.middleware:awrap_model_call:141 - Skills 注入: 5 skills, 已激活 ['data-visualization', 'schema-retrieval', 'sqlite-query'], 隐藏工具 ['graph_search', 'sql_context_search']
-2026-07-27 20:37:23.907 | INFO     | app.services.chat_service:chat_stream:50 - 流式对话完成 - Session: session-1785155793437, 长度: 0
-INFO:     127.0.0.1:63047 - "GET /health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:63553 - "POST /api/chat_stream HTTP/1.1" 200 OK
-2026-07-27 20:41:37.503 | INFO     | app.api.routes_chat:generate:57 - 收到流式对话请求 - Session: session-1785156015113
-2026-07-27 20:41:37.504 | DEBUG    | app.services.session_store:get_history:53 - 获取会话 session-1785156015113 历史: 0 条消息
-2026-07-27 20:41:37.516 | DEBUG    | app.skills.middleware:awrap_model_call:141 - Skills 注入: 5 skills, 已激活 [], 隐藏工具 ['execute_sql', 'graph_search', 'schema_search', 'sql_context_search']
-2026-07-27 20:41:40.390 | INFO     | app.skills.middleware:_maybe_activate:169 - 技能已激活: schema-retrieval
-2026-07-27 20:41:40.390 | INFO     | app.skills.middleware:_maybe_activate:169 - 技能已激活: sqlite-query
-2026-07-27 20:41:40.393 | DEBUG    | app.skills.middleware:awrap_model_call:141 - Skills 注入: 5 skills, 已激活 ['schema-retrieval', 'sqlite-query'], 隐藏工具 ['graph_search', 'sql_context_search']
-2026-07-27 20:41:42.518 | DEBUG    | app.skills.middleware:awrap_model_call:141 - Skills 注入: 5 skills, 已激活 ['schema-retrieval', 'sqlite-query'], 隐藏工具 ['graph_search', 'sql_context_search']
-2026-07-27 20:41:49.400 | DEBUG    | app.skills.middleware:awrap_model_call:141 - Skills 注入: 5 skills, 已激活 ['schema-retrieval', 'sqlite-query'], 隐藏工具 ['graph_search', 'sql_context_search']
-2026-07-27 20:41:58.032 | INFO     | app.services.chat_service:chat_stream:50 - 流式对话完成 - Session: session-1785156015113, 长度: 0
-INFO:     127.0.0.1:55599 - "GET /health HTTP/1.1" 200 OK
+2026-07-27 21:07:48.387 | INFO     | app.rag.vector_store:__init__:33 - 向量存储初始化完成
+INFO:     127.0.0.1:57427 - "POST /api/chat_stream HTTP/1.1" 200 OK
+2026-07-27 21:07:48.405 | INFO     | app.api.routes_chat:generate:57 - 收到流式对话请求 - Session: session-1785157602327
+2026-07-27 21:07:48.407 | DEBUG    | app.services.session_store:get_history:53 - 获取会话 session-1785157602327 历史: 0 条消息
+2026-07-27 21:07:48.413 | DEBUG    | app.skills.middleware:awrap_model_call:141 - Skills 注入: 5 skills, 已激活 [], 隐藏工具 ['execute_sql', 'graph_search', 'schema_search', 'sql_context_search']
+2026-07-27 21:07:52.440 | INFO     | app.skills.middleware:_maybe_activate:169 - 技能已激活: schema-retrieval
+2026-07-27 21:07:52.440 | INFO     | app.skills.middleware:_maybe_activate:169 - 技能已激活: sqlite-query
+2026-07-27 21:07:52.445 | DEBUG    | app.skills.middleware:awrap_model_call:141 - Skills 注入: 5 skills, 已激活 ['schema-retrieval', 'sqlite-query'], 隐藏工具 ['graph_search', 'sql_context_search']
+2026-07-27 21:07:54.875 | DEBUG    | app.skills.middleware:awrap_model_call:141 - Skills 注入: 5 skills, 已激活 ['schema-retrieval', 'sqlite-query'], 隐藏工具 ['graph_search', 'sql_context_search']
+2026-07-27 21:07:59.261 | DEBUG    | app.skills.middleware:awrap_model_call:141 - Skills 注入: 5 skills, 已激活 ['schema-retrieval', 'sqlite-query'], 隐藏工具 ['graph_search', 'sql_context_search']
+2026-07-27 21:08:06.662 | INFO     | app.services.chat_service:chat_stream:50 - 流式对话完成 - Session: session-1785157602327, 长度: 0
