@@ -95,7 +95,7 @@ class ChatAgent:
             stream_mode="messages",
             config={"callbacks": get_langfuse_callbacks()},
         ):
-            if isinstance(chunk, AIMessageChunk):
+            if isinstance(chunk, (AIMessage, AIMessageChunk)):
                 # 优先读 content，如果为空则尝试 reasoning_content（glm-5.2 等推理模型）
                 text = ""
                 if chunk.content:
