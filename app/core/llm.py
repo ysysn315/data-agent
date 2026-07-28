@@ -29,8 +29,8 @@ class ReasoningChatOpenAI(ChatOpenAI):
         """重写：把 reasoning_content 转成 content"""
         # 先手动提取 reasoning_content
         choices = chunk.get("choices", [])
-        if choices:
-            delta = choices[0].get("delta", {})
+        if choices and choices[0] is not None:
+            delta = choices[0].get("delta") or {}
             reasoning_content = delta.get("reasoning_content")
             if reasoning_content:
                 # 把 reasoning_content 塞进 delta.content，让父类正常处理
@@ -80,8 +80,8 @@ class LLMFactory:
             model=model_name,
             api_key=resolved_api_key,
             base_url=base_url or settings.llm_base_url,
-            temperature=temperature or settings.llm_temperature,
-            streaming=streaming or settings.llm_streaming,
+            temperature=temperature if temperature is not None else settings.llm_temperature,
+            streaming=streaming if streaming is not None else settings.llm_streaming,
             **kwargs
         )
 

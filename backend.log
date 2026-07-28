@@ -50,3 +50,31 @@ INFO:     127.0.0.1:51860 - "POST /api/chat_stream HTTP/1.1" 200 OK
 
 现在我已经了解了表结...
 2026-07-27 21:37:24.125 | INFO     | app.services.chat_service:chat_stream:50 - 流式对话完成 - Session: session-1785159381605, 长度: 601
+INFO:     127.0.0.1:65180 - "POST /api/chat_stream HTTP/1.1" 200 OK
+2026-07-28 09:47:30.215 | INFO     | app.api.routes_chat:generate:57 - 收到流式对话请求 - Session: session-1785157382813
+2026-07-28 09:47:30.221 | DEBUG    | app.services.session_store:get_history:53 - 获取会话 session-1785157382813 历史: 0 条消息
+2026-07-28 09:47:30.233 | DEBUG    | app.skills.middleware:awrap_model_call:141 - Skills 注入: 5 skills, 已激活 [], 隐藏工具 ['execute_sql', 'graph_search', 'schema_search', 'sql_context_search']
+2026-07-28 09:47:35.394 | INFO     | app.skills.middleware:_maybe_activate:169 - 技能已激活: schema-retrieval
+2026-07-28 09:47:35.395 | INFO     | app.skills.middleware:_maybe_activate:169 - 技能已激活: sqlite-query
+2026-07-28 09:47:35.401 | DEBUG    | app.skills.middleware:awrap_model_call:141 - Skills 注入: 5 skills, 已激活 ['schema-retrieval', 'sqlite-query'], 隐藏工具 ['graph_search', 'sql_context_search']
+2026-07-28 09:47:37.224 | DEBUG    | app.skills.middleware:awrap_model_call:141 - Skills 注入: 5 skills, 已激活 ['schema-retrieval', 'sqlite-query'], 隐藏工具 ['graph_search', 'sql_context_search']
+2026-07-28 09:47:43.158 | DEBUG    | app.skills.middleware:awrap_model_call:141 - Skills 注入: 5 skills, 已激活 ['schema-retrieval', 'sqlite-query'], 隐藏工具 ['graph_search', 'sql_context_search']
+2026-07-28 09:47:50.413 | DEBUG    | app.services.session_store:add_message:45 - 会话 session-1785157382813 添加消息: user - 各州（customer_state）的销售额 Top5...
+2026-07-28 09:47:50.413 | DEBUG    | app.services.session_store:add_message:45 - 会话 session-1785157382813 添加消息: assistant - ## 各州（customer_state）销售额 Top 5
+
+以下是已完成交付（`delivere...
+2026-07-28 09:47:50.413 | INFO     | app.services.chat_service:chat_stream:50 - 流式对话完成 - Session: session-1785157382813, 长度: 513
+INFO:     127.0.0.1:65458 - "POST /api/chat_stream HTTP/1.1" 200 OK
+2026-07-28 09:48:10.487 | INFO     | app.api.routes_chat:generate:57 - 收到流式对话请求 - Session: session-1785157382813
+2026-07-28 09:48:10.490 | DEBUG    | app.services.session_store:get_history:53 - 获取会话 session-1785157382813 历史: 2 条消息
+2026-07-28 09:48:10.497 | DEBUG    | app.skills.middleware:awrap_model_call:141 - Skills 注入: 5 skills, 已激活 [], 隐藏工具 ['execute_sql', 'graph_search', 'schema_search', 'sql_context_search']
+2026-07-28 09:48:13.260 | INFO     | app.skills.middleware:_maybe_activate:169 - 技能已激活: data-visualization
+2026-07-28 09:48:13.265 | WARNING  | app.mcp.service:_load_one:167 - MCP server 不存在: chart-mcp
+2026-07-28 09:48:13.266 | DEBUG    | app.skills.middleware:awrap_model_call:141 - Skills 注入: 5 skills, 已激活 ['data-visualization'], 隐藏工具 ['execute_sql', 'graph_search', 'schema_search', 'sql_context_search']
+2026-07-28 09:48:39.148 | DEBUG    | app.services.session_store:add_message:45 - 会话 session-1785157382813 添加消息: user - 进一步可视化...
+2026-07-28 09:48:39.149 | DEBUG    | app.services.session_store:add_message:45 - 会话 session-1785157382813 添加消息: assistant - ## 📊 各州销售额 Top 5 可视化
+
+### 柱状图 — 各州销售额对比（单位：R$）
+
+``...
+2026-07-28 09:48:39.149 | INFO     | app.services.chat_service:chat_stream:50 - 流式对话完成 - Session: session-1785157382813, 长度: 1593
