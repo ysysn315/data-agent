@@ -1,5 +1,9 @@
 version: '3.5'
 
+# 注意：本文件仅用于 Milvus 知识库（可选依赖，ENABLE_KB_TOOL=true 时需要）
+# Redis 用于会话/任务队列，请单独启动（brew services start redis）
+# 与 my-agent-original/docker-compose.yml 不同，本文件只包含 Milvus 必需组件
+
 services:
   etcd:
     image: quay.io/coreos/etcd:v3.5.5
@@ -51,4 +55,19 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
       interval: 30s
       timeout: 20s
+      retries: 3
+
+  # Redis 用于会话存储和任务队列（必需，非可选）
+  redis:
+    image: redis:7-alpine
+    container_name: data-agent-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./volumes/redis:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
       retries: 3

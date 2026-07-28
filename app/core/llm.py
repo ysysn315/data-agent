@@ -3,9 +3,8 @@
 特殊处理：
 - glm-5.2 等推理模型的 reasoning_content 转 content（LangChain 默认只读 content）
 """
-from typing import Any, Optional
+from typing import Optional
 
-from langchain_core.messages import AIMessageChunk
 from langchain_openai import ChatOpenAI
 from loguru import logger
 
@@ -32,8 +31,8 @@ class ReasoningChatOpenAI(ChatOpenAI):
         if choices and choices[0] is not None:
             delta = choices[0].get("delta") or {}
             reasoning_content = delta.get("reasoning_content")
-            if reasoning_content:
-                # 把 reasoning_content 塞进 delta.content，让父类正常处理
+            if reasoning_content and not delta.get("content"):
+                # 只在 content 为空时，把 reasoning_content 转成 content
                 delta["content"] = reasoning_content
                 # 移除 reasoning_content 避免重复
                 del delta["reasoning_content"]
@@ -70,9 +69,10 @@ class LLMFactory:
             # 显式失败：不要让空 key 在第一次真实调用时才以 401 暴露
             raise ValueError("LLM_API_KEY 未配置，请在 .env 中设置")
 
-        # 判断是否是推理模型（glm-5.2 等）
+        # 判断是否是推理模型（glm-5.2 / deepseek-r1 / o1 / o3 等）
         model_name = model or settings.llm_model
-        is_reasoning_model = "glm" in model_name.lower() or "reasoning" in model_name.lower()
+        reasoning_models = getattr(settings, "reasoning_models", ["glm", "deepseek-r1", "o1", "o3"])
+        is_reasoning_model = any(rm in model_name.lower() for rm in reasoning_models)
 
         llm_class = ReasoningChatOpenAI if is_reasoning_model else ChatOpenAI
 
