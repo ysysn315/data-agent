@@ -1,8 +1,7 @@
 version: '3.5'
 
-# 注意：本文件仅用于 Milvus 知识库（可选依赖，ENABLE_KB_TOOL=true 时需要）
-# Redis 用于会话/任务队列，请单独启动（brew services start redis）
-# 与 my-agent-original/docker-compose.yml 不同，本文件只包含 Milvus 必需组件
+# data-agent 基础设施：Milvus（知识库，ENABLE_KB_TOOL=true 时需要）+ Redis（会话/任务队列，必需）
+# 国内网络环境用：docker compose -f docker-compose.yml -f docker-compose.cn.yml up（cn.yml 仅覆盖镜像源）
 
 services:
   etcd:

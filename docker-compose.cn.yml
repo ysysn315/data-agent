@@ -1,42 +1,12 @@
+# 国内镜像源 override：与 docker-compose.yml 配合使用，仅覆盖 etcd/minio/milvus 镜像源
+#   docker compose -f docker-compose.yml -f docker-compose.cn.yml up
+# redis 及所有 healthcheck/端口等服务定义从 docker-compose.yml 继承
 services:
   etcd:
     image: registry.cn-hangzhou.aliyuncs.com/coreos/etcd:v3.5.5
-    container_name: milvus-etcd
-    environment:
-      - ETCD_AUTO_COMPACTION_MODE=revision
-      - ETCD_AUTO_COMPACTION_RETENTION=1000
-      - ETCD_QUOTA_BACKEND_BYTES=4294967296
-    volumes:
-      - ./volumes/etcd:/etcd
-    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
-    ports:
-      - "2379:2379"
 
   minio:
     image: registry.cn-hangzhou.aliyuncs.com/minio/minio:RELEASE.2023-03-20T20-16-18Z
-    container_name: milvus-minio
-    environment:
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
-    volumes:
-      - ./volumes/minio:/minio_data
-    command: minio server /minio_data
-    ports:
-      - "9000:9000"
-      - "9001:9001"
 
   milvus:
     image: registry.cn-hangzhou.aliyuncs.com/milvusdb/milvus:v2.5.6
-    container_name: milvus
-    command: ["milvus", "run", "standalone"]
-    environment:
-      ETCD_ENDPOINTS: etcd:2379
-      MINIO_ADDRESS: minio:9000
-    volumes:
-      - ./volumes/milvus:/var/lib/milvus
-    ports:
-      - "19530:19530"
-      - "9091:9091"
-    depends_on:
-      - etcd
-      - minio

@@ -41,16 +41,11 @@ class ChatService:
         collected_content: list[str] = []
         async for chunk in self.agent.chat_stream(question, history=history, summary=summary):
             # chat_agent yield {"type": "reasoning"|"content", "text": str}
-            if isinstance(chunk, dict):
-                text = chunk.get("text", "")
-                if text:
-                    yield text  # 思考与答案都推给前端展示
-                if chunk.get("type") == "content":
-                    collected_content.append(text)  # 仅最终答案入会话历史
-            else:
-                # 兼容裸字符串 chunk
-                collected_content.append(chunk)
-                yield chunk
+            text = chunk.get("text", "")
+            if text:
+                yield text  # 思考与答案都推给前端展示
+            if chunk.get("type") == "content":
+                collected_content.append(text)  # 仅最终答案入会话历史
 
         # 只存最终答案（content），思考过程不入历史，保持与非流式 chat() 一致
         answer = "".join(collected_content)
