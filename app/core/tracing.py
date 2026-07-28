@@ -7,6 +7,7 @@
 - 失败降级：初始化 Langfuse 客户端或 CallbackHandler 抛错时，记 warning 并返回 []，
   绝不让 tracing 故障波及对话主链路。
 """
+
 from __future__ import annotations
 
 from typing import Any, List

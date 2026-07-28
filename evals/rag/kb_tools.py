@@ -12,7 +12,6 @@ from app.rag.embeddings import EmbeddingService
 from app.rag.vector_store import VectorStore
 from app.services.vector_index_service import VectorIndexService
 
-
 # 统一从仓库根目录定位测试文档，避免依赖当前命令执行位置。
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 

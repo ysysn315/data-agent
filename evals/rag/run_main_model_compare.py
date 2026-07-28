@@ -109,15 +109,9 @@ def use_openai_compatible_chat(model_name: str) -> bool:
 
 
 def normalize_token_usage(token_usage: dict) -> dict:
-    input_tokens = int(
-        token_usage.get("input_tokens", token_usage.get("prompt_tokens", 0)) or 0
-    )
-    output_tokens = int(
-        token_usage.get("output_tokens", token_usage.get("completion_tokens", 0)) or 0
-    )
-    total_tokens = int(
-        token_usage.get("total_tokens", input_tokens + output_tokens) or 0
-    )
+    input_tokens = int(token_usage.get("input_tokens", token_usage.get("prompt_tokens", 0)) or 0)
+    output_tokens = int(token_usage.get("output_tokens", token_usage.get("completion_tokens", 0)) or 0)
+    total_tokens = int(token_usage.get("total_tokens", input_tokens + output_tokens) or 0)
     return {
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,
@@ -187,9 +181,7 @@ async def invoke_openai_compatible_chat(
         )
 
     if response.is_error:
-        raise RuntimeError(
-            f"status_code: {response.status_code} {format_http_error(response)}".strip()
-        )
+        raise RuntimeError(f"status_code: {response.status_code} {format_http_error(response)}".strip())
 
     data = response.json()
     choices = data.get("choices") or []
@@ -211,9 +203,7 @@ async def generate_answer_with_main_model_usage(rag_service, question: str) -> d
         }
     )
     ai_message = await rag_service.llm.ainvoke(prompt_value.to_messages())
-    sources = list(
-        set(doc.get("metadata", {}).get("source", "未知来源") for doc in docs)
-    )
+    sources = list(set(doc.get("metadata", {}).get("source", "未知来源") for doc in docs))
     token_usage = (getattr(ai_message, "response_metadata", {}) or {}).get("token_usage", {})
     return {
         "answer": extract_text_content(getattr(ai_message, "content", "")),
@@ -250,13 +240,9 @@ async def generate_answer_with_fixed_generation_path(
     else:
         ai_message = await rag_service.llm.ainvoke(messages)
         answer = extract_text_content(getattr(ai_message, "content", ""))
-        token_usage = normalize_token_usage(
-            (getattr(ai_message, "response_metadata", {}) or {}).get("token_usage", {})
-        )
+        token_usage = normalize_token_usage((getattr(ai_message, "response_metadata", {}) or {}).get("token_usage", {}))
 
-    sources = list(
-        set(doc.get("metadata", {}).get("source", "unknown_source") for doc in docs)
-    )
+    sources = list(set(doc.get("metadata", {}).get("source", "unknown_source") for doc in docs))
     return {
         "answer": answer,
         "sources": sources,

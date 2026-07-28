@@ -39,9 +39,7 @@ def _fetch_schema(conn: sqlite3.Connection) -> dict[str, list[str]]:
     而单库 PRAGMA 开销极小，现取最简单也最不易出错。
     """
     schema: dict[str, list[str]] = {}
-    rows = conn.execute(
-        "SELECT name FROM sqlite_master WHERE type IN ('table', 'view')"
-    ).fetchall()
+    rows = conn.execute("SELECT name FROM sqlite_master WHERE type IN ('table', 'view')").fetchall()
     for (name,) in rows:
         if name.startswith("sqlite_"):
             continue

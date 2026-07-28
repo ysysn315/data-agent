@@ -12,6 +12,7 @@
 路由风格对齐 routes_tasks（APIRouter(prefix=...) + Depends 注入），依赖 get_analysis_agent
 可被 dependency_overrides 换成假 agent（离线测试不触碰真 LLM）。
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status

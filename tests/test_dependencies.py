@@ -3,9 +3,8 @@
 回归：get_chat_agent 曾在持有 _init_lock 时调用 get_skill_service（同一把锁），
 asyncio.Lock 不可重入导致死锁——首次 chat 请求永久挂起。
 """
-import asyncio
 
-import pytest
+import asyncio
 
 from app.core import dependencies
 from app.core.settings import settings

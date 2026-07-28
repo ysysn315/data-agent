@@ -12,6 +12,7 @@
 门面（run_sync 桥 + LLM 同步调用），FastAPI 会把同步路由放进线程池执行，
 LLM 抽取的秒级耗时不会阻塞主事件循环。
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -25,8 +26,10 @@ router = APIRouter(prefix="/graph", tags=["graph"])
 
 # ========== 请求模型 ==========
 
+
 class TripleIn(BaseModel):
     """一条三元组：主语 -[谓词]-> 宾语"""
+
     subject: str = Field(..., min_length=1, description="主语（实体/指标名）")
     predicate: str = Field(..., min_length=1, description="谓词（短动词短语，如 属于、计算自）")
     object: str = Field(..., min_length=1, description="宾语（实体/指标名）")
@@ -35,15 +38,18 @@ class TripleIn(BaseModel):
 
 class TriplesCreate(BaseModel):
     """批量添加三元组"""
+
     triples: list[TripleIn] = Field(..., min_length=1, description="待入库的三元组列表")
 
 
 class ExtractRequest(BaseModel):
     """LLM 抽取请求"""
+
     text: str = Field(..., description="待抽取的文本（空白文本直接返回空结果，不调 LLM）")
 
 
 # ========== 写入 ==========
+
 
 @router.post("/triples", status_code=status.HTTP_201_CREATED)
 def add_triples(req: TriplesCreate, service: GraphService = Depends(get_graph_service)) -> dict:
@@ -63,6 +69,7 @@ def extract_from_text(req: ExtractRequest, service: GraphService = Depends(get_g
 
 # ========== 查询 ==========
 
+
 @router.get("/entity/{name}")
 def get_entity(
     name: str,
@@ -72,9 +79,7 @@ def get_entity(
     """实体的邻居子图（出边入边都带谓词；实体不存在 → 404）"""
     result = service.query_entity(name, depth=depth)
     if result is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=f"图谱中不存在实体: {name}"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"图谱中不存在实体: {name}")
     return result
 
 

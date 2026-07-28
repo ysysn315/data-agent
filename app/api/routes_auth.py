@@ -8,6 +8,7 @@
 demo（auth_enabled=False）下守卫恒放行、current_user 为占位 dev_user，
 可用于本地联调；真正的鉴权在 auth_enabled=True 时生效。
 """
+
 from __future__ import annotations
 
 from typing import Optional
@@ -23,8 +24,10 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 # ========== 请求/响应模型 ==========
 
+
 class UserCreateRequest(BaseModel):
     """新建用户请求"""
+
     username: str = Field(..., description="用户名（唯一）")
     role: str = Field("member", description="角色：admin | member")
     workspace: str = Field("default", description="工作空间 slug（不存在则自动创建）")
@@ -32,6 +35,7 @@ class UserCreateRequest(BaseModel):
 
 class UserResponse(BaseModel):
     """用户信息（不含哈希/明文）"""
+
     id: int
     username: str
     role: str
@@ -43,11 +47,13 @@ class UserResponse(BaseModel):
 
 class UserCreateResponse(UserResponse):
     """新建用户响应：额外携带**仅此一次**的明文 API Key"""
+
     api_key: str = Field(..., description="明文 API Key，只在创建时返回一次，请立即保存")
 
 
 class MeResponse(BaseModel):
     """当前身份回显（demo 下为占位 dev_user，故大部分字段可空）"""
+
     id: int
     username: str
     role: str
@@ -57,6 +63,7 @@ class MeResponse(BaseModel):
 
 
 # ========== 用户管理（admin） ==========
+
 
 @router.post(
     "/users",
@@ -92,13 +99,12 @@ async def disable_user(user_id: int):
     """禁用用户（其 API Key 随即失效）"""
     updated = await auth.disable_user(user_id)
     if updated is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=f"用户不存在: {user_id}"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"用户不存在: {user_id}")
     return UserResponse(**updated)
 
 
 # ========== 自身身份 ==========
+
 
 @router.get("/me", response_model=MeResponse)
 async def me(current_user: dict = Depends(get_current_user)):

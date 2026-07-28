@@ -14,6 +14,7 @@
 回退 jieba；**不缓存失败状态**（已成功算出的技能向量保留，失败的下次再试）。
 匹配是"增强"而非关键路径，失败降级不打断上层 auto_match（见 IMPLEMENTATION-matching.md ④）。
 """
+
 from __future__ import annotations
 
 import math
@@ -108,10 +109,7 @@ class SkillMatcher:
 
         注意：CJK 单字（如 "图"）`isalnum()` 为真会被保留，与 service v1 口径一致。
         """
-        return {
-            token for token in jieba.lcut(text.lower())
-            if token.strip() and (len(token) > 1 or token.isalnum())
-        }
+        return {token for token in jieba.lcut(text.lower()) if token.strip() and (len(token) > 1 or token.isalnum())}
 
     # ========== 主入口 ==========
 
@@ -166,10 +164,7 @@ class SkillMatcher:
         query_vec = await self._embed(query)
 
         # 3. 余弦排序取 top-k（纯召回，不设阈值：技能数少、上层 top_k 已封顶噪声）
-        scored = [
-            (skill, cosine_similarity(query_vec, self._vector_cache[skill.slug]))
-            for skill in skills
-        ]
+        scored = [(skill, cosine_similarity(query_vec, self._vector_cache[skill.slug])) for skill in skills]
         scored.sort(key=lambda x: x[1], reverse=True)
         return [skill for skill, _ in scored[:top_k]]
 

@@ -12,6 +12,7 @@
 - FakeChatAgent：暴露 .graph.ainvoke，按脚本返回一轮消息（含 execute_sql 调用与最终回答），
   代替「Operation 步骤复用 ChatAgent 跑一轮」。
 """
+
 import json
 from typing import List, Optional
 
@@ -22,7 +23,6 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 
 from app.agents.analysis_agent import AnalysisAgent
 from app.tasks.events import TaskEvent
-
 
 # ========== 假模型 ==========
 
@@ -67,9 +67,7 @@ def _step_messages(answer: str, sql: Optional[str]) -> List:
     """构造一轮 ChatAgent 消息流：可选 execute_sql 调用 + 最终回答。"""
     messages: List = []
     if sql:
-        messages.append(
-            AIMessage(content="", tool_calls=[{"name": "execute_sql", "args": {"sql": sql}, "id": "c1"}])
-        )
+        messages.append(AIMessage(content="", tool_calls=[{"name": "execute_sql", "args": {"sql": sql}, "id": "c1"}]))
         messages.append(ToolMessage(content="(查询结果)", tool_call_id="c1"))
     messages.append(AIMessage(content=answer))
     return messages
@@ -400,24 +398,32 @@ async def test_emit_accepts_sync_callback_and_survives_failure():
 
     事件上报是辅助路径：① 同步/异步回调都要兼容；② 回调抛异常只告警不中断。
     """
+
     def scripted():
-        return FakeScriptedLLM(scripted=[
-            _plan_msg([
-                {"goal": "查订单量", "tool_hint": "sqlite-query"},
-                {"goal": "查金额", "tool_hint": ""},
-            ]),
-            _reflect_msg("已回答", "结论若干", need_more=False),
-        ])
+        return FakeScriptedLLM(
+            scripted=[
+                _plan_msg(
+                    [
+                        {"goal": "查订单量", "tool_hint": "sqlite-query"},
+                        {"goal": "查金额", "tool_hint": ""},
+                    ]
+                ),
+                _reflect_msg("已回答", "结论若干", need_more=False),
+            ]
+        )
 
     def chat():
-        return FakeChatAgent(io=[
-            {"answer": "订单量 3", "sql": "SELECT COUNT(*) FROM orders"},
-            {"answer": "金额 180", "sql": None},
-        ])
+        return FakeChatAgent(
+            io=[
+                {"answer": "订单量 3", "sql": "SELECT COUNT(*) FROM orders"},
+                {"answer": "金额 180", "sql": None},
+            ]
+        )
 
     sync_events = []
     agent = AnalysisAgent(
-        llm=scripted(), chat_agent=chat(),
+        llm=scripted(),
+        chat_agent=chat(),
         on_event=lambda e: sync_events.append(e.type),  # 同步回调
     )
     result = await agent.analyze("测试问题")

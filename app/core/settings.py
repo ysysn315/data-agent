@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     # 应用配置
     app_port: int = 9900
     upload_dir: str = "./uploads"
-    save_dir: str = "./saves"          # 持久化目录（skills / mcp 配置等）
+    save_dir: str = "./saves"  # 持久化目录（skills / mcp 配置等）
     debug: bool = False
 
     # 持久化数据库（SQLAlchemy 2.0 async）。SQLite 起步、PostgreSQL 就绪：
@@ -79,8 +79,8 @@ class Settings(BaseSettings):
     # docker     = 每次执行拉起一次性容器：断网 + 只读挂载 + 内存/CPU/进程数限额
     skill_sandbox_mode: Literal["subprocess", "docker"] = "subprocess"
     skill_sandbox_image: str = "python:3.11-slim"  # 容器镜像（需提前 docker pull）
-    skill_sandbox_memory: str = "256m"             # 容器内存上限（docker --memory 语法）
-    skill_sandbox_cpus: float = 0.5                # 容器 CPU 配额（docker --cpus）
+    skill_sandbox_memory: str = "256m"  # 容器内存上限（docker --memory 语法）
+    skill_sandbox_cpus: float = 0.5  # 容器 CPU 配额（docker --cpus）
 
     # Langfuse 调用链追踪（可选，默认关闭）
     # enabled=False 或 key 为空时完全跳过，不 import langfuse，不影响主流程

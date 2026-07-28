@@ -8,6 +8,7 @@ SQLite 没有原生的表/字段注释（COMMENT），M-Schema 生成时无法�
 - 字段名严格对齐 Olist 公开数据集的真实列名（含官方拼写错误，如 lenght）。
 - 六张表覆盖 REQUIREMENTS §5 演示场景：orders / order_items / customers / products / sellers / payments。
 """
+
 from __future__ import annotations
 
 # 结构：{表名: {"comment": 表注释, "fields": {字段名: 字段注释}}}

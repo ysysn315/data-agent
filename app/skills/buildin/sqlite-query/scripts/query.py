@@ -6,6 +6,7 @@
 
 仅用标准库，无第三方依赖。
 """
+
 import argparse
 import json
 import re
@@ -48,11 +49,13 @@ def main() -> int:
         print(json.dumps({"error": f"SQL 执行失败: {e}"}, ensure_ascii=False))
         return 1
 
-    print(json.dumps(
-        {"columns": columns, "rows": [list(r) for r in rows], "row_count": len(rows)},
-        ensure_ascii=False,
-        default=str,
-    ))
+    print(
+        json.dumps(
+            {"columns": columns, "rows": [list(r) for r in rows], "row_count": len(rows)},
+            ensure_ascii=False,
+            default=str,
+        )
+    )
     return 0
 
 

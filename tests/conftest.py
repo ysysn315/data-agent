@@ -1,4 +1,5 @@
 """pytest 公共 fixtures"""
+
 import sqlite3
 from pathlib import Path
 

@@ -1,4 +1,4 @@
-from typing import List, Set, Iterable
+from typing import Iterable, List, Set
 
 
 def hit_at_k(pred: List[str], gold: Set[str], k: int) -> float:
@@ -33,7 +33,7 @@ def source_hit(pred_sources: List[str], expected_sources: Iterable[str]) -> floa
     exp = [x.strip().lower() for x in expected_sources if x.strip()]
     if not exp:
         return 1.0
-    p = " | ".join((pred_sources or [])).lower()
+    p = " | ".join(pred_sources or []).lower()
     hit = sum(1 for e in exp if e in p)
     return hit / len(exp)
 
@@ -190,11 +190,7 @@ def source_precision_strict(
     """只奖励与预期 source 集合一致的引用。"""
     pred = [_normalize_source_name(x) for x in (pred_sources or []) if x]
     pred = _unique_keep_order(pred)
-    allowed = {
-        _normalize_source_name(x)
-        for x in (expected_sources_all or []) + (expected_sources_any or [])
-        if x
-    }
+    allowed = {_normalize_source_name(x) for x in (expected_sources_all or []) + (expected_sources_any or []) if x}
 
     if not pred:
         return 1.0 if not allowed else 0.0
@@ -207,9 +203,7 @@ def source_precision_strict(
 
 def forbidden_source_score(pred_sources, forbidden_sources=None) -> float:
     """命中禁用 source 越少越好。"""
-    forbidden = {
-        _normalize_source_name(x) for x in (forbidden_sources or []) if x
-    }
+    forbidden = {_normalize_source_name(x) for x in (forbidden_sources or []) if x}
     pred = {_normalize_source_name(x) for x in (pred_sources or []) if x}
 
     if not forbidden:

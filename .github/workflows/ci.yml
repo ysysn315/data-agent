@@ -1,0 +1,46 @@
+# data-agent CI：每次 push / PR 自动跑 Lint + 测试
+# 测试套件为离线 CI 设计（Redis 用 fakeredis、LLM 全 mock、Milvus 不依赖），
+# 需真实 Redis/Docker 的用例有 skipif 自动跳过，CI 无需起任何外部服务。
+name: CI
+
+on:
+  push:
+    branches: ['**']   # 任意分支
+  pull_request:
+
+jobs:
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 安装 uv
+        uses: astral-sh/setup-uv@v4
+      - name: 设置 Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: 安装依赖
+        run: uv sync
+      - name: ruff 规则检查
+        run: uv run ruff check .
+      - name: ruff 格式检查
+        run: uv run ruff format --check .
+
+  test:
+    name: Test (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 安装 uv
+        uses: astral-sh/setup-uv@v4
+      - name: 设置 Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: 安装依赖
+        run: uv sync
+      - name: 跑测试
+        # 用 -m pytest 而非 pytest：项目用 flat 布局（app/ 在仓库根），
+        # -m 会把 cwd 加进 sys.path[0] 让 import app 生效；console_script 入口不会。
+        run: uv run python -m pytest tests/ -q

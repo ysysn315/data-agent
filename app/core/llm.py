@@ -3,10 +3,10 @@
 特殊处理：
 - glm-5.2 等推理模型的 reasoning_content 转 content（LangChain 默认只读 content）
 """
+
 from typing import Optional
 
 from langchain_openai import ChatOpenAI
-from loguru import logger
 
 from app.core.settings import settings
 
@@ -35,9 +35,7 @@ class ReasoningChatOpenAI(ChatOpenAI):
         base_generation_info: dict | None,
     ):
         """流式：reasoning_content 保留到 additional_kwargs，不并入 content"""
-        gen_chunk = super()._convert_chunk_to_generation_chunk(
-            chunk, default_chunk_class, base_generation_info
-        )
+        gen_chunk = super()._convert_chunk_to_generation_chunk(chunk, default_chunk_class, base_generation_info)
         if gen_chunk is None:
             # delta=None 等情况父类返回 None
             return None
@@ -57,11 +55,7 @@ class ReasoningChatOpenAI(ChatOpenAI):
     ):
         """非流式：从原始响应恢复 reasoning_content（langchain 默认丢弃）"""
         result = super()._create_chat_result(response, generation_info)
-        response_dict = (
-            response
-            if isinstance(response, dict)
-            else response.model_dump(warnings=False)
-        )
+        response_dict = response if isinstance(response, dict) else response.model_dump(warnings=False)
         raw_choices = response_dict.get("choices", []) or []
         for gen, raw_choice in zip(result.generations, raw_choices):
             raw_msg = raw_choice.get("message", {}) if isinstance(raw_choice, dict) else {}
@@ -82,7 +76,7 @@ class LLMFactory:
         base_url: Optional[str] = None,
         temperature: Optional[float] = None,
         streaming: Optional[bool] = None,
-        **kwargs
+        **kwargs,
     ) -> ChatOpenAI:
         """
         创建 LLM 实例
@@ -112,7 +106,7 @@ class LLMFactory:
             base_url=base_url or settings.llm_base_url,
             temperature=temperature if temperature is not None else settings.llm_temperature,
             streaming=streaming if streaming is not None else settings.llm_streaming,
-            **kwargs
+            **kwargs,
         )
 
     @staticmethod
@@ -122,7 +116,7 @@ class LLMFactory:
             model=settings.embedding_model,
             api_key=settings.embedding_api_key or "ollama",
             base_url=settings.embedding_base_url,
-            **kwargs
+            **kwargs,
         )
 
 

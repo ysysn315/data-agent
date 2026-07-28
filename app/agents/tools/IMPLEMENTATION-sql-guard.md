@@ -62,8 +62,7 @@ r = validate_sql(
 
 ```python
 cte_names = {cte.alias for cte in root.find_all(exp.CTE) if cte.alias}
-tables = {t.name for t in root.find_all(exp.Table)
-          if t.name and t.name not in cte_names}
+tables = {t.name for t in root.find_all(exp.Table) if t.name and t.name not in cte_names}
 ```
 
 先遍历所有 `exp.CTE` 收集别名，再遍历 `exp.Table`，名字落在 CTE 别名集合里的一律跳过。
@@ -83,9 +82,9 @@ tables = {t.name for t in root.find_all(exp.Table)
 ### 自动 LIMIT 的 AST 改写
 
 ```python
-if root.args.get("limit") is None:      # 最外层没有 LIMIT
-    root = root.limit(default_limit)     # AST 层挂上 LIMIT 节点
-fixed_sql = root.sql(dialect="sqlite")   # 由 AST 回写文本
+if root.args.get("limit") is None:  # 最外层没有 LIMIT
+    root = root.limit(default_limit)  # AST 层挂上 LIMIT 节点
+fixed_sql = root.sql(dialect="sqlite")  # 由 AST 回写文本
 ```
 
 判断和改写都在 AST 上做：`root.args["limit"]` 直接看最外层查询有没有 LIMIT 节点

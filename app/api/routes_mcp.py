@@ -6,6 +6,7 @@
 读口（list/get）保持开放。demo（auth_enabled=False）下守卫恒放行，行为与从前一致。
 受保护清单集中在 app/core/auth.PROTECTED_ENDPOINTS。
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -47,9 +48,7 @@ async def create_server(server: MCPServer, mcp_service: MCPService = Depends(get
 
 
 @router.put("/servers/{slug}", response_model=MCPServer, dependencies=[Depends(get_admin_user)])
-async def update_server(
-    slug: str, server: MCPServer, mcp_service: MCPService = Depends(get_mcp_service)
-):
+async def update_server(slug: str, server: MCPServer, mcp_service: MCPService = Depends(get_mcp_service)):
     """更新 MCP server 配置"""
     try:
         return mcp_service.update_server(slug, server)
@@ -97,6 +96,4 @@ async def test_server(slug: str, mcp_service: MCPService = Depends(get_mcp_servi
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY, detail=f"连接失败: {e}"
-        )
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"连接失败: {e}")

@@ -20,6 +20,7 @@ LLMFactory 配置：
 11. reasoning_models 命中模型名子串 → 走 ReasoningChatOpenAI
 12. 不命中 → 走普通 ChatOpenAI
 """
+
 import pytest
 from langchain_core.messages import AIMessageChunk
 
@@ -29,9 +30,7 @@ from app.core.llm import ChatOpenAI, LLMFactory, ReasoningChatOpenAI
 @pytest.fixture
 def reasoning_llm() -> ReasoningChatOpenAI:
     """推理模型 LLM 实例（不发真实请求，仅测方法）"""
-    return ReasoningChatOpenAI(
-        model="glm-5.2", api_key="test-key", base_url="http://localhost"
-    )
+    return ReasoningChatOpenAI(model="glm-5.2", api_key="test-key", base_url="http://localhost")
 
 
 def _convert(llm, chunk: dict):

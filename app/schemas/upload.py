@@ -1,6 +1,8 @@
 # 上传相关数据模型
 # TODO: 任务 13.1 - 定义 UploadResponse 模型
-from pydantic import BaseModel,Field
+from pydantic import BaseModel, Field
+
+
 class UploadResponse(BaseModel):
     """
     文件上传响应模型

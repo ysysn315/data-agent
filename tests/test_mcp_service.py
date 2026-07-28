@@ -1,5 +1,4 @@
 """MCPService 测试：注册表 CRUD / 配置投影 / 缓存失效 / 真实 stdio server 加载"""
-import json
 
 import pytest
 
@@ -37,8 +36,11 @@ def test_to_client_config_gates_fields_by_transport():
     assert "headers" not in config  # stdio 不带 headers
 
     http = MCPServer(
-        slug="chart", transport="streamable_http",
-        url="http://localhost:1122/mcp", headers={"A": "b"}, timeout=5,
+        slug="chart",
+        transport="streamable_http",
+        url="http://localhost:1122/mcp",
+        headers={"A": "b"},
+        timeout=5,
         command="should-be-ignored",
     )
     config = http.to_client_config()
@@ -90,11 +92,16 @@ async def test_load_tools_from_real_stdio_server(tmp_path):
     )
 
     import sys
+
     service = MCPService(config_path=tmp_path / "mcp.json", load_timeout=30)
-    service.create_server(MCPServer(
-        slug="math", transport="stdio",
-        command=sys.executable, args=[str(server_script)],
-    ))
+    service.create_server(
+        MCPServer(
+            slug="math",
+            transport="stdio",
+            command=sys.executable,
+            args=[str(server_script)],
+        )
+    )
 
     tools = await service.load_tools(["math"])
     assert [t.name for t in tools] == ["add"]

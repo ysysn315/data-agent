@@ -12,6 +12,7 @@
 - 同步门面（MCPService/ExampleStore/TermStore 的 DB 版）的用例用 sync + 注入 runner
   （持久化事件循环），既隔离又真正跑到门面里的迁移/种子分支。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -74,6 +75,7 @@ def _make_skill(root: Path, slug: str, **kw) -> Skill:
 
 
 # ========== 技能仓储：CRUD（完整 InMemory 契约） ==========
+
 
 async def test_skill_repo_full_crud(tmp_path):
     engine, sm = create_engine_and_sessionmaker(_db_url(tmp_path))
@@ -140,6 +142,7 @@ async def test_skill_repo_full_crud(tmp_path):
 
 # ========== 技能表：不存正文，正文从 dir_path 现读 ==========
 
+
 async def test_skills_table_stores_no_content(tmp_path):
     url = _db_url(tmp_path)
     engine, sm = create_engine_and_sessionmaker(url)
@@ -164,6 +167,7 @@ async def test_skills_table_stores_no_content(tmp_path):
 
         # 目录被删后，正文读为空串（数据库里本就没有备份），元数据仍在
         import shutil
+
         shutil.rmtree(got.dir_path)
         got2 = await SqlAlchemySkillRepository(sm2).get_by_slug("alpha")
         assert got2.content == ""
@@ -173,6 +177,7 @@ async def test_skills_table_stores_no_content(tmp_path):
 
 
 # ========== 重启持久性：同文件重开 engine，数据仍在 ==========
+
 
 async def test_restart_persistence(tmp_path):
     url = _db_url(tmp_path)
@@ -207,16 +212,23 @@ async def test_restart_persistence(tmp_path):
 
 # ========== MCP / 示例 / 术语仓储：CRUD + 整表替换 ==========
 
+
 async def test_mcp_repo_crud(tmp_path):
     engine, sm = create_engine_and_sessionmaker(_db_url(tmp_path))
     await init_db(engine)
     try:
         repo = MCPRepository(sm)
-        await repo.upsert(MCPServer(
-            slug="chart", name="图表", transport="streamable_http",
-            url="http://localhost:1122/mcp", headers={"A": "b"}, timeout=5,
-            disabled_tools=["danger"],
-        ))
+        await repo.upsert(
+            MCPServer(
+                slug="chart",
+                name="图表",
+                transport="streamable_http",
+                url="http://localhost:1122/mcp",
+                headers={"A": "b"},
+                timeout=5,
+                disabled_tools=["danger"],
+            )
+        )
         assert await repo.count() == 1
         got = await repo.get("chart")
         assert got.url == "http://localhost:1122/mcp" and got.headers == {"A": "b"}
@@ -228,10 +240,12 @@ async def test_mcp_repo_crud(tmp_path):
         assert await repo.count() == 1
 
         # replace_all（整表替换）
-        await repo.replace_all([
-            MCPServer(slug="a", transport="stdio", command="x"),
-            MCPServer(slug="b", transport="stdio", command="y"),
-        ])
+        await repo.replace_all(
+            [
+                MCPServer(slug="a", transport="stdio", command="x"),
+                MCPServer(slug="b", transport="stdio", command="y"),
+            ]
+        )
         assert await repo.count() == 2 and await repo.get("chart") is None
         assert await repo.delete("a") is True and await repo.delete("a") is False
     finally:
@@ -268,6 +282,7 @@ async def test_example_and_term_repo_crud(tmp_path):
 
 # ========== 同步门面：JSON→DB 一次性迁移 + 种子幂等 ==========
 
+
 @pytest.fixture
 def sync_db(tmp_path):
     """同步门面用：tmp sqlite + 持久化事件循环 runner（模拟 app.db.run_sync 的桥）。"""
@@ -291,9 +306,17 @@ def test_mcp_json_to_db_migration_once(sync_db):
 
     # 历史 JSON 注册表
     cfg = tmp_path / "mcp_servers.json"
-    cfg.write_text(json.dumps({"servers": [
-        MCPServer(slug="chart", transport="stdio", command="python").model_dump(),
-    ]}, ensure_ascii=False), encoding="utf-8")
+    cfg.write_text(
+        json.dumps(
+            {
+                "servers": [
+                    MCPServer(slug="chart", transport="stdio", command="python").model_dump(),
+                ]
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
 
     # 首次启动：表空 + 有历史 JSON → 一次性迁移入库
     svc = MCPService(config_path=cfg, repo=repo, runner=run)
@@ -337,9 +360,17 @@ def test_term_store_json_to_db_migration(sync_db):
 
     # 历史 JSON 术语库（非种子内容），表空 → 迁移这批而非灌种
     path = tmp_path / "terminology.json"
-    path.write_text(json.dumps({"terms": [
-        {"term": "动销率", "synonyms": ["动销"], "definition": "有销量商品占比", "sql_hint": None},
-    ]}, ensure_ascii=False), encoding="utf-8")
+    path.write_text(
+        json.dumps(
+            {
+                "terms": [
+                    {"term": "动销率", "synonyms": ["动销"], "definition": "有销量商品占比", "sql_hint": None},
+                ]
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
 
     store = TermStore(path, repo=repo, runner=run)
     assert run(repo.count()) == 1

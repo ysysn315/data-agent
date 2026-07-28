@@ -1,4 +1,6 @@
 """Skills 系统 - 模块入口"""
+
+from app.skills.middleware import SkillsMiddleware, SkillsState
 from app.skills.models import (
     ExpandedSkills,
     Skill,
@@ -7,15 +9,14 @@ from app.skills.models import (
     SkillSourceType,
     SkillStatus,
 )
-from app.skills.repository import SkillRepository
-from app.skills.service import SkillService
-from app.skills.middleware import SkillsMiddleware, SkillsState
 from app.skills.remote_install import (
     RemoteInstallError,
     install_remote_skill,
     install_remote_skills_batch,
     list_remote_skills,
 )
+from app.skills.repository import SkillRepository
+from app.skills.service import SkillService
 
 __all__ = [
     # 数据模型

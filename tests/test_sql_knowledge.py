@@ -3,6 +3,7 @@
 覆盖：store 持久化与中文检索命中、术语同义词命中、合并工具输出含术语+示例、
 TestClient 走一遍增删查 API、sql-generation SKILL.md 仍可解析且依赖展开含 sql_context_search。
 """
+
 from pathlib import Path
 
 import pytest
@@ -16,6 +17,7 @@ BUILTIN_DIR = Path(__file__).parent.parent / "app" / "skills" / "buildin"
 
 
 # ========== ExampleStore ==========
+
 
 def test_example_store_seed_and_persistence(tmp_path):
     """种子灌入 + 持久化：新实例能读回，且不重复灌种。"""
@@ -59,6 +61,7 @@ def test_example_store_add_update_delete(tmp_path):
 
 # ========== TermStore ==========
 
+
 def test_term_store_seed_and_synonym_match(tmp_path):
     """种子术语 + 同义词子串命中。"""
     store = TermStore(tmp_path / "t.json")
@@ -92,6 +95,7 @@ def test_term_store_crud_persistence(tmp_path):
 
 # ========== 合并门控工具 ==========
 
+
 def test_sql_context_tool_contains_term_and_example(tmp_path):
     """一个工具同时返回术语解释 + 相似示例。"""
     ex = ExampleStore(tmp_path / "e.json")
@@ -99,9 +103,9 @@ def test_sql_context_tool_contains_term_and_example(tmp_path):
     tool = create_sql_context_tool(ex, tm)
 
     out = tool.invoke({"question": "各州的复购率是多少"})
-    assert "复购率" in out                     # 术语命中
+    assert "复购率" in out  # 术语命中
     assert "购买 2 次以上" in out or "下单次数≥2" in out  # 术语口径
-    assert "customer_state" in out or "示例" in out       # 相似示例段
+    assert "customer_state" in out or "示例" in out  # 相似示例段
 
 
 def test_sql_context_tool_empty(tmp_path):
@@ -114,6 +118,7 @@ def test_sql_context_tool_empty(tmp_path):
 
 
 # ========== SKILL.md 依赖展开 ==========
+
 
 async def test_sql_generation_skill_declares_context_tool(skill_service):
     """sql-generation 仍可解析，且依赖展开的 tools 含 sql_context_search。"""
@@ -128,6 +133,7 @@ async def test_sql_generation_skill_declares_context_tool(skill_service):
 
 
 # ========== API（TestClient 增删查）==========
+
 
 @pytest.fixture
 def client(tmp_path):

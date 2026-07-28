@@ -10,6 +10,7 @@
 
 按项目约定不改 tests/conftest.py，需要的 fixture 都写在本文件里。
 """
+
 import json
 import sqlite3
 import sys
@@ -52,6 +53,7 @@ def _run(db_path: str, sql: str) -> list[tuple]:
 
 # ========== 数据集自检：golden_sql 都能跑、都有结果 ==========
 
+
 def test_dataset_size_and_tags():
     """规模 25~30，标签只用约定的 5 个分层。"""
     assert 25 <= len(DATASET) <= 30, f"用例数 {len(DATASET)} 不在 25~30 区间"
@@ -69,7 +71,7 @@ def test_all_five_layers_covered():
     used = set()
     for c in DATASET:
         used.update(c["tags"])
-    assert EXPECTED_TAGS <= used, f"缺少分层: {EXPECTED_TAGS - used}"
+    assert used >= EXPECTED_TAGS, f"缺少分层: {EXPECTED_TAGS - used}"
 
 
 @pytest.mark.parametrize("case", DATASET, ids=[c["id"] for c in DATASET])
@@ -81,18 +83,18 @@ def test_golden_sql_executes_with_results(case, synthetic_db):
 
 # ========== golden_has_order_by 判定 ==========
 
+
 def test_golden_has_order_by_detection():
     assert golden_has_order_by("SELECT a FROM t ORDER BY a") is True
     assert golden_has_order_by("SELECT a, COUNT(*) FROM t GROUP BY a") is False
     # 只看最外层：CTE 内部的 ORDER BY 不算
-    assert golden_has_order_by(
-        "WITH x AS (SELECT a FROM t ORDER BY a) SELECT a FROM x"
-    ) is False
+    assert golden_has_order_by("WITH x AS (SELECT a FROM t ORDER BY a) SELECT a FROM x") is False
     # 解析失败保守当作有序
     assert golden_has_order_by("这不是SQL ###") is True
 
 
 # ========== 结果集对比：正例 / 反例 ==========
+
 
 def test_compare_identical_sets():
     a = [("SP", 100.0), ("RJ", 50.0)]
@@ -136,26 +138,21 @@ def test_compare_real_difference_is_false():
     """真实数值差异必须判 False（容差之外）。"""
     assert compare_result_sets([(100.0,)], [(101.0,)], order_sensitive=False) is False
     # 行数不同也应判 False
-    assert compare_result_sets(
-        [("SP", 1), ("RJ", 2)], [("SP", 1)], order_sensitive=False
-    ) is False
+    assert compare_result_sets([("SP", 1), ("RJ", 2)], [("SP", 1)], order_sensitive=False) is False
 
 
 def test_compare_multiset_counts_matter():
     """行序无关不等于去重：重复行的重数不同应判 False。"""
-    assert compare_result_sets(
-        [("SP",), ("SP",)], [("SP",)], order_sensitive=False
-    ) is False
+    assert compare_result_sets([("SP",), ("SP",)], [("SP",)], order_sensitive=False) is False
 
 
 def test_normalize_none_handling():
     """含 NULL 的行不应抛异常，且能正确判等。"""
-    assert compare_result_sets(
-        [(None, 1)], [(1, None)], order_sensitive=False
-    ) is True
+    assert compare_result_sets([(None, 1)], [(1, None)], order_sensitive=False) is True
 
 
 # ========== build_report 聚合 ==========
+
 
 def test_build_report_aggregates_overall_and_by_tag():
     mock = [

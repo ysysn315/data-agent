@@ -8,6 +8,7 @@
 
 注意：按项目约定不改 tests/conftest.py，需要的 fixture 写在本文件里。
 """
+
 import json
 import sqlite3
 import sys
@@ -50,10 +51,7 @@ def test_indexes_created(synthetic_db):
     """常用索引应已建立。"""
     conn = sqlite3.connect(synthetic_db)
     try:
-        n = conn.execute(
-            "SELECT COUNT(*) FROM sqlite_master "
-            "WHERE type='index' AND name LIKE 'idx_%'"
-        ).fetchone()[0]
+        n = conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'").fetchone()[0]
         assert n >= 10
     finally:
         conn.close()
@@ -63,21 +61,16 @@ def test_foreign_key_consistency(synthetic_db):
     """所有跨表关联列都必须落在父表主键集合内（无孤儿行）。"""
     conn = sqlite3.connect(synthetic_db)
     checks = {
-        "order_items.order_id → orders":
-            "SELECT COUNT(*) FROM order_items "
-            "WHERE order_id NOT IN (SELECT order_id FROM orders)",
-        "order_items.product_id → products":
-            "SELECT COUNT(*) FROM order_items "
-            "WHERE product_id NOT IN (SELECT product_id FROM products)",
-        "order_items.seller_id → sellers":
-            "SELECT COUNT(*) FROM order_items "
-            "WHERE seller_id NOT IN (SELECT seller_id FROM sellers)",
-        "payments.order_id → orders":
-            "SELECT COUNT(*) FROM payments "
-            "WHERE order_id NOT IN (SELECT order_id FROM orders)",
-        "orders.customer_id → customers":
-            "SELECT COUNT(*) FROM orders "
-            "WHERE customer_id NOT IN (SELECT customer_id FROM customers)",
+        "order_items.order_id → orders": "SELECT COUNT(*) FROM order_items "
+        "WHERE order_id NOT IN (SELECT order_id FROM orders)",
+        "order_items.product_id → products": "SELECT COUNT(*) FROM order_items "
+        "WHERE product_id NOT IN (SELECT product_id FROM products)",
+        "order_items.seller_id → sellers": "SELECT COUNT(*) FROM order_items "
+        "WHERE seller_id NOT IN (SELECT seller_id FROM sellers)",
+        "payments.order_id → orders": "SELECT COUNT(*) FROM payments "
+        "WHERE order_id NOT IN (SELECT order_id FROM orders)",
+        "orders.customer_id → customers": "SELECT COUNT(*) FROM orders "
+        "WHERE customer_id NOT IN (SELECT customer_id FROM customers)",
     }
     try:
         for label, sql in checks.items():
@@ -97,8 +90,7 @@ def test_timestamps_parseable_and_in_range(synthetic_db):
         assert unparseable == 0
 
         lo, hi = conn.execute(
-            "SELECT MIN(date(order_purchase_timestamp)), "
-            "MAX(date(order_purchase_timestamp)) FROM orders"
+            "SELECT MIN(date(order_purchase_timestamp)), MAX(date(order_purchase_timestamp)) FROM orders"
         ).fetchone()
         assert lo >= "2016-01-01"
         assert hi <= "2018-12-31"
@@ -119,9 +111,7 @@ def test_execute_sql_tool_works(synthetic_db):
     # 各州客户数 Top5 —— 典型 demo 问题
     result = execute_sql.invoke(
         {
-            "sql": "SELECT customer_state, COUNT(*) AS n "
-                   "FROM customers GROUP BY customer_state "
-                   "ORDER BY n DESC",
+            "sql": "SELECT customer_state, COUNT(*) AS n FROM customers GROUP BY customer_state ORDER BY n DESC",
             "limit": 5,
         }
     )
@@ -138,8 +128,8 @@ def test_execute_sql_join_across_tables(synthetic_db):
     result = execute_sql.invoke(
         {
             "sql": "SELECT o.order_status, ROUND(SUM(i.price), 2) AS gmv "
-                   "FROM orders o JOIN order_items i ON o.order_id = i.order_id "
-                   "GROUP BY o.order_status ORDER BY gmv DESC",
+            "FROM orders o JOIN order_items i ON o.order_id = i.order_id "
+            "GROUP BY o.order_status ORDER BY gmv DESC",
             "limit": 10,
         }
     )

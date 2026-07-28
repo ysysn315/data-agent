@@ -11,6 +11,7 @@
   为 MCPService / ExampleStore / TermStore 的「DB 版」存储后端，
   提供 list_all / replace_all（整表替换，对应 JSON 版的整文件原子重写）+ 单条增删查。
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -24,8 +25,8 @@ from app.db.models import MCPServerModel, SkillModel, SQLExampleModel, Terminolo
 from app.mcp.models import MCPServer
 from app.skills.models import Skill, SkillSourceType
 
-
 # ========== 技能仓储（InMemorySkillRepository 契约的 SQLAlchemy 实现） ==========
+
 
 class SqlAlchemySkillRepository:
     """技能数据访问层（数据库版）。
@@ -117,9 +118,7 @@ class SqlAlchemySkillRepository:
         async with self._sm() as session:
             stmt = select(SkillModel).where(SkillModel.enabled.is_(True))
             if include_global:
-                stmt = stmt.where(
-                    or_(SkillModel.user_id.is_(None), SkillModel.user_id == user_id)
-                )
+                stmt = stmt.where(or_(SkillModel.user_id.is_(None), SkillModel.user_id == user_id))
             else:
                 stmt = stmt.where(SkillModel.user_id == user_id)
             stmt = stmt.order_by(SkillModel.id)
@@ -130,9 +129,7 @@ class SqlAlchemySkillRepository:
 
     async def create(self, skill: Skill) -> Skill:
         async with self._sm() as session:
-            exists = (
-                await session.execute(select(SkillModel.id).where(SkillModel.slug == skill.slug))
-            ).first()
+            exists = (await session.execute(select(SkillModel.id).where(SkillModel.slug == skill.slug))).first()
             if exists:
                 raise ValueError(f"Skill slug 已存在: {skill.slug}")
 
@@ -212,12 +209,23 @@ class SqlAlchemySkillRepository:
 
 # ========== MCP 注册表仓储 ==========
 
+
 class MCPRepository:
     """MCP server 注册表存储后端（供 MCPService 的 DB 版）。"""
 
     _FIELDS = (
-        "name", "description", "transport", "url", "headers", "timeout",
-        "sse_read_timeout", "command", "args", "env", "enabled", "disabled_tools",
+        "name",
+        "description",
+        "transport",
+        "url",
+        "headers",
+        "timeout",
+        "sse_read_timeout",
+        "command",
+        "args",
+        "env",
+        "enabled",
+        "disabled_tools",
     )
 
     def __init__(self, sessionmaker: async_sessionmaker):
@@ -292,6 +300,7 @@ class MCPRepository:
 
 # ========== SQL 示例库仓储 ==========
 
+
 class SQLExampleRepository:
     """SQL 示例库存储后端（供 ExampleStore 的 DB 版）。领域层用 dict，故仓储也收发 dict。"""
 
@@ -337,12 +346,14 @@ class SQLExampleRepository:
         async with self._sm() as session:
             await session.execute(delete(SQLExampleModel))
             for rec in records:
-                session.add(SQLExampleModel(
-                    example_id=rec["id"],
-                    question=rec["question"],
-                    sql=rec["sql"],
-                    verified=bool(rec.get("verified", True)),
-                ))
+                session.add(
+                    SQLExampleModel(
+                        example_id=rec["id"],
+                        question=rec["question"],
+                        sql=rec["sql"],
+                        verified=bool(rec.get("verified", True)),
+                    )
+                )
             await session.commit()
 
     async def count(self) -> int:
@@ -352,6 +363,7 @@ class SQLExampleRepository:
 
 
 # ========== 术语库仓储 ==========
+
 
 class TerminologyRepository:
     """业务术语库存储后端（供 TermStore 的 DB 版）。term 为主键。"""
@@ -398,12 +410,14 @@ class TerminologyRepository:
         async with self._sm() as session:
             await session.execute(delete(TerminologyModel))
             for rec in records:
-                session.add(TerminologyModel(
-                    term=rec["term"],
-                    synonyms=list(rec.get("synonyms") or []),
-                    definition=rec.get("definition") or "",
-                    sql_hint=rec.get("sql_hint"),
-                ))
+                session.add(
+                    TerminologyModel(
+                        term=rec["term"],
+                        synonyms=list(rec.get("synonyms") or []),
+                        definition=rec.get("definition") or "",
+                        sql_hint=rec.get("sql_hint"),
+                    )
+                )
             await session.commit()
 
     async def count(self) -> int:
@@ -448,21 +462,21 @@ class GraphTripleRepository:
         if not triples:
             return 0
         async with self._sm() as session:
-            stmt = select(
-                GraphTripleModel.subject, GraphTripleModel.predicate, GraphTripleModel.object
-            )
+            stmt = select(GraphTripleModel.subject, GraphTripleModel.predicate, GraphTripleModel.object)
             existing = {tuple(row) for row in (await session.execute(stmt)).all()}
             added = 0
             for t in triples:
                 key = (t["subject"], t["predicate"], t["object"])
                 if key in existing:
                     continue
-                session.add(GraphTripleModel(
-                    subject=t["subject"],
-                    predicate=t["predicate"],
-                    object=t["object"],
-                    source=t.get("source") or "manual",
-                ))
+                session.add(
+                    GraphTripleModel(
+                        subject=t["subject"],
+                        predicate=t["predicate"],
+                        object=t["object"],
+                        source=t.get("source") or "manual",
+                    )
+                )
                 existing.add(key)
                 added += 1
             await session.commit()
@@ -505,9 +519,7 @@ class WorkspaceRepository:
 
     async def create(self, slug: str, name: str = "") -> dict:
         async with self._sm() as session:
-            exists = (
-                await session.execute(select(WorkspaceModel.id).where(WorkspaceModel.slug == slug))
-            ).first()
+            exists = (await session.execute(select(WorkspaceModel.id).where(WorkspaceModel.slug == slug))).first()
             if exists:
                 raise ValueError(f"工作空间 slug 已存在: {slug}")
             row = WorkspaceModel(slug=slug, name=name or slug)
@@ -572,9 +584,7 @@ class UserRepository:
         api_key_prefix: str,
     ) -> dict:
         async with self._sm() as session:
-            exists = (
-                await session.execute(select(UserModel.id).where(UserModel.username == username))
-            ).first()
+            exists = (await session.execute(select(UserModel.id).where(UserModel.username == username))).first()
             if exists:
                 raise ValueError(f"用户名已存在: {username}")
             row = UserModel(

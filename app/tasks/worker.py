@@ -8,6 +8,7 @@ Redis 连接从 settings.redis_* 组装（build_redis_settings），不引入 ar
     ctx["job_id"]  —— 即入队时用 task_id 设的 arq job_id，任务据此写自己的状态/事件；
     ctx["redis"]   —— arq 连接池，构造 TaskService 直接复用（只写，不读）。
 """
+
 from __future__ import annotations
 
 from typing import Optional
@@ -51,9 +52,7 @@ def _final_text(msg) -> str:
     content = getattr(msg, "content", "")
     if isinstance(content, str):
         return content
-    return "".join(
-        p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") == "text"
-    )
+    return "".join(p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") == "text")
 
 
 async def run_chat_task(ctx, question: str, session_id: Optional[str] = None) -> dict:
@@ -192,9 +191,7 @@ async def run_analysis_task(ctx, question: str) -> dict:
         agent = AnalysisAgent(llm=llm, chat_agent=chat_agent, on_event=_on_event)
         result = await agent.analyze(question)  # done 事件已由 agent 通过 on_event 上报
 
-        await svc.mark_done(
-            task_id, {"report": result["report"], "steps": result["step_summaries"]}
-        )
+        await svc.mark_done(task_id, {"report": result["report"], "steps": result["step_summaries"]})
         return {"report": result["report"]}
     except Exception as e:  # noqa: BLE001 —— 同前：标失败 + error 事件后上抛给 arq 记账
         logger.exception(f"run_analysis_task 失败: {e}")
@@ -223,6 +220,6 @@ class WorkerSettings:
     redis_settings = build_redis_settings(settings)
     on_startup = _on_startup
     on_shutdown = _on_shutdown
-    max_tries = 2          # 瞬时故障重试一次
-    job_timeout = 600      # 单任务上限 10 分钟
-    keep_result = 3600     # arq 自身结果保留 1 小时（我们的状态另存 Hash）
+    max_tries = 2  # 瞬时故障重试一次
+    job_timeout = 600  # 单任务上限 10 分钟
+    keep_result = 3600  # arq 自身结果保留 1 小时（我们的状态另存 Hash）

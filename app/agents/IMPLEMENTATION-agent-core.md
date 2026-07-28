@@ -20,11 +20,11 @@
 
 ```python
 _chat_agent = ChatAgent(
-    llm=LLMFactory.create_llm(),                 # 任意 OpenAI 兼容接口，不绑厂商
-    tools=base_tools,                            # get_current_datetime + read_skill/run_skill_script + 可选 tavily/kb
+    llm=LLMFactory.create_llm(),  # 任意 OpenAI 兼容接口，不绑厂商
+    tools=base_tools,  # get_current_datetime + read_skill/run_skill_script + 可选 tavily/kb
     middleware=[
         SkillsMiddleware(skill_service, mcp_service, gated_tools=[execute_sql, schema_search]),
-        ToolRuntimeMiddleware(),                 # 熔断/重试/降级，顺序在 Skills 之后
+        ToolRuntimeMiddleware(),  # 熔断/重试/降级，顺序在 Skills 之后
     ],
 )
 ```

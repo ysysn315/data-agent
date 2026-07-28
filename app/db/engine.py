@@ -18,6 +18,7 @@
 alembic 迁移留二期：起步只有 create_all 幂等建表，schema 尚在快速变动，
 迁移脚本的维护成本大于收益；理由详见 IMPLEMENTATION.md。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -41,7 +42,7 @@ def _ensure_sqlite_dir(database_url: str) -> None:
     prefix = "sqlite+aiosqlite:///"
     if not database_url.startswith(prefix):
         return
-    raw = database_url[len(prefix):]
+    raw = database_url[len(prefix) :]
     if not raw or raw == ":memory:":
         return
     db_path = Path(raw)
@@ -61,6 +62,7 @@ def create_engine_and_sessionmaker(
     engine = create_async_engine(database_url, echo=echo, poolclass=NullPool)
 
     if database_url.startswith("sqlite"):
+
         @event.listens_for(engine.sync_engine, "connect")
         def _set_sqlite_pragma(dbapi_conn, _connection_record):  # pragma: no cover - 连接钩子
             cursor = dbapi_conn.cursor()
@@ -104,6 +106,7 @@ def get_sessionmaker() -> async_sessionmaker:
 
 
 # ========== 后台事件循环（承接同步门面的 async DB 调用） ==========
+
 
 class _BackgroundLoop:
     """独立守护线程 + 事件循环，用于 sync→async 桥接。"""

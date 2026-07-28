@@ -14,6 +14,7 @@
 orders / order_items / customers / products / sellers / payments。
 时间统一以 TEXT（ISO 字符串）存储，可被 SQLite date()/datetime() 解析。
 """
+
 from __future__ import annotations
 
 import argparse
@@ -227,21 +228,13 @@ def import_from_csv(conn: sqlite3.Connection, csv_dir: str | Path) -> dict[str, 
     for table, (filename, colspec) in CSV_SPECS.items():
         path = csv_dir / filename
         if not path.exists():
-            raise FileNotFoundError(
-                f"缺少 Kaggle 文件: {path}（期望官方命名 {filename}）"
-            )
+            raise FileNotFoundError(f"缺少 Kaggle 文件: {path}（期望官方命名 {filename}）")
         target_cols = [c[0] for c in colspec]
         placeholders = ", ".join(["?"] * len(target_cols))
-        insert_sql = (
-            f"INSERT OR IGNORE INTO {table} ({', '.join(target_cols)}) "
-            f"VALUES ({placeholders})"
-        )
+        insert_sql = f"INSERT OR IGNORE INTO {table} ({', '.join(target_cols)}) VALUES ({placeholders})"
         with path.open(newline="", encoding="utf-8") as f:
             reader = csv.DictReader(f)
-            batch = (
-                tuple(conv(row.get(src)) for _, src, conv in colspec)
-                for row in reader
-            )
+            batch = (tuple(conv(row.get(src)) for _, src, conv in colspec) for row in reader)
             conn.executemany(insert_sql, batch)
     conn.commit()
     return table_counts(conn)
@@ -252,10 +245,26 @@ def import_from_csv(conn: sqlite3.Connection, csv_dir: str | Path) -> dict[str, 
 # ---------------------------------------------------------------------------
 # 巴西州代码及权重（近似真实分布：SP 一家独大，东南沿海次之）
 STATE_WEIGHTS: list[tuple[str, int]] = [
-    ("SP", 42), ("RJ", 13), ("MG", 12), ("RS", 6), ("PR", 5),
-    ("SC", 4), ("BA", 3), ("DF", 2), ("GO", 2), ("ES", 2),
-    ("PE", 2), ("CE", 1), ("PA", 1), ("MT", 1), ("MA", 1),
-    ("MS", 1), ("PB", 1), ("RN", 1), ("AL", 1), ("PI", 1),
+    ("SP", 42),
+    ("RJ", 13),
+    ("MG", 12),
+    ("RS", 6),
+    ("PR", 5),
+    ("SC", 4),
+    ("BA", 3),
+    ("DF", 2),
+    ("GO", 2),
+    ("ES", 2),
+    ("PE", 2),
+    ("CE", 1),
+    ("PA", 1),
+    ("MT", 1),
+    ("MA", 1),
+    ("MS", 1),
+    ("PB", 1),
+    ("RN", 1),
+    ("AL", 1),
+    ("PI", 1),
 ]
 
 # 各州代表城市（简化，仅取一两个大城市；其余用通用名兜底）
@@ -284,22 +293,44 @@ STATE_CITIES: dict[str, list[str]] = {
 
 # 真实 olist 品类（葡语），取常见若干
 CATEGORIES = [
-    "cama_mesa_banho", "beleza_saude", "esporte_lazer", "moveis_decoracao",
-    "informatica_acessorios", "utilidades_domesticas", "relogios_presentes",
-    "telefonia", "automotivo", "brinquedos", "cool_stuff", "perfumaria",
-    "bebes", "eletronicos", "papelaria", "fashion_bolsas_e_acessorios",
-    "pet_shop", "moveis_escritorio", "consoles_games", "construcao_ferramentas",
+    "cama_mesa_banho",
+    "beleza_saude",
+    "esporte_lazer",
+    "moveis_decoracao",
+    "informatica_acessorios",
+    "utilidades_domesticas",
+    "relogios_presentes",
+    "telefonia",
+    "automotivo",
+    "brinquedos",
+    "cool_stuff",
+    "perfumaria",
+    "bebes",
+    "eletronicos",
+    "papelaria",
+    "fashion_bolsas_e_acessorios",
+    "pet_shop",
+    "moveis_escritorio",
+    "consoles_games",
+    "construcao_ferramentas",
 ]
 
 # 订单状态权重（delivered 绝对主导）
 STATUS_WEIGHTS = [
-    ("delivered", 88), ("shipped", 4), ("canceled", 3),
-    ("invoiced", 2), ("processing", 2), ("unavailable", 1),
+    ("delivered", 88),
+    ("shipped", 4),
+    ("canceled", 3),
+    ("invoiced", 2),
+    ("processing", 2),
+    ("unavailable", 1),
 ]
 
 # 支付方式权重
 PAYMENT_WEIGHTS = [
-    ("credit_card", 74), ("boleto", 19), ("voucher", 5), ("debit_card", 2),
+    ("credit_card", 74),
+    ("boleto", 19),
+    ("voucher", 5),
+    ("debit_card", 2),
 ]
 
 # 合成规模
@@ -309,8 +340,8 @@ N_PRODUCTS = 600
 N_ORDERS = 3000
 
 # 时间跨度：2016-09 ~ 2018-10（贴近真实 olist 区间）
-_START_ORDINAL = 736208   # 2016-09-01
-_END_ORDINAL = 736984     # 2018-10-16
+_START_ORDINAL = 736208  # 2016-09-01
+_END_ORDINAL = 736984  # 2018-10-16
 
 
 def _weighted_pool(weights: list[tuple[str, int]]) -> list[str]:
@@ -357,9 +388,7 @@ def generate_synthetic(conn: sqlite3.Connection, seed: int = 42) -> dict[str, in
         city = rng.choice(STATE_CITIES.get(state, [f"cidade_{state.lower()}"]))
         customers.append((cid, _hex_id(rng), city, state))
         customer_ids.append(cid)
-    conn.executemany(
-        "INSERT INTO customers VALUES (?, ?, ?, ?)", customers
-    )
+    conn.executemany("INSERT INTO customers VALUES (?, ?, ?, ?)", customers)
 
     # --- sellers ---
     sellers: list[tuple] = []
@@ -400,10 +429,7 @@ def generate_synthetic(conn: sqlite3.Connection, seed: int = 42) -> dict[str, in
         else:
             delivered_ts = None
         estimated_ts = _iso(rng, purchase_ord + rng.randint(10, 30))
-        orders.append(
-            (oid, customer_id, status, purchase_ts, approved_ts,
-             delivered_ts, estimated_ts)
-        )
+        orders.append((oid, customer_id, status, purchase_ts, approved_ts, delivered_ts, estimated_ts))
 
         # 每单 1~4 个订单项（偏向 1~2）
         n_items = rng.choices([1, 2, 3, 4], weights=[60, 25, 10, 5])[0]
@@ -412,10 +438,7 @@ def generate_synthetic(conn: sqlite3.Connection, seed: int = 42) -> dict[str, in
             price = _price(rng)
             freight = round(price * rng.uniform(0.05, 0.25) + rng.uniform(5, 20), 2)
             order_total += price + freight
-            items.append(
-                (oid, item_no, rng.choice(product_ids), rng.choice(seller_ids),
-                 price, freight)
-            )
+            items.append((oid, item_no, rng.choice(product_ids), rng.choice(seller_ids), price, freight))
 
         # 支付：多数一笔付清；小概率拆成两笔（含一张 voucher）
         ptype = rng.choice(payment_pool)
@@ -423,21 +446,13 @@ def generate_synthetic(conn: sqlite3.Connection, seed: int = 42) -> dict[str, in
         if rng.random() < 0.08 and order_total > 40:
             voucher_val = round(order_total * rng.uniform(0.1, 0.3), 2)
             payments.append((oid, 1, "voucher", 1, voucher_val))
-            payments.append(
-                (oid, 2, ptype, installments, round(order_total - voucher_val, 2))
-            )
+            payments.append((oid, 2, ptype, installments, round(order_total - voucher_val, 2)))
         else:
             payments.append((oid, 1, ptype, installments, round(order_total, 2)))
 
-    conn.executemany(
-        "INSERT INTO orders VALUES (?, ?, ?, ?, ?, ?, ?)", orders
-    )
-    conn.executemany(
-        "INSERT INTO order_items VALUES (?, ?, ?, ?, ?, ?)", items
-    )
-    conn.executemany(
-        "INSERT INTO payments VALUES (?, ?, ?, ?, ?)", payments
-    )
+    conn.executemany("INSERT INTO orders VALUES (?, ?, ?, ?, ?, ?, ?)", orders)
+    conn.executemany("INSERT INTO order_items VALUES (?, ?, ?, ?, ?, ?)", items)
+    conn.executemany("INSERT INTO payments VALUES (?, ?, ?, ?, ?)", payments)
     conn.commit()
     return table_counts(conn)
 
@@ -474,9 +489,7 @@ def _print_counts(db_path: str | Path, counts: dict[str, int]) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="导入/生成演示用 Brazilian E-Commerce SQLite 库"
-    )
+    parser = argparse.ArgumentParser(description="导入/生成演示用 Brazilian E-Commerce SQLite 库")
     parser.add_argument(
         "--csv-dir",
         help="Kaggle 官方 CSV 目录（含 olist_*_dataset.csv）",

@@ -1,7 +1,6 @@
+import time
 from pathlib import Path
 from typing import Any, Dict, Optional
-import time
-
 
 DOC_TYPE_MAP = {
     ".md": "markdown",

@@ -1,9 +1,8 @@
 import asyncio
 from statistics import mean
 
-from evals.rag.common import load_json, save_json, build_rag
+from evals.rag.common import build_rag, load_json, save_json
 from evals.rag.metrics import keyword_recall, source_hit
-
 
 DATASET_PATH = "evals/rag/datasets/rag_generation_cases.json"
 REPORT_PATH = "evals/rag/reports/generation_latest.json"

@@ -1,4 +1,5 @@
 """Skills 系统 - 数据模型"""
+
 from __future__ import annotations
 
 import re
@@ -13,49 +14,45 @@ from pydantic import BaseModel, Field, field_validator
 
 class SkillSourceType(str, Enum):
     """Skill 来源类型"""
-    BUILTIN = "builtin"      # 系统内置
-    UPLOAD = "upload"        # 用户上传
-    REMOTE = "remote"        # 远程安装
+
+    BUILTIN = "builtin"  # 系统内置
+    UPLOAD = "upload"  # 用户上传
+    REMOTE = "remote"  # 远程安装
 
 
 class SkillStatus(str, Enum):
     """Skill 状态"""
+
     ENABLED = "enabled"
     DISABLED = "disabled"
 
 
 # SKILL.md YAML frontmatter 正则
-FRONTMATTER_PATTERN = re.compile(
-    r"^---\s*\n(.*?)\n---\s*\n(.*)$",
-    re.DOTALL
-)
+FRONTMATTER_PATTERN = re.compile(r"^---\s*\n(.*?)\n---\s*\n(.*)$", re.DOTALL)
 
 
 class SkillFrontmatter(BaseModel):
     """SKILL.md YAML frontmatter 解析模型"""
+
     name: str = Field(..., description="显示名称")
     slug: str = Field(..., description="唯一标识")
     description: str = Field(default="", description="一句话描述")
     version: str = Field(default="1.0.0", description="版本")
     author: str = Field(default="", description="作者")
-    dependencies: dict[str, list[str]] = Field(
-        default_factory=dict,
-        description="依赖声明：tools/mcps/skills"
-    )
+    dependencies: dict[str, list[str]] = Field(default_factory=dict, description="依赖声明：tools/mcps/skills")
 
     @field_validator("slug")
     @classmethod
     def validate_slug(cls, v: str) -> str:
         """验证 slug 格式：小写字母、数字、连字符"""
         if not re.match(r"^[a-z0-9]+(-[a-z0-9]+)*$", v):
-            raise ValueError(
-                "slug 必须是小写字母、数字、连字符组合，如 'schema-retrieval'"
-            )
+            raise ValueError("slug 必须是小写字母、数字、连字符组合，如 'schema-retrieval'")
         return v
 
 
 class SkillContent(BaseModel):
     """SKILL.md 完整内容解析"""
+
     frontmatter: SkillFrontmatter
     body: str = Field(..., description="Markdown 正文")
     raw: str = Field(..., description="原始文件内容")
@@ -77,11 +74,7 @@ class SkillContent(BaseModel):
         except Exception as e:
             raise ValueError(f"frontmatter 验证失败: {e}")
 
-        return cls(
-            frontmatter=frontmatter,
-            body=body.strip(),
-            raw=raw_content
-        )
+        return cls(frontmatter=frontmatter, body=body.strip(), raw=raw_content)
 
 
 @dataclass
@@ -92,15 +85,16 @@ class Skill:
     dir_path 指向 skill 目录（内含 SKILL.md 和可选的 scripts/ 等随附文件），
     content 仅作为根 SKILL.md 的缓存，供 API 详情展示。
     """
+
     id: Optional[int] = None
     slug: str = ""
     name: str = ""
     description: str = ""
-    content: str = ""                    # 根 SKILL.md 内容（缓存）
-    dir_path: Optional[str] = None       # skill 目录路径（v2 新增）
+    content: str = ""  # 根 SKILL.md 内容（缓存）
+    dir_path: Optional[str] = None  # skill 目录路径（v2 新增）
     source_type: SkillSourceType = SkillSourceType.BUILTIN
     enabled: bool = True
-    user_id: Optional[int] = None        # 创建者，NULL=系统内置
+    user_id: Optional[int] = None  # 创建者，NULL=系统内置
     share_config: dict[str, Any] = field(default_factory=dict)
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -146,7 +140,7 @@ class Skill:
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "frontmatter": self.parsed.frontmatter.model_dump(),
-            "body": self.parsed.body
+            "body": self.parsed.body,
         }
 
 
@@ -158,9 +152,10 @@ class ExpandedSkills:
     system prompt 只注入每个 skill 的名称 + 描述 + 读取指引，
     正文由模型调用 read_skill(slug) 按需加载 —— 注入成本与正文长度无关。
     """
-    skills: list[Skill] = field(default_factory=list)           # 所有 skills（含依赖）
-    tools: list[str] = field(default_factory=list)               # 所有声明的工具（去重）
-    mcps: list[str] = field(default_factory=list)                # 所有声明的 MCP（去重）
+
+    skills: list[Skill] = field(default_factory=list)  # 所有 skills（含依赖）
+    tools: list[str] = field(default_factory=list)  # 所有声明的工具（去重）
+    mcps: list[str] = field(default_factory=list)  # 所有声明的 MCP（去重）
 
     def add_skill(self, skill: Skill) -> None:
         """添加 skill 并收集其依赖"""
@@ -198,8 +193,7 @@ class ExpandedSkills:
             "# 可用技能（Skills）",
             "",
             "以下技能可用。技能的完整说明尚未加载：",
-            "**使用某个技能前，必须先调用 `read_skill(slug)` 读取其完整说明**，"
-            "这会同时解锁该技能声明的专用工具。",
+            "**使用某个技能前，必须先调用 `read_skill(slug)` 读取其完整说明**，这会同时解锁该技能声明的专用工具。",
             "",
         ]
         for skill in self.skills:

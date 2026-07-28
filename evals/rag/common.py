@@ -1,12 +1,12 @@
 import json
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
 
 from langchain_community.chat_models import ChatTongyi
 from loguru import logger
 
-from app.core.settings import get_settings
 from app.clients.milvus_client import MilvusClient
+from app.core.settings import get_settings
 from app.rag.embeddings import EmbeddingService
 from app.rag.query_rewriter import QueryRewriter
 from app.rag.reranker import BGEReranker

@@ -11,6 +11,7 @@ REQUIREMENTS §9 一期决策是"沙箱太重，先本地 subprocess"；本模�
 - docker 未安装 / 守护进程未启动 → 抛 SandboxUnavailableError（中文提示），
   工具层转成普通文本返回给模型，不炸 agent 主流程。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -28,8 +29,8 @@ SCRIPT_TIMEOUT_SECONDS = 30
 MAX_OUTPUT_CHARS = 8000
 
 # Docker 沙箱固定参数（威胁模型见 IMPLEMENTATION-sandbox.md ②）
-PIDS_LIMIT = "64"                              # 防 fork 炸弹
-CONTAINER_NAME_PREFIX = "data-agent-skill-"    # 容器名前缀 + 随机 ID，超时兜底回收时精确点名
+PIDS_LIMIT = "64"  # 防 fork 炸弹
+CONTAINER_NAME_PREFIX = "data-agent-skill-"  # 容器名前缀 + 随机 ID，超时兜底回收时精确点名
 _CLEANUP_TIMEOUT_SECONDS = 10
 # docker run 自身失败（守护进程未启动等）的识别：约定退出码 125 + stderr 特征串
 _DAEMON_ERROR_MARKS = ("Cannot connect to the Docker daemon", "error during connect")
@@ -99,7 +100,9 @@ class SubprocessRunner:
         timeout: float = SCRIPT_TIMEOUT_SECONDS,
     ) -> RunResult:
         process = await asyncio.create_subprocess_exec(
-            sys.executable, str(skill_dir / script_rel), *args,
+            sys.executable,
+            str(skill_dir / script_rel),
+            *args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=str(skill_dir),
@@ -133,24 +136,33 @@ class DockerRunner:
         self._cpus = cpus
         self._docker_bin = docker_bin
 
-    def build_command(
-        self, skill_dir: Path, script_rel: str, args: Sequence[str], container_name: str
-    ) -> list[str]:
+    def build_command(self, skill_dir: Path, script_rel: str, args: Sequence[str], container_name: str) -> list[str]:
         """构造 docker run 命令行（纯函数，离线可测）。各 flag 的威胁模型见 IMPLEMENTATION-sandbox.md ②"""
         return [
-            self._docker_bin, "run",
-            "--rm",                          # 正常退出即删容器
-            "--name", container_name,        # 随机命名，超时兜底回收时点名用
-            "--network", "none",             # 断网：防数据外带 / 反弹 shell / 恶意下载
-            "--memory", self._memory,        # 内存上限
-            "--cpus", str(self._cpus),       # CPU 配额
-            "--pids-limit", PIDS_LIMIT,      # 防 fork 炸弹
-            "--read-only",                   # 根文件系统只读：防落盘持久化
-            "-v", f"{skill_dir}:/skill:ro",  # 技能目录只读挂载（对标 Yuxi provisioner app.py:508）
-            "-w", "/skill",                  # 工作目录与 subprocess 模式的 cwd 语义一致
-            "--tmpfs", "/tmp",               # 唯一可写处，容器退出即蒸发
+            self._docker_bin,
+            "run",
+            "--rm",  # 正常退出即删容器
+            "--name",
+            container_name,  # 随机命名，超时兜底回收时点名用
+            "--network",
+            "none",  # 断网：防数据外带 / 反弹 shell / 恶意下载
+            "--memory",
+            self._memory,  # 内存上限
+            "--cpus",
+            str(self._cpus),  # CPU 配额
+            "--pids-limit",
+            PIDS_LIMIT,  # 防 fork 炸弹
+            "--read-only",  # 根文件系统只读：防落盘持久化
+            "-v",
+            f"{skill_dir}:/skill:ro",  # 技能目录只读挂载（对标 Yuxi provisioner app.py:508）
+            "-w",
+            "/skill",  # 工作目录与 subprocess 模式的 cwd 语义一致
+            "--tmpfs",
+            "/tmp",  # 唯一可写处，容器退出即蒸发
             self._image,
-            "python", script_rel, *args,
+            "python",
+            script_rel,
+            *args,
         ]
 
     async def run(
@@ -171,8 +183,7 @@ class DockerRunner:
             )
         except FileNotFoundError:
             raise SandboxUnavailableError(
-                "Docker 沙箱不可用：未找到 docker 命令。"
-                "请安装 Docker，或将 SKILL_SANDBOX_MODE 设回 subprocess"
+                "Docker 沙箱不可用：未找到 docker 命令。请安装 Docker，或将 SKILL_SANDBOX_MODE 设回 subprocess"
             )
 
         try:
@@ -200,7 +211,10 @@ class DockerRunner:
         """docker rm -f 强删容器；容器已随 --rm 消失时报错无害，静默忽略"""
         try:
             process = await asyncio.create_subprocess_exec(
-                self._docker_bin, "rm", "-f", container_name,
+                self._docker_bin,
+                "rm",
+                "-f",
+                container_name,
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.DEVNULL,
             )
@@ -218,5 +232,6 @@ def _make_result(exit_code: int | None, stdout_bytes: bytes, stderr_bytes: bytes
     truncated = total > MAX_OUTPUT_CHARS
     if truncated:
         stdout = stdout[:MAX_OUTPUT_CHARS] + f"\n...（输出截断，共 {total} 字符）"
-    return RunResult(exit_code=exit_code if exit_code is not None else -1,
-                     stdout=stdout, stderr=stderr, truncated=truncated)
+    return RunResult(
+        exit_code=exit_code if exit_code is not None else -1, stdout=stdout, stderr=stderr, truncated=truncated
+    )

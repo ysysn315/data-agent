@@ -19,13 +19,13 @@ values（execute 返回的 rows），不保证 golden 与预测的列名一致�
 按值归一是最稳的口径 —— 代价是极端情况下 `(1,2)` 与 `(2,1)` 会判等，对本 demo 的
 业务查询可接受（IMPLEMENTATION.md 的"取舍"一节有说明）。
 """
+
 from __future__ import annotations
 
 from collections import Counter
 from typing import Any, Iterable, Sequence
 
 import sqlglot
-from sqlglot import expressions as exp
 
 # 默认浮点量化小数位：演示库金额多为两位小数，SUM/AVG 也按两位对齐足够。
 DEFAULT_FLOAT_DECIMALS = 2
@@ -104,8 +104,9 @@ def compare_result_sets(
 
     order_sensitive 通常由 golden_has_order_by(golden_sql) 得出。
     """
-    return normalize_result_set(golden_rows, order_sensitive, decimals) == \
-        normalize_result_set(pred_rows, order_sensitive, decimals)
+    return normalize_result_set(golden_rows, order_sensitive, decimals) == normalize_result_set(
+        pred_rows, order_sensitive, decimals
+    )
 
 
 def build_report(case_results: list[dict]) -> dict:

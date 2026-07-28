@@ -11,6 +11,7 @@
 本地门控工具（如 execute_sql）挂在 middleware.tools 上 —— 构建期注册进 ToolNode
 （否则执行时报 "not a valid tool"，Yuxi skills.py:151-164 同款坑），请求期按激活状态过滤可见性。
 """
+
 from __future__ import annotations
 
 from typing import Annotated, NotRequired, Optional, Sequence
@@ -38,6 +39,7 @@ def _activated_skills_reducer(left: Optional[list[str]], right: Optional[list[st
 
 class SkillsState(AgentState):
     """扩展 Agent 状态：记录已激活的技能"""
+
     activated_skills: NotRequired[Annotated[list[str], _activated_skills_reducer]]
 
 
@@ -92,9 +94,7 @@ class SkillsMiddleware(AgentMiddleware):
                     user_input = str(msg.content)
                     break
             if user_input:
-                matched = await self.skill_service.match_skills_by_query(
-                    query=user_input, top_k=self.max_match_skills
-                )
+                matched = await self.skill_service.match_skills_by_query(query=user_input, top_k=self.max_match_skills)
                 return [s.slug for s in matched]
             return []
 
@@ -103,9 +103,7 @@ class SkillsMiddleware(AgentMiddleware):
         return [s.slug for s in skills]
 
     async def awrap_model_call(self, request: ModelRequest, handler):
-        expanded = await self.skill_service.expand_dependencies(
-            await self._resolve_root_slugs(request)
-        )
+        expanded = await self.skill_service.expand_dependencies(await self._resolve_root_slugs(request))
 
         if not expanded.skills:
             return await handler(request)
@@ -139,12 +137,9 @@ class SkillsMiddleware(AgentMiddleware):
                         model_tools.append(mcp_tool)
 
         logger.debug(
-            f"Skills 注入: {len(expanded.skills)} skills, "
-            f"已激活 {sorted(activated)}, 隐藏工具 {sorted(hidden)}"
+            f"Skills 注入: {len(expanded.skills)} skills, 已激活 {sorted(activated)}, 隐藏工具 {sorted(hidden)}"
         )
-        return await handler(
-            request.override(system_message=new_system, tools=model_tools)
-        )
+        return await handler(request.override(system_message=new_system, tools=model_tools))
 
     # ========== 激活拦截 + MCP 动态工具执行（工具调用时） ==========
 
@@ -169,9 +164,7 @@ class SkillsMiddleware(AgentMiddleware):
         logger.info(f"技能已激活: {slug}")
         if isinstance(result, Command):
             update = dict(result.update or {})
-            update["activated_skills"] = _activated_skills_reducer(
-                update.get("activated_skills"), [slug]
-            )
+            update["activated_skills"] = _activated_skills_reducer(update.get("activated_skills"), [slug])
             return Command(update=update)
         return Command(update={"activated_skills": [slug], "messages": [result]})
 

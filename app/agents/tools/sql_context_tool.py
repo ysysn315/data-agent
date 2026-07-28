@@ -31,9 +31,7 @@ def create_sql_context_tool(example_store: ExampleStore, term_store: TermStore):
         examples = example_store.search(question, top_k=3)
 
         if not term_hits and not examples:
-            return (
-                "未命中任何业务术语或相似示例。请直接依据 schema_search 返回的 M-Schema 生成 SQL。"
-            )
+            return "未命中任何业务术语或相似示例。请直接依据 schema_search 返回的 M-Schema 生成 SQL。"
 
         parts: list[str] = []
 

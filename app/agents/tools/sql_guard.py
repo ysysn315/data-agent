@@ -131,10 +131,7 @@ def _check_columns(
         _orig_table, cols_ci = entry
         if col_name.lower() not in cols_ci:
             avail = "、".join(cols_ci.values())
-            return (
-                f"表 {entry[0]} 不存在列「{col_name}」。"
-                f"该表可用列：{avail}"
-            )
+            return f"表 {entry[0]} 不存在列「{col_name}」。该表可用列：{avail}"
     return None
 
 
