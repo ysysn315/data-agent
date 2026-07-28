@@ -3,7 +3,7 @@
 特殊处理：
 - glm-5.2 等推理模型的 reasoning_content 转 content（LangChain 默认只读 content）
 """
-from typing import Optional
+from typing import Any, Optional
 
 from langchain_openai import ChatOpenAI
 from loguru import logger
@@ -25,7 +25,7 @@ class ReasoningChatOpenAI(ChatOpenAI):
         default_chunk_class: type,
         base_generation_info: dict | None,
     ):
-        """重写：把 reasoning_content 转成 content"""
+        """重写：把 reasoning_content 转成 content（流式路径）"""
         # 先手动提取 reasoning_content
         choices = chunk.get("choices", [])
         if choices and choices[0] is not None:
@@ -40,6 +40,69 @@ class ReasoningChatOpenAI(ChatOpenAI):
         return super()._convert_chunk_to_generation_chunk(
             chunk, default_chunk_class, base_generation_info
         )
+
+    def _generate(
+        self,
+        messages: list,
+        stop: list[str] | None = None,
+        run_manager: Any = None,
+        **kwargs: Any,
+    ):
+        """重写：非流式路径，把 reasoning_content 转成 content"""
+        result = super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
+
+        # 处理非流式响应
+        for generation in result.generations:
+            message = generation.message
+            if not message.content and hasattr(message, "additional_kwargs"):
+                reasoning = message.additional_kwargs.get("reasoning_content", "")
+                if reasoning:
+                    message.content = reasoning
+
+        return result
+
+    async def _agenerate(
+        self,
+        messages: list,
+        stop: list[str] | None = None,
+        run_manager: Any = None,
+        **kwargs: Any,
+    ):
+        """重写：非流式异步路径，把 reasoning_content 转成 content"""
+        result = await super()._agenerate(messages, stop=stop, run_manager=run_manager, **kwargs)
+
+        # 处理非流式响应
+        for generation in result.generations:
+            message = generation.message
+            if not message.content and hasattr(message, "additional_kwargs"):
+                reasoning = message.additional_kwargs.get("reasoning_content", "")
+                if reasoning:
+                    message.content = reasoning
+
+        return result
+
+    def _stream(
+        self,
+        messages: list,
+        stop: list[str] | None = None,
+        run_manager: Any = None,
+        **kwargs: Any,
+    ):
+        """重写：同步流式路径，确保 reasoning_content 被处理"""
+        # 父类的 _stream 会调用 _convert_chunk_to_generation_chunk，已重写
+        return super()._stream(messages, stop=stop, run_manager=run_manager, **kwargs)
+
+    async def _astream(
+        self,
+        messages: list,
+        stop: list[str] | None = None,
+        run_manager: Any = None,
+        **kwargs: Any,
+    ):
+        """重写：异步流式路径，确保 reasoning_content 被处理"""
+        # 父类的 _astream 会调用 _convert_chunk_to_generation_chunk，已重写
+        async for chunk in super()._astream(messages, stop=stop, run_manager=run_manager, **kwargs):
+            yield chunk
 
 
 class LLMFactory:

@@ -78,3 +78,4 @@ INFO:     127.0.0.1:65458 - "POST /api/chat_stream HTTP/1.1" 200 OK
 
 ``...
 2026-07-28 09:48:39.149 | INFO     | app.services.chat_service:chat_stream:50 - 流式对话完成 - Session: session-1785157382813, 长度: 1593
+INFO:     127.0.0.1:56394 - "GET /health HTTP/1.1" 200 OK
