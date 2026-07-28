@@ -3,7 +3,7 @@
 特殊处理：
 - glm-5.2 等推理模型的 reasoning_content 转 content（LangChain 默认只读 content）
 """
-from typing import Any, Optional
+from typing import Optional
 
 from langchain_openai import ChatOpenAI
 from loguru import logger
@@ -14,9 +14,18 @@ from app.core.settings import settings
 class ReasoningChatOpenAI(ChatOpenAI):
     """兼容推理模型的 ChatOpenAI
 
-    glm-5.2 等推理模型返回 reasoning_content（思考过程）和 content（最终答案），
-    但 LangChain 默认只读 content。当 content 为空时，自动把 reasoning_content
-    转成 content，保证下游能拿到文本。
+    glm-5.2 等推理模型在响应里带 reasoning_content（思考过程）和 content（最终答案），
+    但 langchain_openai 1.4.1 明确不提取 reasoning_content（base.py 模块 docstring：
+    "not extracted or preserved"）。本子类在两个入口补回：
+
+    - 流式（_convert_chunk_to_generation_chunk）：把 reasoning_content 保留到
+      message.additional_kwargs，**不并入 content**——思考过程只展示给用户看，
+      不应污染会话历史。下游 ChatAgent.chat_stream 按通道分别读取。
+    - 非流式（_create_chat_result）：从原始响应 message.reasoning_content 恢复。
+      content 为空（纯思考 / 被 max_tokens 截断）时用它兜底，避免下游拿到空串
+      （AnalysisAgent JSON 解析、eval 会因此失败）。
+
+    _create_chat_result 被 _generate / _agenerate 共用，覆盖一处即覆盖同步与异步。
     """
 
     def _convert_chunk_to_generation_chunk(
@@ -25,84 +34,42 @@ class ReasoningChatOpenAI(ChatOpenAI):
         default_chunk_class: type,
         base_generation_info: dict | None,
     ):
-        """重写：把 reasoning_content 转成 content（流式路径）"""
-        # 先手动提取 reasoning_content
-        choices = chunk.get("choices", [])
-        if choices and choices[0] is not None:
-            delta = choices[0].get("delta") or {}
-            reasoning_content = delta.get("reasoning_content")
-            if reasoning_content and not delta.get("content"):
-                # 只在 content 为空时，把 reasoning_content 转成 content
-                delta["content"] = reasoning_content
-                # 移除 reasoning_content 避免重复
-                del delta["reasoning_content"]
-
-        return super()._convert_chunk_to_generation_chunk(
+        """流式：reasoning_content 保留到 additional_kwargs，不并入 content"""
+        gen_chunk = super()._convert_chunk_to_generation_chunk(
             chunk, default_chunk_class, base_generation_info
         )
+        if gen_chunk is None:
+            # delta=None 等情况父类返回 None
+            return None
+        # 兼容 beta.chat.completions.stream 的 choices 包装（chunk.chunk.choices）
+        choices = chunk.get("choices", []) or chunk.get("chunk", {}).get("choices", [])
+        if choices and choices[0] is not None:
+            delta = choices[0].get("delta") or {}
+            reasoning = delta.get("reasoning_content")
+            if reasoning:
+                gen_chunk.message.additional_kwargs["reasoning_content"] = reasoning
+        return gen_chunk
 
-    def _generate(
+    def _create_chat_result(
         self,
-        messages: list,
-        stop: list[str] | None = None,
-        run_manager: Any = None,
-        **kwargs: Any,
+        response,
+        generation_info: dict | None = None,
     ):
-        """重写：非流式路径，把 reasoning_content 转成 content"""
-        result = super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
-
-        # 处理非流式响应
-        for generation in result.generations:
-            message = generation.message
-            if not message.content and hasattr(message, "additional_kwargs"):
-                reasoning = message.additional_kwargs.get("reasoning_content", "")
-                if reasoning:
-                    message.content = reasoning
-
+        """非流式：从原始响应恢复 reasoning_content（langchain 默认丢弃）"""
+        result = super()._create_chat_result(response, generation_info)
+        response_dict = (
+            response
+            if isinstance(response, dict)
+            else response.model_dump(warnings=False)
+        )
+        raw_choices = response_dict.get("choices", []) or []
+        for gen, raw_choice in zip(result.generations, raw_choices):
+            raw_msg = raw_choice.get("message", {}) if isinstance(raw_choice, dict) else {}
+            reasoning = raw_msg.get("reasoning_content") or raw_msg.get("reasoning")
+            if reasoning and not gen.message.content:
+                # content 为空（纯思考 / 被截断）时用 reasoning 兜底，避免下游空串失败
+                gen.message.content = reasoning
         return result
-
-    async def _agenerate(
-        self,
-        messages: list,
-        stop: list[str] | None = None,
-        run_manager: Any = None,
-        **kwargs: Any,
-    ):
-        """重写：非流式异步路径，把 reasoning_content 转成 content"""
-        result = await super()._agenerate(messages, stop=stop, run_manager=run_manager, **kwargs)
-
-        # 处理非流式响应
-        for generation in result.generations:
-            message = generation.message
-            if not message.content and hasattr(message, "additional_kwargs"):
-                reasoning = message.additional_kwargs.get("reasoning_content", "")
-                if reasoning:
-                    message.content = reasoning
-
-        return result
-
-    def _stream(
-        self,
-        messages: list,
-        stop: list[str] | None = None,
-        run_manager: Any = None,
-        **kwargs: Any,
-    ):
-        """重写：同步流式路径，确保 reasoning_content 被处理"""
-        # 父类的 _stream 会调用 _convert_chunk_to_generation_chunk，已重写
-        return super()._stream(messages, stop=stop, run_manager=run_manager, **kwargs)
-
-    async def _astream(
-        self,
-        messages: list,
-        stop: list[str] | None = None,
-        run_manager: Any = None,
-        **kwargs: Any,
-    ):
-        """重写：异步流式路径，确保 reasoning_content 被处理"""
-        # 父类的 _astream 会调用 _convert_chunk_to_generation_chunk，已重写
-        async for chunk in super()._astream(messages, stop=stop, run_manager=run_manager, **kwargs):
-            yield chunk
 
 
 class LLMFactory:
@@ -134,7 +101,7 @@ class LLMFactory:
 
         # 判断是否是推理模型（glm-5.2 / deepseek-r1 / o1 / o3 等）
         model_name = model or settings.llm_model
-        reasoning_models = getattr(settings, "reasoning_models", ["glm", "deepseek-r1", "o1", "o3"])
+        reasoning_models = settings.reasoning_models
         is_reasoning_model = any(rm in model_name.lower() for rm in reasoning_models)
 
         llm_class = ReasoningChatOpenAI if is_reasoning_model else ChatOpenAI

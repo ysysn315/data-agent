@@ -39,24 +39,20 @@ class ChatService:
         summary = self.session_store.get_summary(session_id)
 
         collected_content: list[str] = []
-        collected_reasoning: list[str] = []
         async for chunk in self.agent.chat_stream(question, history=history, summary=summary):
-            # 分离 content 和 reasoning_content，只存 content 到会话历史
+            # chat_agent yield {"type": "reasoning"|"content", "text": str}
             if isinstance(chunk, dict):
-                if "content" in chunk:
-                    text = chunk.get("content", "")
-                    collected_content.append(text)
-                    yield text
-                elif "reasoning_content" in chunk:
-                    text = chunk.get("reasoning_content", "")
-                    collected_reasoning.append(text)
-                    yield text
+                text = chunk.get("text", "")
+                if text:
+                    yield text  # 思考与答案都推给前端展示
+                if chunk.get("type") == "content":
+                    collected_content.append(text)  # 仅最终答案入会话历史
             else:
-                # 兼容字符串 chunk
+                # 兼容裸字符串 chunk
                 collected_content.append(chunk)
                 yield chunk
 
-        # 只把 content（非 reasoning）存入会话历史，保持与非流式 chat() 一致
+        # 只存最终答案（content），思考过程不入历史，保持与非流式 chat() 一致
         answer = "".join(collected_content)
         if answer:
             self.session_store.add_message(session_id, "user", question)

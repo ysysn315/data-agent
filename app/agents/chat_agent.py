@@ -96,17 +96,19 @@ class ChatAgent:
             config={"callbacks": get_langfuse_callbacks()},
         ):
             if isinstance(chunk, (AIMessage, AIMessageChunk)):
-                # 优先读 content，如果为空则尝试 reasoning_content（glm-5.2 等推理模型）
-                text = ""
+                # 分通道：reasoning_content=思考过程（只展示不入历史），content=最终答案
+                # ReasoningChatOpenAI 已把 reasoning_content 保留到 additional_kwargs
+                reasoning = chunk.additional_kwargs.get("reasoning_content")
+                if reasoning:
+                    yield {"type": "reasoning", "text": reasoning}
+
                 if chunk.content:
                     if isinstance(chunk.content, str):
                         text = chunk.content
                     else:
+                        text = ""
                         for part in chunk.content:
                             if isinstance(part, dict) and part.get("type") == "text":
                                 text += part.get("text", "")
-                elif hasattr(chunk, "reasoning_content") and getattr(chunk, "reasoning_content"):
-                    text = getattr(chunk, "reasoning_content")
-
-                if text:
-                    yield text
+                    if text:
+                        yield {"type": "content", "text": text}

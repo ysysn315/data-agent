@@ -27,8 +27,8 @@ class Settings(BaseSettings):
     llm_base_url: Optional[str] = None  # 自定义 endpoint，如 "https://aigc.sankuai.com/v1/openai/native"
     llm_temperature: float = 0.1
     llm_streaming: bool = False
-    # 推理模型列表（reasoning_content 转 content 兼容）
-    reasoning_models: list[str] = ["glm", "deepseek-r1", "o1", "o3"]
+    # 推理模型列表：命中模型名子串即启用 reasoning_content 处理（思考/答案分通道，不污染历史）
+    reasoning_models: list[str] = ["glm", "deepseek-reasoner", "deepseek-r1", "o1", "o3"]
 
     # Embedding 配置（支持本地 Ollama 或 OpenAI 兼容接口）
     embedding_provider: str = "openai"  # openai / ollama / dashscope
