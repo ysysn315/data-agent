@@ -1,5 +1,3 @@
-version: '3.5'
-
 # data-agent 基础设施：Milvus（知识库，ENABLE_KB_TOOL=true 时需要）+ Redis（会话/任务队列，必需）
 # 国内网络环境用：docker compose -f docker-compose.yml -f docker-compose.cn.yml up（cn.yml 仅覆盖镜像源）
 

@@ -88,8 +88,12 @@ class ChatAgent:
         question: str,
         history: Optional[List[dict]] = None,
         summary: str = "",
-    ) -> AsyncIterator[str]:
-        """流式对话，逐 token 产出模型文本。"""
+    ) -> AsyncIterator[dict]:
+        """流式对话，逐 token 产出模型文本。
+
+        yield {"type": "reasoning"|"content", "text": str}：
+        reasoning=思考过程（只展示不入历史），content=最终答案。
+        """
         async for chunk, _meta in self.graph.astream(
             {"messages": self._build_messages(question, history, summary)},
             stream_mode="messages",
