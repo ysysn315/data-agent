@@ -7,6 +7,7 @@
 4. 构造失败 → 降级为 []
 另外用假模型驱动 ChatAgent 跑一轮，确认 callbacks 注入不炸且回调确被触发。
 """
+
 from typing import List
 
 import pytest
@@ -77,9 +78,9 @@ def test_enabled_returns_cached_singleton(monkeypatch):
 
     assert len(first) == 1
     assert isinstance(first[0], FakeHandler)
-    assert first is second                              # 同一列表实例（单例缓存）
-    assert first[0] is second[0]                        # 同一 handler 实例
-    assert constructed == {"client": 1, "handler": 1}   # 惰性：只构造一次
+    assert first is second  # 同一列表实例（单例缓存）
+    assert first[0] is second[0]  # 同一 handler 实例
+    assert constructed == {"client": 1, "handler": 1}  # 惰性：只构造一次
 
 
 def test_build_failure_degrades_to_empty(monkeypatch):

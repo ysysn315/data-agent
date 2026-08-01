@@ -2,6 +2,7 @@
 
 自建临时库 fixture（sql_guard_db），不动 conftest。
 """
+
 import json
 import sqlite3
 
@@ -44,6 +45,7 @@ def sql_guard_db(tmp_path) -> str:
 
 # ---------- validate_sql：自动 LIMIT ----------
 
+
 def test_select_auto_limit_added():
     r = validate_sql("SELECT price FROM orders", schema=SCHEMA, default_limit=1000)
     assert r.ok
@@ -58,6 +60,7 @@ def test_existing_limit_not_duplicated():
 
 
 # ---------- validate_sql：CTE 名不被当未知表（关键回归，SQLBot 7118b40 的坑）----------
+
 
 def test_cte_name_not_treated_as_unknown_table():
     sql = "WITH recent AS (SELECT order_id, price FROM orders) SELECT price FROM recent"
@@ -75,6 +78,7 @@ def test_cte_referencing_unknown_real_table_still_caught():
 
 
 # ---------- validate_sql：只读 / 单语句 / 语法 ----------
+
 
 def test_multi_statement_rejected():
     r = validate_sql("SELECT 1; DROP TABLE orders", schema=SCHEMA)
@@ -111,6 +115,7 @@ def test_syntax_error_reports_position():
 
 # ---------- validate_sql：未知表 / 未知列，文案含候选 ----------
 
+
 def test_unknown_table_lists_candidates():
     r = validate_sql("SELECT * FROM nope", schema=SCHEMA)
     assert not r.ok
@@ -134,10 +139,7 @@ def test_qualified_unknown_column_caught():
 
 def test_known_column_and_join_pass():
     # 多表 JOIN：限定列都存在应通过（且不因无法定位非限定列而误报）
-    sql = (
-        "SELECT o.price, c.name FROM orders o "
-        "JOIN customers c ON o.order_id = c.customer_id"
-    )
+    sql = "SELECT o.price, c.name FROM orders o JOIN customers c ON o.order_id = c.customer_id"
     r = validate_sql(sql, schema=SCHEMA)
     assert r.ok, r.error
 
@@ -150,6 +152,7 @@ def test_no_schema_skips_table_column_check():
 
 
 # ---------- execute_sql 集成 ----------
+
 
 def test_execute_sql_good_query_returns_data(sql_guard_db):
     execute_sql = create_execute_sql_tool(sql_guard_db)
@@ -206,8 +209,7 @@ def test_select_alias_in_order_by_not_false_positive(sql_guard_db):
     from app.agents.tools.sql_guard import validate_sql
 
     result = validate_sql(
-        "SELECT customer_state, COUNT(*) AS n FROM customers "
-        "GROUP BY customer_state ORDER BY n DESC",
+        "SELECT customer_state, COUNT(*) AS n FROM customers GROUP BY customer_state ORDER BY n DESC",
         schema={"customers": ["customer_id", "customer_state"]},
     )
     assert result.ok, result.error

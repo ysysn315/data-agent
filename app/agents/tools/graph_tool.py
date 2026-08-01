@@ -35,10 +35,7 @@ def create_graph_search_tool(graph_service: GraphService):
         if result is None:
             candidates = graph_service.suggest_entities(name)
             if candidates:
-                return (
-                    f"图谱中不存在实体「{name}」。"
-                    f"相近实体：{'、'.join(candidates)}（请用精确名称重查）"
-                )
+                return f"图谱中不存在实体「{name}」。相近实体：{'、'.join(candidates)}（请用精确名称重查）"
             return f"图谱中不存在实体「{name}」，也没有相近实体（图谱可能未覆盖该概念）。"
 
         lines = [f"实体「{name}」的 {result['depth']} 跳邻居子图（{len(result['edges'])} 条关系）："]

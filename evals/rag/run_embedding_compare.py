@@ -40,7 +40,6 @@ from evals.rag.metrics import (
     strict_generation_score,
 )
 
-
 RETRIEVAL_DATASET_PATH = "evals/rag/datasets/rag_retrieval_cases.json"
 GENERATION_DATASET_PATH = "evals/rag/datasets/rag_generation_cases_formal_template.json"
 REPORT_PATH = "evals/rag/reports/embedding_compare_latest.json"
@@ -123,9 +122,7 @@ def build_eval_rerankers(settings: Settings):
         reranker = BGEReranker("BAAI/bge-reranker-base")
         logger.info("[embedding-compare] Using BGE reranker.")
     except Exception as e:  # noqa: BLE001
-        logger.warning(
-            f"[embedding-compare] BGE reranker unavailable, fallback to LLM rerank: {e}"
-        )
+        logger.warning(f"[embedding-compare] BGE reranker unavailable, fallback to LLM rerank: {e}")
 
     reranker_llm = ChatTongyi(
         dashscope_api_key=settings.dashscope_api_key,
@@ -238,9 +235,7 @@ async def run_retrieval_eval(vector_store: VectorStore, cases: List[Dict]) -> Di
             "mrr": round(mean(mrr_list), 4) if mrr_list else 0.0,
             "precision@3": round(mean(p3_list), 4) if p3_list else 0.0,
             "ndcg@3": round(mean(ndcg3_list), 4) if ndcg3_list else 0.0,
-            "map": round(mean_average_precision(all_pred, all_gold), 4)
-            if all_pred
-            else 0.0,
+            "map": round(mean_average_precision(all_pred, all_gold), 4) if all_pred else 0.0,
         },
         "cases": per_case,
     }
@@ -344,22 +339,12 @@ async def run_generation_eval(rag_service: RAGService, cases: List[Dict]) -> Dic
         "summary": {
             "num_cases": len(cases),
             "keyword_recall": round(mean(keyword_scores), 4) if keyword_scores else 0.0,
-            "source_hit": round(mean(legacy_source_scores), 4)
-            if legacy_source_scores
-            else 0.0,
+            "source_hit": round(mean(legacy_source_scores), 4) if legacy_source_scores else 0.0,
             "fact_recall": round(mean(fact_scores), 4) if fact_scores else 0.0,
-            "source_recall_strict": round(mean(source_recall_scores), 4)
-            if source_recall_scores
-            else 0.0,
-            "source_precision_strict": round(mean(source_precision_scores), 4)
-            if source_precision_scores
-            else 0.0,
-            "hallucination_score": round(mean(hallucination_scores), 4)
-            if hallucination_scores
-            else 0.0,
-            "forbidden_source_score": round(mean(forbidden_source_scores), 4)
-            if forbidden_source_scores
-            else 0.0,
+            "source_recall_strict": round(mean(source_recall_scores), 4) if source_recall_scores else 0.0,
+            "source_precision_strict": round(mean(source_precision_scores), 4) if source_precision_scores else 0.0,
+            "hallucination_score": round(mean(hallucination_scores), 4) if hallucination_scores else 0.0,
+            "forbidden_source_score": round(mean(forbidden_source_scores), 4) if forbidden_source_scores else 0.0,
             "strict_score": round(mean(strict_scores), 4) if strict_scores else 0.0,
             "error_rate": round(errors / len(cases), 4) if cases else 0.0,
         },

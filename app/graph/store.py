@@ -11,6 +11,7 @@
 （如 客单价-[计算自]->订单数 与未来可能的 客单价-[核算于]->订单数），
 edge key 直接用谓词，重建天然幂等。
 """
+
 from __future__ import annotations
 
 from typing import Callable, Coroutine, Sequence
@@ -95,8 +96,11 @@ class GraphStore:
             for t in self.list_triples():
                 # edge key 用谓词：同 (s,o) 的不同谓词共存，重复重建也不叠边
                 g.add_edge(
-                    t["subject"], t["object"],
-                    key=t["predicate"], predicate=t["predicate"], source=t["source"],
+                    t["subject"],
+                    t["object"],
+                    key=t["predicate"],
+                    predicate=t["predicate"],
+                    source=t["source"],
                 )
             self._graph = g
         return self._graph

@@ -11,6 +11,7 @@ run_skill_script：执行 skill 目录随附的脚本（对标 Yuxi mysql-report
 路径包含校验留在本层 —— 第一道闸，与执行器无关；
 "远程安装的 skill 默认禁用"不变，沙箱是人工启用之后的第二道防线（纵深防御）。
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -85,13 +86,12 @@ def create_skill_tools(skill_service, runner: Optional[ScriptRunner] = None) -> 
 
         # 校验通过后才折算目录内相对路径，交给执行器（docker 模式在容器内以 /skill 为根）
         script_rel = (Path("scripts") / script_path.relative_to(scripts_dir)).as_posix()
-        logger.info(
-            f"执行 skill 脚本: {slug}/{script_rel} args={script_args} "
-            f"runner={type(script_runner).__name__}"
-        )
+        logger.info(f"执行 skill 脚本: {slug}/{script_rel} args={script_args} runner={type(script_runner).__name__}")
         try:
             result = await script_runner.run(
-                skill_dir, script_rel, [str(a) for a in script_args],
+                skill_dir,
+                script_rel,
+                [str(a) for a in script_args],
                 timeout=SCRIPT_TIMEOUT_SECONDS,
             )
         except ScriptTimeoutError:

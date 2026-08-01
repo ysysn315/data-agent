@@ -3,14 +3,15 @@
 # 向量存储模块
 # TODO: 任务 12.2 - 实现 VectorStore 类
 
-from typing import List, Dict
-from app.clients.milvus_client import MilvusClient
-from app.rag.embeddings import EmbeddingService
-from loguru import logger
 import json
 import re
-from typing import Optional
-from langchain_core.messages import SystemMessage, HumanMessage
+from typing import Dict, List, Optional
+
+from langchain_core.messages import HumanMessage, SystemMessage
+from loguru import logger
+
+from app.clients.milvus_client import MilvusClient
+from app.rag.embeddings import EmbeddingService
 from app.rag.metadata_filters import (
     matches_metadata_filters,
     normalize_metadata_filters,
@@ -18,13 +19,20 @@ from app.rag.metadata_filters import (
 
 
 class VectorStore:
-    def __init__(self, milvus_client: MilvusClient, embedding_service: EmbeddingService,
-                 reranker_llm: Optional[object] = None,reranker: Optional[object] = None, dense_top_k: int = 10, enable_rerank: bool = True,
-                 enable_hybrid: bool = True):
+    def __init__(
+        self,
+        milvus_client: MilvusClient,
+        embedding_service: EmbeddingService,
+        reranker_llm: Optional[object] = None,
+        reranker: Optional[object] = None,
+        dense_top_k: int = 10,
+        enable_rerank: bool = True,
+        enable_hybrid: bool = True,
+    ):
         self.milvus = milvus_client
         self.embedding = embedding_service
         self.reranker_llm = reranker_llm
-        self.reranker = reranker 
+        self.reranker = reranker
         self.dense_top_k = dense_top_k
         self.enable_rerank = enable_rerank
         self.enable_hybrid = enable_hybrid
@@ -39,15 +47,14 @@ class VectorStore:
                 return
             texts = [chunk["content"] for chunk in chunks]
             vectors = await self.embedding.embed_texts(texts)
-            data = [
-                vectors, texts, [chunk["metadata"] for chunk in chunks]
-            ]
+            data = [vectors, texts, [chunk["metadata"] for chunk in chunks]]
             self.milvus.collection.insert(data)
             self.milvus.collection.flush()
             logger.info(f"成功插入 {len(chunks)} 个文档块")
             self.all_chunks.extend(chunks)
             if self.enable_hybrid:
                 from app.rag.bm25 import BM25Retriever
+
                 self.bm25_retriever = BM25Retriever()
                 self.bm25_retriever.index(self.all_chunks)
 
@@ -78,7 +85,7 @@ class VectorStore:
 - 只输出一行 JSON
 - 严禁输出 markdown（包括 ```json）
 - 严禁输出任何解释文字
-- 输出必须以 '{'开头，以 '}' 结尾
+- 输出必须以 '{"开头，以 "}' 结尾
 - JSON 必须只包含一个键：order
 {{"order":[0,2,1,3]}}
 规则：
@@ -127,16 +134,12 @@ class VectorStore:
                 anns_field="vector",
                 param={"metric_type": "IP", "params": {"nprobe": 10}},
                 limit=candidate_limit,
-                output_fields=["content", "metadata"]
+                output_fields=["content", "metadata"],
             )
             docs = []
             for hit in results[0]:
                 docs.append(
-                    {
-                        "content": hit.entity.get("content"),
-                        "metadata": hit.entity.get("metadata"),
-                        "score": hit.score
-                    }
+                    {"content": hit.entity.get("content"), "metadata": hit.entity.get("metadata"), "score": hit.score}
                 )
             # ===== 新增：混合检索融合 =====
             if self.enable_hybrid and self.bm25_retriever is not None:
@@ -149,10 +152,7 @@ class VectorStore:
 
             if normalized_filters:
                 before_filter_count = len(docs)
-                docs = [
-                    doc for doc in docs
-                    if matches_metadata_filters(doc.get("metadata"), normalized_filters)
-                ]
+                docs = [doc for doc in docs if matches_metadata_filters(doc.get("metadata"), normalized_filters)]
                 logger.info(
                     f"[VectorStore.search] metadata_filters={normalized_filters} "
                     f"filtered {before_filter_count} -> {len(docs)}"
@@ -168,11 +168,10 @@ class VectorStore:
             )
             if self.enable_rerank and len(docs) > 1:
                 if self.reranker is not None:
-                    docs=self.reranker.rerank(query,docs,top_k=candidate_limit)
+                    docs = self.reranker.rerank(query, docs, top_k=candidate_limit)
                     logger.info("[VectorStore.search] Rerank 模型重排完成")
-                      
-                elif self.reranker_llm is not None:
 
+                elif self.reranker_llm is not None:
                     try:
                         prompt = self._build_rerank_prompt(query, docs)
                         messages = [
@@ -193,9 +192,7 @@ class VectorStore:
             logger.info(f"[VectorStore.search] top3 before={before} after={after}")
             docs = docs[:top_k]
             logger.info(f"检索到 {len(docs)} 个相关文档")
-            logger.info(
-                f"[VectorStore.search] 返回数={len(docs)} / 候选数={candidate_limit} (top_k={top_k})"
-            )
+            logger.info(f"[VectorStore.search] 返回数={len(docs)} / 候选数={candidate_limit} (top_k={top_k})")
             return docs
         except Exception as e:
             logger.error(f"检索文档失败: {str(e)}")
@@ -226,10 +223,7 @@ class VectorStore:
             expr = f"metadata['source'] == '{source}'"
 
             # 查询匹配的文档
-            results = self.milvus.collection.query(
-                expr=expr,
-                output_fields=["id"]
-            )
+            results = self.milvus.collection.query(expr=expr, output_fields=["id"])
 
             if not results:
                 logger.info(f"没有找到来源为 {source} 的文档，跳过删除")

@@ -20,6 +20,7 @@
   可在同一 loop 里 await create_user 再发请求）。ASGITransport 不触发 startup，故 bootstrap
   只在被显式 await 时发生，测试可控。
 """
+
 from __future__ import annotations
 
 import re
@@ -36,6 +37,7 @@ BUILTIN_DIR = Path(__file__).parent.parent / "app" / "skills" / "buildin"
 
 
 # ========== 公共工具 ==========
+
 
 def _client() -> httpx.AsyncClient:
     return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test")
@@ -69,6 +71,7 @@ def auth_on(auth_db, monkeypatch):
 
 
 # ========== 轻量假件（保护矩阵/读开放用，避免真实技能/MCP 副作用） ==========
+
 
 class _FakeSkillService:
     repository = None
@@ -139,6 +142,7 @@ def _override_all_services():
 
 # ========== 1. 开关关（demo）：行为与从前一致 ==========
 
+
 async def test_demo_me_returns_dev_user(monkeypatch):
     monkeypatch.setattr(settings, "auth_enabled", False)
     async with _client() as c:
@@ -184,6 +188,7 @@ async def test_demo_admin_endpoint_open(monkeypatch):
 
 
 # ========== 2. bootstrap + verify ==========
+
 
 async def test_bootstrap_idempotent_and_logs_key(auth_on, loguru_capture):
     key = await auth.bootstrap()
@@ -240,9 +245,10 @@ async def test_api_key_only_hash_stored(auth_on):
     key = created["api_key"]
     assert created["api_key_prefix"] == key[:8]
 
+    from sqlalchemy import select
+
     from app.db import get_sessionmaker
     from app.db.models import UserModel
-    from sqlalchemy import select
 
     async with get_sessionmaker()() as session:
         row = (await session.execute(select(UserModel).where(UserModel.username == "bob"))).scalar_one()
@@ -252,6 +258,7 @@ async def test_api_key_only_hash_stored(auth_on):
 
 
 # ========== 3. /me ==========
+
 
 async def test_me_requires_valid_key(auth_on):
     admin = await auth.create_user("root", "admin", "default")
@@ -265,6 +272,7 @@ async def test_me_requires_valid_key(auth_on):
 
 
 # ========== 4. admin 用户管理 ==========
+
 
 async def test_admin_user_management(auth_on):
     admin = await auth.create_user("root", "admin", "default")
@@ -280,9 +288,7 @@ async def test_admin_user_management(auth_on):
         assert r.json()["api_key"].startswith("da-")
 
         # member 建用户 -> 403
-        r2 = await c.post(
-            "/api/auth/users", headers=_bearer(member["api_key"]), json={"username": "u3"}
-        )
+        r2 = await c.post("/api/auth/users", headers=_bearer(member["api_key"]), json={"username": "u3"})
         assert r2.status_code == 403
 
         # 无 key -> 401
@@ -295,21 +301,18 @@ async def test_admin_user_management(auth_on):
         assert {u["username"] for u in r3.json()} >= {"root", "m1", "u2"}
 
         # 禁用 member
-        rd = await c.post(
-            f"/api/auth/users/{member['id']}/disable", headers=_bearer(admin["api_key"])
-        )
+        rd = await c.post(f"/api/auth/users/{member['id']}/disable", headers=_bearer(admin["api_key"]))
         assert rd.status_code == 200 and rd.json()["enabled"] is False
 
         # 禁用后 member key 失效
         assert (await c.get("/api/auth/me", headers=_bearer(member["api_key"]))).status_code == 401
 
         # 禁用不存在用户 -> 404
-        assert (
-            await c.post("/api/auth/users/999999/disable", headers=_bearer(admin["api_key"]))
-        ).status_code == 404
+        assert (await c.post("/api/auth/users/999999/disable", headers=_bearer(admin["api_key"]))).status_code == 404
 
 
 # ========== 5. member 建技能可以、启停 403、admin 启用 200 ==========
+
 
 async def _real_skill_service(save_root: Path):
     from app.skills.repository import InMemorySkillRepository
@@ -331,28 +334,21 @@ async def test_member_create_skill_but_toggle_forbidden(auth_on, tmp_path):
     try:
         async with _client() as c:
             # member 建技能 -> 201
-            r = await c.post(
-                "/api/skills", headers=_bearer(member["api_key"]), json={"content": _skill_md("mine")}
-            )
+            r = await c.post("/api/skills", headers=_bearer(member["api_key"]), json={"content": _skill_md("mine")})
             assert r.status_code == 201
 
             # member 启停 -> 403（启停需 admin）
-            assert (
-                await c.post("/api/skills/mine/enable", headers=_bearer(member["api_key"]))
-            ).status_code == 403
-            assert (
-                await c.post("/api/skills/mine/disable", headers=_bearer(member["api_key"]))
-            ).status_code == 403
+            assert (await c.post("/api/skills/mine/enable", headers=_bearer(member["api_key"]))).status_code == 403
+            assert (await c.post("/api/skills/mine/disable", headers=_bearer(member["api_key"]))).status_code == 403
 
             # admin 启用 -> 200
-            assert (
-                await c.post("/api/skills/mine/enable", headers=_bearer(admin["api_key"]))
-            ).status_code == 200
+            assert (await c.post("/api/skills/mine/enable", headers=_bearer(admin["api_key"]))).status_code == 200
     finally:
         app.dependency_overrides.clear()
 
 
 # ========== 6. 工作空间隔离 ==========
+
 
 async def test_workspace_isolation(auth_on, tmp_path):
     from app.core.dependencies import get_skill_service
@@ -391,6 +387,7 @@ async def test_workspace_isolation(auth_on, tmp_path):
 
 
 # ========== 7. 保护清单矩阵化断言（逐口 401/403/放行） ==========
+
 
 async def test_protection_matrix(auth_on):
     admin = await auth.create_user("root", "admin", "default")
@@ -439,11 +436,7 @@ def test_protected_registry_matches_routes():
     惰性挂载子路由，app.routes 不再是拍平的 APIRoute，openapi()["paths"] 才是稳定口径。
     """
     schema = app.openapi()
-    registered = {
-        (method.upper(), path)
-        for path, operations in schema["paths"].items()
-        for method in operations
-    }
+    registered = {(method.upper(), path) for path, operations in schema["paths"].items() for method in operations}
     for method, path, level in auth.PROTECTED_ENDPOINTS:
         assert level in ("login", "admin"), f"非法级别: {level}"
         assert (method, path) in registered, f"清单端点未注册: {method} {path}"

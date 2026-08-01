@@ -88,18 +88,31 @@ class ChatAgent:
         question: str,
         history: Optional[List[dict]] = None,
         summary: str = "",
-    ) -> AsyncIterator[str]:
-        """流式对话，逐 token 产出模型文本。"""
+    ) -> AsyncIterator[dict]:
+        """流式对话，逐 token 产出模型文本。
+
+        yield {"type": "reasoning"|"content", "text": str}：
+        reasoning=思考过程（只展示不入历史），content=最终答案。
+        """
         async for chunk, _meta in self.graph.astream(
             {"messages": self._build_messages(question, history, summary)},
             stream_mode="messages",
             config={"callbacks": get_langfuse_callbacks()},
         ):
-            if isinstance(chunk, AIMessageChunk) and chunk.content:
-                # content 可能是 str 或分段 list，统一成文本
-                if isinstance(chunk.content, str):
-                    yield chunk.content
-                else:
-                    for part in chunk.content:
-                        if isinstance(part, dict) and part.get("type") == "text":
-                            yield part.get("text", "")
+            if isinstance(chunk, (AIMessage, AIMessageChunk)):
+                # 分通道：reasoning_content=思考过程（只展示不入历史），content=最终答案
+                # ReasoningChatOpenAI 已把 reasoning_content 保留到 additional_kwargs
+                reasoning = chunk.additional_kwargs.get("reasoning_content")
+                if reasoning:
+                    yield {"type": "reasoning", "text": reasoning}
+
+                if chunk.content:
+                    if isinstance(chunk.content, str):
+                        text = chunk.content
+                    else:
+                        text = ""
+                        for part in chunk.content:
+                            if isinstance(part, dict) and part.get("type") == "text":
+                                text += part.get("text", "")
+                    if text:
+                        yield {"type": "content", "text": text}

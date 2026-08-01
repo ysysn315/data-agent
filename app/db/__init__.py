@@ -10,6 +10,7 @@ SQLite 起步、PostgreSQL 就绪（只改 settings.database_url 一行）。
 
 设计说明见 app/db/IMPLEMENTATION.md。
 """
+
 from __future__ import annotations
 
 from app.db.engine import (

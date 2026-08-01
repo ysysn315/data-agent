@@ -6,7 +6,6 @@ from typing import Iterable, List
 import torch
 from FlagEmbedding import FlagModel
 
-
 # 统一放在 D 盘，避免模型下载到系统盘。
 MODEL_CACHE_DIR = Path("D:/AI编程/kiro-place/JAVA-agent/my-agent/models")
 os.environ["HF_HOME"] = str(MODEL_CACHE_DIR)

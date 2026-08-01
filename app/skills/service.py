@@ -6,6 +6,7 @@ v2 要点：
 - 依赖展开：分支内 stack 判环 + 全局 seen 去重（菱形依赖不再误报为环）
 - 语义匹配：委托 SkillMatcher（embedding 向量召回，未配置/失败回退 jieba 关键词）
 """
+
 from __future__ import annotations
 
 import shutil
@@ -120,11 +121,7 @@ class SkillService:
 
         return skill.content or None
 
-    async def list_skills(
-        self,
-        enabled_only: bool = True,
-        user_id: Optional[int] = None
-    ) -> list[Skill]:
+    async def list_skills(self, enabled_only: bool = True, user_id: Optional[int] = None) -> list[Skill]:
         """列表查询 skills"""
         skills = list(self._builtin_skills_cache.values())
 
@@ -148,11 +145,7 @@ class SkillService:
 
     # ========== 依赖展开 ==========
 
-    async def expand_dependencies(
-        self,
-        skill_slugs: list[str],
-        max_depth: int = 10
-    ) -> ExpandedSkills:
+    async def expand_dependencies(self, skill_slugs: list[str], max_depth: int = 10) -> ExpandedSkills:
         """展开 skills 依赖（递归，仅对 skills 边递归）
 
         环检测：分支内 stack 判环（真环告警跳过）；
@@ -220,10 +213,7 @@ class SkillService:
         return SkillMatcher._tokenize(text)
 
     async def match_skills_by_query(
-        self,
-        query: str,
-        candidate_slugs: Optional[list[str]] = None,
-        top_k: int = 3
+        self, query: str, candidate_slugs: Optional[list[str]] = None, top_k: int = 3
     ) -> list[Skill]:
         """根据用户查询匹配 skills
 
@@ -313,11 +303,7 @@ class SkillService:
 
     # ========== 增删改 ==========
 
-    async def create_skill(
-        self,
-        content: str,
-        user_id: Optional[int] = None
-    ) -> Skill:
+    async def create_skill(self, content: str, user_id: Optional[int] = None) -> Skill:
         """创建 skill（从 SKILL.md 内容；配置了 save_dir 时落盘为目录）"""
         parsed = SkillContent.parse(content)
         slug = parsed.frontmatter.slug
@@ -341,7 +327,7 @@ class SkillService:
             dir_path=dir_path,
             source_type=SkillSourceType.UPLOAD,
             enabled=True,
-            user_id=user_id
+            user_id=user_id,
         )
 
         if self.repository:
@@ -350,12 +336,7 @@ class SkillService:
         self._invalidate_match_cache(slug)
         return skill
 
-    async def update_skill(
-        self,
-        slug: str,
-        content: str,
-        user_id: Optional[int] = None
-    ) -> Skill:
+    async def update_skill(self, slug: str, content: str, user_id: Optional[int] = None) -> Skill:
         """更新 skill（重写根 SKILL.md）"""
         existing = await self.get_skill(slug)
         if not existing:
@@ -370,9 +351,7 @@ class SkillService:
 
         parsed = SkillContent.parse(content)
         if parsed.frontmatter.slug != slug:
-            raise ValueError(
-                f"frontmatter slug ({parsed.frontmatter.slug}) 与目标 skill ({slug}) 不一致"
-            )
+            raise ValueError(f"frontmatter slug ({parsed.frontmatter.slug}) 与目标 skill ({slug}) 不一致")
 
         existing.name = parsed.frontmatter.name
         existing.description = parsed.frontmatter.description

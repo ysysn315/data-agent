@@ -1,4 +1,5 @@
 """Skills 工具测试：read_skill / run_skill_script / execute_sql"""
+
 import json
 
 from app.agents.tools.sql_tool import create_execute_sql_tool
@@ -16,22 +17,26 @@ async def test_read_skill_returns_body(skill_service):
 
 async def test_run_skill_script_executes(skill_service, demo_db):
     _, run_skill_script = create_skill_tools(skill_service)
-    output = await run_skill_script.ainvoke({
-        "slug": "sqlite-query",
-        "script": "query.py",
-        "script_args": ["--db", demo_db, "--sql", "SELECT COUNT(*) AS n FROM orders"],
-    })
+    output = await run_skill_script.ainvoke(
+        {
+            "slug": "sqlite-query",
+            "script": "query.py",
+            "script_args": ["--db", demo_db, "--sql", "SELECT COUNT(*) AS n FROM orders"],
+        }
+    )
     data = json.loads(output)
     assert data["rows"][0][0] == 3
 
 
 async def test_run_skill_script_path_traversal_blocked(skill_service):
     _, run_skill_script = create_skill_tools(skill_service)
-    output = await run_skill_script.ainvoke({
-        "slug": "sqlite-query",
-        "script": "../../../etc/passwd",
-        "script_args": [],
-    })
+    output = await run_skill_script.ainvoke(
+        {
+            "slug": "sqlite-query",
+            "script": "../../../etc/passwd",
+            "script_args": [],
+        }
+    )
     assert "非法脚本路径" in output or "脚本不存在" in output
 
 

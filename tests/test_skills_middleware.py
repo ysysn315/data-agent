@@ -5,7 +5,8 @@
 2. 门控：execute_sql 激活前对模型不可见，read_skill 后可见
 3. read_skill 成功 → state.activated_skills 记录 slug
 """
-from typing import Any, List
+
+from typing import List
 
 import pytest
 from langchain.agents import create_agent
@@ -20,6 +21,7 @@ from app.skills.tools import create_skill_tools
 
 class FakeToolCallingModel(BaseChatModel):
     """按脚本吐消息的假模型，记录每轮绑定的工具名"""
+
     scripted: List[AIMessage]
     step: int = 0
     seen_tool_names: List[List[str]] = []
@@ -57,14 +59,22 @@ async def test_progressive_disclosure_and_gating(agent_parts):
     middleware, base_tools = agent_parts
     model = FakeToolCallingModel(
         scripted=[
-            AIMessage(content="", tool_calls=[
-                {"name": "read_skill", "args": {"slug": "sqlite-query"}, "id": "c1"},
-            ]),
-            AIMessage(content="", tool_calls=[
-                {"name": "execute_sql",
-                 "args": {"sql": "SELECT customer_state, SUM(price) FROM orders GROUP BY 1"},
-                 "id": "c2"},
-            ]),
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {"name": "read_skill", "args": {"slug": "sqlite-query"}, "id": "c1"},
+                ],
+            ),
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "execute_sql",
+                        "args": {"sql": "SELECT customer_state, SUM(price) FROM orders GROUP BY 1"},
+                        "id": "c2",
+                    },
+                ],
+            ),
             AIMessage(content="各州销售额：SP 130.0，RJ 50.5"),
         ],
         seen_tool_names=[],
@@ -78,8 +88,8 @@ async def test_progressive_disclosure_and_gating(agent_parts):
     first_prompt = model.seen_system_prompts[0]
     assert "sqlite-query" in first_prompt
     assert "read_skill" in first_prompt
-    assert "操作流程" not in first_prompt          # 正文标题不应出现
-    assert "sqlite_master" not in first_prompt     # 正文细节不应出现
+    assert "操作流程" not in first_prompt  # 正文标题不应出现
+    assert "sqlite_master" not in first_prompt  # 正文细节不应出现
 
     # --- 门控：第一轮 execute_sql 不可见，激活后第二轮可见 ---
     assert "execute_sql" not in model.seen_tool_names[0]
@@ -98,9 +108,12 @@ async def test_read_nonexistent_skill_does_not_activate(agent_parts):
     middleware, base_tools = agent_parts
     model = FakeToolCallingModel(
         scripted=[
-            AIMessage(content="", tool_calls=[
-                {"name": "read_skill", "args": {"slug": "ghost-skill"}, "id": "c1"},
-            ]),
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {"name": "read_skill", "args": {"slug": "ghost-skill"}, "id": "c1"},
+                ],
+            ),
             AIMessage(content="没有这个技能"),
         ],
         seen_tool_names=[],

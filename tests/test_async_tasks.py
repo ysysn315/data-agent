@@ -10,6 +10,7 @@
 7. run_eval_task 逐例进度事件格式（monkeypatch 掉 eval，不调真 LLM/库）
 8. 真实 arq worker 端到端一条（burst worker），本机 6379 连不上则跳过
 """
+
 import socket
 
 import fakeredis.aioredis
@@ -19,7 +20,6 @@ from arq import ArqRedis
 
 from app.tasks.events import TaskEvent
 from app.tasks.service import TaskService
-
 
 # ========== fakeredis fixtures（共享 FakeServer，text 端 decode，arq 端 bytes）==========
 
@@ -212,13 +212,15 @@ async def test_run_eval_task_emits_progress_events(fake_server, monkeypatch):
 
     # 固定 3 例数据集；重资源与逐例评估整体 monkeypatch，绝不碰真 LLM/库
     monkeypatch.setattr(
-        ev, "load_dataset",
+        ev,
+        "load_dataset",
         lambda: [{"id": "q1", "tags": ["agg"]}, {"id": "q2", "tags": []}, {"id": "q3", "tags": ["join"]}],
     )
     monkeypatch.setattr(worker, "_build_eval_context", lambda model: ("db", {}, "body", "M", object()))
     seq = iter([True, False, True])
     monkeypatch.setattr(
-        ev, "evaluate_case",
+        ev,
+        "evaluate_case",
         lambda case, *a, **k: {"id": case["id"], "tags": case.get("tags", []), "correct": next(seq)},
     )
 

@@ -72,9 +72,10 @@
 from langchain_openai import ChatOpenAI
 from typing import Optional
 
+
 class LLMFactory:
     """LLM 工厂，支持自定义 base_url 和 api_key"""
-    
+
     @staticmethod
     def create_llm(
         model: str,
@@ -82,11 +83,11 @@ class LLMFactory:
         base_url: Optional[str] = None,  # 自定义 endpoint，如美团 FRIDAY
         temperature: float = 0.1,
         streaming: bool = False,
-        **kwargs
+        **kwargs,
     ):
         """
         创建 LLM 实例
-        
+
         参数:
             model: 模型名称（如 "glm-5.2", "qwen-max", "gpt-4"）
             api_key: API Key
@@ -101,21 +102,20 @@ class LLMFactory:
             base_url=base_url,  # 关键：支持自定义 endpoint
             temperature=temperature,
             streaming=streaming,
-            **kwargs
+            **kwargs,
         )
+
 
 # 使用示例
 # 1. 调用美团 FRIDAY API
 mt_llm = LLMFactory.create_llm(
-    model="glm-5.2",
-    api_key="220641...73",
-    base_url="https://aigc.sankuai.com/v1/openai/native"
+    model="glm-5.2", api_key="220641...73", base_url="https://aigc.sankuai.com/v1/openai/native"
 )
 
 # 2. 调用 OpenAI 官方
 openai_llm = LLMFactory.create_llm(
     model="gpt-4",
-    api_key="sk-..."
+    api_key="sk-...",
     # base_url 不传，默认 OpenAI
 )
 
@@ -123,7 +123,7 @@ openai_llm = LLMFactory.create_llm(
 ollama_llm = LLMFactory.create_llm(
     model="bge-m3",
     api_key="ollama",  # Ollama 不需要真实 key
-    base_url="http://localhost:11434/v1"
+    base_url="http://localhost:11434/v1",
 )
 ```
 

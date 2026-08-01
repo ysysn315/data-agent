@@ -7,6 +7,7 @@
 路由风格对齐 routes_mcp（APIRouter(prefix=...) + Depends 注入 service），SSE 复用
 routes_chat 的 StreamingResponse(text/event-stream)。
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status

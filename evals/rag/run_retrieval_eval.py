@@ -1,8 +1,8 @@
 import asyncio
 from statistics import mean
 
-from evals.rag.common import load_json, save_json, build_rag
-from evals.rag.metrics import hit_at_k, recall_at_k, mrr, precision_at_k, ndcg_at_k, mean_average_precision
+from evals.rag.common import build_rag, load_json, save_json
+from evals.rag.metrics import hit_at_k, mean_average_precision, mrr, ndcg_at_k, precision_at_k, recall_at_k
 
 DATASET_PATH = "evals/rag/datasets/rag_retrieval_cases.json"
 REPORT_PATH = "evals/rag/reports/retrieval_latest.json"
@@ -60,7 +60,7 @@ async def main():
                 "recall@3": r3,
                 "mrr": m,
                 "precision@3": p3,
-                "ndcg@3": ndcg3
+                "ndcg@3": ndcg3,
             }
         )
 

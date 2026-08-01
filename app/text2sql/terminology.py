@@ -7,6 +7,7 @@ prompt，让模型按公司口径算指标（如"复购率"该怎么算、GMV �
 见 backend/apps/terminology/curd/terminology.py:select_terminology_by_word）。
 持久化：save_path 指向的 JSON 文件（原子写，与 ExampleStore 同思路）。
 """
+
 from __future__ import annotations
 
 import json
@@ -21,7 +22,9 @@ SEED_TERMS: list[dict] = [
         "term": "GMV",
         "synonyms": ["成交总额", "成交额", "销售额"],
         "definition": "成交总额，统计口径为订单商品金额之和（不含运费）。",
-        "sql_hint": "对 order_items.price 求和：SUM(oi.price)。按月趋势用 strftime('%Y-%m', order_purchase_timestamp) 分组。",
+        "sql_hint": (
+            "对 order_items.price 求和：SUM(oi.price)。按月趋势用 strftime('%Y-%m', order_purchase_timestamp) 分组。"
+        ),
     },
     {
         "term": "复购率",
@@ -137,12 +140,14 @@ class TermStore:
         if not term or not term.strip():
             raise ValueError("term 不能为空")
 
-        rec = self._normalize({
-            "term": term,
-            "synonyms": synonyms or [],
-            "definition": definition,
-            "sql_hint": sql_hint,
-        })
+        rec = self._normalize(
+            {
+                "term": term,
+                "synonyms": synonyms or [],
+                "definition": definition,
+                "sql_hint": sql_hint,
+            }
+        )
 
         for i, existing in enumerate(self._terms):
             if existing["term"] == rec["term"]:

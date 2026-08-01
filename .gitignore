@@ -1,23 +1,54 @@
+# 日志文件
+*.log
+backend.log
+frontend.log
+
 # Python
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
+.Python
 .venv/
-*.egg-info/
+venv/
+env/
 
-# 环境与本地数据
+# 环境变量
 .env
-uploads/
-saves/
-models/
+.env.local
+
+# 数据库
+*.db
+*.sqlite
+*.sqlite3
 data/*.db
 
-# 测试与缓存
-.pytest_cache/
-.ruff_cache/
-htmlcov/
-.coverage
+# 上传文件
+uploads/
+saves/
+
+# 模型缓存
+models/
 
 # IDE
-.idea/
 .vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
 .DS_Store
+Thumbs.db
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+
+# 测试覆盖率
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Docker
+volumes/

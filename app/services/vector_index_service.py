@@ -4,11 +4,13 @@
 # TODO: 任务 13.2 - 实现 VectorIndexService 类
 
 from typing import Dict
-from app.rag.chunking import DocumentChunker
-from app.rag.vector_store import VectorStore
+
 from loguru import logger
+
+from app.rag.chunking import DocumentChunker
 from app.rag.load import DocumentLoader
 from app.rag.metadata_filters import build_base_metadata, merge_chunk_metadata
+from app.rag.vector_store import VectorStore
 
 
 class VectorIndexService:
@@ -51,16 +53,8 @@ class VectorIndexService:
 
             await self.vector_store.insert(chunks)
             logger.info(f"文档 {filename} 索引完成，共 {len(chunks)} 个 chunks")
-            return {
-                "filename": filename,
-                "chunks": len(chunks),
-                "status": "success"
-            }
+            return {"filename": filename, "chunks": len(chunks), "status": "success"}
 
         except Exception as e:
             logger.error(f"索引文档 {filename} 失败: {str(e)}")
-            return {
-                "filename": filename,
-                "chunks": 0,
-                "status": "failed"
-            }
+            return {"filename": filename, "chunks": 0, "status": "failed"}

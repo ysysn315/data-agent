@@ -5,6 +5,7 @@
 - enabled 用 bool（Yuxi 用 Integer 1/0，易错）
 - to_client_config 按 transport 投影出 MultiServerMCPClient 的连接配置
 """
+
 from __future__ import annotations
 
 import re
@@ -17,6 +18,7 @@ SLUG_PATTERN = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 
 class MCPServer(BaseModel):
     """一个 MCP server 的注册信息"""
+
     slug: str = Field(..., description="唯一标识")
     name: str = Field(default="", description="显示名称")
     description: str = Field(default="", description="描述")

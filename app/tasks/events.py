@@ -4,6 +4,7 @@ TaskEvent 是任务进度的统一结构：worker 用 XADD 追加到 Redis Strea
 读出后原样透传给前端。字段刻意做小、与具体任务解耦 —— 无论是对话任务还是评估任务，
 进度都压进这四个字段里，前端只认一种事件 schema。
 """
+
 from __future__ import annotations
 
 from typing import Any, Optional

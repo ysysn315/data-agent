@@ -17,6 +17,7 @@ LangGraph StateGraph，产出一份结构化 Markdown 报告。
 构造期注入 llm 与 chat_agent（测试可全部换成假模型）；每阶段通过回调 on_event 上报
 TaskEvent 进度（复用 app/tasks/events.py 的事件模型，异步任务侧直接透传给 SSE）。
 """
+
 from __future__ import annotations
 
 import inspect
@@ -50,12 +51,12 @@ class AnalysisState(TypedDict, total=False):
 
     question: str
     max_steps: int
-    plan: List[dict]           # [{goal, tool_hint}]
-    step_results: List[dict]   # [{index, goal, answer, sql_list, tools}]
-    reflection: str            # 反思给出的「结论与建议」正文
-    assessment: str            # 反思对「是否回答了原问题」的一句话判断
-    supplement_used: bool      # 是否已用掉那一次补充机会（防循环）
-    report: str                # 最终 Markdown 报告
+    plan: List[dict]  # [{goal, tool_hint}]
+    step_results: List[dict]  # [{index, goal, answer, sql_list, tools}]
+    reflection: str  # 反思给出的「结论与建议」正文
+    assessment: str  # 反思对「是否回答了原问题」的一句话判断
+    supplement_used: bool  # 是否已用掉那一次补充机会（防循环）
+    report: str  # 最终 Markdown 报告
 
 
 class AnalysisAgent:
@@ -215,9 +216,7 @@ class AnalysisAgent:
             )
         return {"step_results": results}
 
-    async def _run_step(
-        self, step: dict, prior: List[dict], question: str
-    ) -> tuple[str, List[str], List[str]]:
+    async def _run_step(self, step: dict, prior: List[dict], question: str) -> tuple[str, List[str], List[str]]:
         """跑 ChatAgent 一轮执行单步，返回（回答文本, SQL 列表, 工具轨迹）。"""
         prompt = _operation_prompt(question, step, prior)
         result = await self.chat_agent.graph.ainvoke(
@@ -346,9 +345,7 @@ def _as_text(content: Any) -> str:
     if isinstance(content, str):
         return content
     if isinstance(content, list):
-        return "".join(
-            p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") == "text"
-        )
+        return "".join(p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") == "text")
     return str(content)
 
 
@@ -476,7 +473,7 @@ def _planner_user(question: str, max_steps: int) -> str:
         "每一步聚焦一个可独立执行的子目标。\n\n"
         f"分析请求：{question}\n\n"
         "输出要求：一个 JSON 数组，每个元素是对象，字段：\n"
-        '  - goal：这一步要达成的具体目标（中文，一句话）\n'
+        "  - goal：这一步要达成的具体目标（中文，一句话）\n"
         '  - tool_hint：建议使用的技能或工具提示（如 "sqlite-query 技能查询订单表"、"检索内部文档"）\n'
         '示例：[{"goal": "统计各州订单量", "tool_hint": "sqlite-query 技能对 orders 表分组"}, ...]\n'
         "只输出 JSON 数组本身。"
@@ -484,8 +481,7 @@ def _planner_user(question: str, max_steps: int) -> str:
 
 
 _PLANNER_RETRY = (
-    "上一次的输出无法被解析为 JSON。请严格只输出一个 JSON 数组，"
-    "不要包含任何解释、前后缀或 Markdown 代码围栏。"
+    "上一次的输出无法被解析为 JSON。请严格只输出一个 JSON 数组，不要包含任何解释、前后缀或 Markdown 代码围栏。"
 )
 
 _REFLECTION_SYSTEM = (
@@ -499,18 +495,16 @@ def _reflection_user(question: str, results: List[dict]) -> str:
     for r in results:
         sql = "；".join(r.get("sql_list", [])) or "无"
         blocks.append(
-            f"步骤 {r.get('index')}（目标：{r.get('goal')}）\n"
-            f"回答：{_preview(r.get('answer', '')) or '无'}\n"
-            f"SQL：{sql}"
+            f"步骤 {r.get('index')}（目标：{r.get('goal')}）\n回答：{_preview(r.get('answer', '')) or '无'}\nSQL：{sql}"
         )
     joined = "\n\n".join(blocks) or "（无已完成步骤）"
     return (
         f"用户原始问题：{question}\n\n"
         f"各步骤结果：\n{joined}\n\n"
         "请输出一个 JSON 对象，字段：\n"
-        '  - assessment：一句话判断数据是否回答了原问题\n'
-        '  - conclusion：给用户的「结论与建议」正文（可多句，综合各步发现）\n'
-        '  - need_more：布尔，是否还缺一个关键步骤才能回答问题\n'
+        "  - assessment：一句话判断数据是否回答了原问题\n"
+        "  - conclusion：给用户的「结论与建议」正文（可多句，综合各步发现）\n"
+        "  - need_more：布尔，是否还缺一个关键步骤才能回答问题\n"
         '  - supplement：当 need_more 为 true 时，给出补充步骤对象 {"goal":..., "tool_hint":...}；否则给 {}\n'
         "只输出 JSON 对象本身。"
     )

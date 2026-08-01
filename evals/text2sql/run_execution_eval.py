@@ -17,6 +17,7 @@
 
 本模块只做"编排 + IO"，纯粹的结果集归一化/对比/聚合逻辑都在 common.py（可独立测试）。
 """
+
 from __future__ import annotations
 
 import argparse
@@ -40,9 +41,7 @@ from evals.text2sql.common import build_report, compare_result_sets, golden_has_
 _HERE = Path(__file__).resolve().parent
 DATASET_PATH = _HERE / "dataset.json"
 REPORTS_DIR = _HERE / "reports"
-SKILL_MD_PATH = (
-    _HERE.parent.parent / "app" / "skills" / "buildin" / "sql-generation" / "SKILL.md"
-)
+SKILL_MD_PATH = _HERE.parent.parent / "app" / "skills" / "buildin" / "sql-generation" / "SKILL.md"
 
 
 def load_dataset(path: Path = DATASET_PATH) -> list[dict]:
@@ -60,9 +59,7 @@ def fetch_schema(db_path: str) -> dict[str, list[str]]:
     conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=10)
     try:
         schema: dict[str, list[str]] = {}
-        rows = conn.execute(
-            "SELECT name FROM sqlite_master WHERE type IN ('table', 'view')"
-        ).fetchall()
+        rows = conn.execute("SELECT name FROM sqlite_master WHERE type IN ('table', 'view')").fetchall()
         for (name,) in rows:
             if name.startswith("sqlite_"):
                 continue
@@ -167,9 +164,7 @@ def evaluate_case(
 
         # 4. execution accuracy 对比（行序敏感性由 golden 是否含 ORDER BY 决定）
         order_sensitive = golden_has_order_by(case["golden_sql"])
-        result["correct"] = compare_result_sets(
-            golden_rows, pred_rows, order_sensitive=order_sensitive
-        )
+        result["correct"] = compare_result_sets(golden_rows, pred_rows, order_sensitive=order_sensitive)
     except Exception as e:  # noqa: BLE001 —— 单例失败不该中断整轮评估
         result["error"] = f"执行异常: {e}"
     return result
@@ -183,10 +178,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if not Path(args.db).exists():
-        print(
-            f"演示库不存在: {args.db}\n"
-            f"请先运行: python scripts/import_ecommerce.py --synthetic --db {args.db}"
-        )
+        print(f"演示库不存在: {args.db}\n请先运行: python scripts/import_ecommerce.py --synthetic --db {args.db}")
         return 1
 
     dataset = load_dataset()
@@ -218,13 +210,13 @@ def main(argv: list[str] | None = None) -> int:
 
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     out = REPORTS_DIR / "execution_latest.json"
-    out.write_text(
-        json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
 
     print(f"\n报告已保存: {out}")
-    print(f"总体执行准确率: {report['summary']['accuracy']:.2%} "
-          f"({report['summary']['correct']}/{report['summary']['total']})")
+    print(
+        f"总体执行准确率: {report['summary']['accuracy']:.2%} "
+        f"({report['summary']['correct']}/{report['summary']['total']})"
+    )
     print("按标签:")
     for tag, b in report["by_tag"].items():
         print(f"  {tag:<10} {b['accuracy']:.2%} ({b['correct']}/{b['total']})")

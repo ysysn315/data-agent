@@ -8,6 +8,7 @@
 subprocess（REQUIREMENTS §9）。因此**远程安装的 skill 默认 enabled=False**，
 需要人工审查内容后通过 API 启用。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -21,11 +22,8 @@ from loguru import logger
 from app.skills.models import Skill, SkillContent, SkillSourceType
 from app.skills.service import SkillService
 
-
 # GitHub URL 正则：https://github.com/owner/repo 或 owner/repo
-GITHUB_PATTERN = re.compile(
-    r"^(?:https?://github\.com/)?([a-zA-Z0-9_.-]+)/([a-zA-Z0-9_.-]+?)(?:\.git)?$"
-)
+GITHUB_PATTERN = re.compile(r"^(?:https?://github\.com/)?([a-zA-Z0-9_.-]+)/([a-zA-Z0-9_.-]+?)(?:\.git)?$")
 
 # 仓库内 skill 目录的查找路径（按优先级）
 SKILL_SEARCH_ROOTS = ("skills", "", ".agents/skills")
@@ -33,6 +31,7 @@ SKILL_SEARCH_ROOTS = ("skills", "", ".agents/skills")
 
 class RemoteInstallError(Exception):
     """远程安装错误"""
+
     pass
 
 
@@ -65,27 +64,24 @@ def _normalize_skill_name(skill: str) -> str:
     return skill
 
 
-async def _run_git_clone(
-    owner: str,
-    repo: str,
-    target_dir: Path,
-    timeout: int = 60
-) -> None:
+async def _run_git_clone(owner: str, repo: str, target_dir: Path, timeout: int = 60) -> None:
     """执行 git clone --depth 1"""
     url = f"https://github.com/{owner}/{repo}.git"
     logger.info(f"Cloning {url} to {target_dir}")
 
     process = await asyncio.create_subprocess_exec(
-        "git", "clone", "--depth", "1", url, str(target_dir),
+        "git",
+        "clone",
+        "--depth",
+        "1",
+        url,
+        str(target_dir),
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
 
     try:
-        stdout, stderr = await asyncio.wait_for(
-            process.communicate(),
-            timeout=timeout
-        )
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
     except asyncio.TimeoutError:
         process.kill()
         await process.communicate()
@@ -132,17 +128,16 @@ def _scan_skills(repo_dir: Path) -> list[dict[str, str]]:
             slug = parsed.frontmatter.slug
             if slug not in seen:
                 seen.add(slug)
-                skills.append({
-                    "name": slug,
-                    "description": parsed.frontmatter.description,
-                })
+                skills.append(
+                    {
+                        "name": slug,
+                        "description": parsed.frontmatter.description,
+                    }
+                )
     return skills
 
 
-async def list_remote_skills(
-    source: str,
-    timeout: int = 60
-) -> list[dict[str, str]]:
+async def list_remote_skills(source: str, timeout: int = 60) -> list[dict[str, str]]:
     """列出远程仓库中所有可安装的 skills"""
     owner, repo = _normalize_source(source)
 
@@ -188,11 +183,7 @@ async def _import_one(
 
 
 async def install_remote_skill(
-    source: str,
-    skill_name: str,
-    skill_service: SkillService,
-    user_id: Optional[int] = None,
-    timeout: int = 60
+    source: str, skill_name: str, skill_service: SkillService, user_id: Optional[int] = None, timeout: int = 60
 ) -> Skill:
     """从远程仓库安装单个 skill（整目录导入，默认禁用）"""
     owner, repo = _normalize_source(source)
@@ -209,11 +200,7 @@ async def install_remote_skill(
 
 
 async def install_remote_skills_batch(
-    source: str,
-    skill_names: list[str],
-    skill_service: SkillService,
-    user_id: Optional[int] = None,
-    timeout: int = 60
+    source: str, skill_names: list[str], skill_service: SkillService, user_id: Optional[int] = None, timeout: int = 60
 ) -> list[dict]:
     """批量从同一个远程仓库安装多个 skills（只 clone 一次）
 

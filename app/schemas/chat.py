@@ -25,11 +25,11 @@ class MetadataFilters(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    Id:str
-    Question:str
+    Id: str
+    Question: str
     metadata_filters: Optional[MetadataFilters] = None
 
 
 class ChatResponse(BaseModel):
-    answer:str
-    sources:List[str]=[]
+    answer: str
+    sources: List[str] = []

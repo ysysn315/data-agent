@@ -1,5 +1,5 @@
-from typing import List
 import json
+from typing import List
 
 import redis
 from loguru import logger
@@ -80,7 +80,7 @@ class SessionStore:
         history = self.get_history(session_id)
         if len(history) <= self.max_messages:
             return []
-        return history[:-self.max_messages]
+        return history[: -self.max_messages]
 
     def apply_summary_and_trim(self, session_id: str, summary: str) -> None:
         """

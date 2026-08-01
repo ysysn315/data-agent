@@ -6,6 +6,7 @@
 3. SKILL.md 升级后仍可被 SkillContent.parse 解析
 4. 依赖展开后 schema_search 出现在 expanded.tools（激活后可解锁）
 """
+
 import sqlite3
 from pathlib import Path
 
@@ -51,6 +52,7 @@ def ecommerce_db(tmp_path) -> str:
 
 
 # ========== M-Schema 生成 ==========
+
 
 def test_build_table_m_schema_basic():
     text = build_table_m_schema(
@@ -116,6 +118,7 @@ def test_list_tables(ecommerce_db):
 
 # ========== schema_search 门控工具 ==========
 
+
 def test_schema_search_tool_returns_m_schema(ecommerce_db):
     tool = create_schema_search_tool(ecommerce_db)
     result = tool.invoke({"question": "查询各州的订单数"})
@@ -131,6 +134,7 @@ def test_schema_search_tool_missing_db(tmp_path):
 
 
 # ========== 升级后的 SKILL.md 仍合法 + 依赖展开解锁 schema_search ==========
+
 
 @pytest.mark.parametrize("slug", ["schema-retrieval", "sql-generation"])
 def test_upgraded_skill_md_parses(slug):

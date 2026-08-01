@@ -12,6 +12,7 @@ milvus_graph_service.py）：Neo4j Cypher 子图查询 + Milvus 实体向量召�
 LLM 惰性注入：llm_provider 是零参工厂（如 LLMFactory.create_llm），首次抽取才调用，
 不触发 /extract 就不要求配置 LLM_API_KEY（与 llm.py 的显式失败设计一致）。
 """
+
 from __future__ import annotations
 
 from typing import Any, Callable, Optional, Sequence
@@ -67,8 +68,7 @@ class GraphService:
         # ego_graph 返回半径内节点的诱导子图（含节点间全部边与边属性）
         ego = nx.ego_graph(g, name, radius=depth, undirected=True)
         edges = [
-            {"subject": u, "predicate": data.get("predicate", ""), "object": v,
-             "source": data.get("source", "")}
+            {"subject": u, "predicate": data.get("predicate", ""), "object": v, "source": data.get("source", "")}
             for u, v, data in ego.edges(data=True)
         ]
         edges.sort(key=lambda e: (e["subject"], e["predicate"], e["object"]))
@@ -82,8 +82,16 @@ class GraphService:
         `GMV -[计算自]-> 订单项价格 -[属于]-> 订单项`；反向边渲染为 `A <-[p]- B`）。
         """
         g = self._store.graph
-        result = {"from": source, "to": target, "found": False, "missing": [],
-                  "hops": 0, "path": [], "edges": [], "chain": ""}
+        result = {
+            "from": source,
+            "to": target,
+            "found": False,
+            "missing": [],
+            "hops": 0,
+            "path": [],
+            "edges": [],
+            "chain": "",
+        }
         result["missing"] = [n for n in dict.fromkeys((source, target)) if n not in g]
         if result["missing"]:
             return result
@@ -105,8 +113,7 @@ class GraphService:
                 edges.append({"subject": v, "predicate": predicate, "object": u})
                 chain_parts.append(f"<-[{predicate}]- {v}")
 
-        result.update(found=True, hops=len(nodes) - 1, path=list(nodes),
-                      edges=edges, chain=" ".join(chain_parts))
+        result.update(found=True, hops=len(nodes) - 1, path=list(nodes), edges=edges, chain=" ".join(chain_parts))
         return result
 
     def suggest_entities(self, keyword: str, limit: int = 5) -> list[str]:

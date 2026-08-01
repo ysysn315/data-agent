@@ -1,0 +1,12 @@
+# 国内镜像源 override：与 docker-compose.yml 配合使用，仅覆盖 etcd/minio/milvus 镜像源
+#   docker compose -f docker-compose.yml -f docker-compose.cn.yml up
+# redis 及所有 healthcheck/端口等服务定义从 docker-compose.yml 继承
+services:
+  etcd:
+    image: registry.cn-hangzhou.aliyuncs.com/coreos/etcd:v3.5.5
+
+  minio:
+    image: registry.cn-hangzhou.aliyuncs.com/minio/minio:RELEASE.2023-03-20T20-16-18Z
+
+  milvus:
+    image: registry.cn-hangzhou.aliyuncs.com/milvusdb/milvus:v2.5.6

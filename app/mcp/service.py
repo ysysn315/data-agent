@@ -7,6 +7,7 @@
 
 注册表持久化：save_dir/mcp_servers.json（原子写，与 Skills 同思路暂不引入数据库）
 """
+
 from __future__ import annotations
 
 import asyncio

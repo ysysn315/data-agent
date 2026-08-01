@@ -46,6 +46,7 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
     "fakeredis>=2",
+    "ruff>=0.6",
 ]
 
 # 本地 BGE 重排/向量（重依赖，按需安装）：uv pip install torch FlagEmbedding
@@ -57,3 +58,27 @@ asyncio_mode = "auto"
 [tool.ruff]
 line-length = 120
 target-version = "py311"
+
+[tool.ruff.lint]
+# 启用基础规则集：错误(F)、pycodestyle(E/W)、import 排序(I)、
+# bugbear(B)、简化(SIM)、现代类型注记(UP)。
+select = ["E", "W", "F", "I", "B", "SIM", "UP"]
+ignore = [
+    "B008",     # 函数默认参数调函数：FastAPI Depends() 的标准模式，非 bug
+    "BLE001",   # 裸 except Exception：工具熔断降级有意为之
+    "UP006",    # typing.List → list：纯风格现代化，不阻塞（迁移时再统一）
+    "UP007",    # typing.Optional → X | None：同上
+    "UP035",    # from typing import List 已弃用：同上
+    "UP042",    # typing.Optional → X | None：同上
+    "UP045",    # typing.Optional → X | None：同上
+    "UP037",    # 引号注记：同上
+    "UP041",    # typing.Tuple → tuple：同上
+    "B904",     # raise from err：链式异常有价值，44 处待专项清理，暂不阻塞
+    "B905",     # zip() 缺 strict=：待专项评估，暂不阻塞
+    "SIM102",   # 嵌套 if 可合并：可读性见仁见智
+    "SIM108",   # if/else 可改三元：可读性见仁见智
+    "E402",     # import 不在顶部：部分文件有意先设 sys 路径
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]   # 测试里长行可接受

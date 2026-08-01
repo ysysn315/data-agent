@@ -8,6 +8,7 @@ SKILL.md 正文永远从 dir_path 读（见 repositories.SqlAlchemySkillReposito
 - JSON：SQLite 存 TEXT、PG 存 json，SQLAlchemy 自动编解码（列表/字典）
 - DateTime：naive UTC，与内存版 InMemorySkillRepository（datetime.utcnow）口径一致
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -46,9 +47,7 @@ class SkillModel(Base):
     user_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     share_config: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=_utcnow, onupdate=_utcnow
-    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
 
 
 class MCPServerModel(Base):
@@ -117,9 +116,7 @@ class GraphTripleModel(Base):
     """
 
     __tablename__ = "graph_triples"
-    __table_args__ = (
-        UniqueConstraint("subject", "predicate", "object", name="uq_graph_triples_spo"),
-    )
+    __table_args__ = (UniqueConstraint("subject", "predicate", "object", name="uq_graph_triples_spo"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     subject: Mapped[str] = mapped_column(String(256), nullable=False, index=True)

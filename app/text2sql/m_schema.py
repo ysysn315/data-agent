@@ -20,6 +20,7 @@ templates/template.yaml 中 <m-schema> 的说明）。相比原始 DDL，它更�
 与 SQLBot 的差异：SQLBot 每个字段单独一行（多行 M-Schema），这里压成单行
 `[(...), (...)]` 更省 token，语义等价；demo 表字段少，可读性无损。
 """
+
 from __future__ import annotations
 
 import sqlite3
@@ -57,10 +58,7 @@ def build_table_m_schema(
     if table_comment:
         header += f", {table_comment}"
 
-    entries = [
-        _column_entry(name, col_type, field_comments.get(name, ""))
-        for name, col_type in columns
-    ]
+    entries = [_column_entry(name, col_type, field_comments.get(name, "")) for name, col_type in columns]
     body = "[" + ", ".join(entries) + "]"
     return f"{header}\n{body}"
 
@@ -70,8 +68,7 @@ def list_tables(db_path: str) -> list[str]:
     conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True, timeout=10)
     try:
         rows = conn.execute(
-            "SELECT name FROM sqlite_master "
-            "WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
         ).fetchall()
     finally:
         conn.close()
@@ -113,8 +110,7 @@ def generate_m_schema(
             table_names = [
                 r[0]
                 for r in conn.execute(
-                    "SELECT name FROM sqlite_master "
-                    "WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
                 ).fetchall()
             ]
         else:

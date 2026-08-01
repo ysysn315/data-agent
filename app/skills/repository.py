@@ -3,6 +3,7 @@
 跳过数据库，用内存 dict 实现，用于开发和测试。
 二期再切 PostgreSQL/SQLite。
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -34,7 +35,7 @@ class InMemorySkillRepository:
         enabled_only: bool = False,
         source_type: Optional[SkillSourceType] = None,
         limit: int = 100,
-        offset: int = 0
+        offset: int = 0,
     ) -> list[Skill]:
         """列表查询"""
         skills = list(self._skills.values())
@@ -48,17 +49,13 @@ class InMemorySkillRepository:
             skills = [s for s in skills if s.source_type == source_type]
 
         # 分页
-        return skills[offset:offset + limit]
+        return skills[offset : offset + limit]
 
     async def list_enabled(self) -> list[Skill]:
         """查询所有启用的 skills"""
         return await self.list_all(enabled_only=True)
 
-    async def list_accessible_by_user(
-        self,
-        user_id: int,
-        include_global: bool = True
-    ) -> list[Skill]:
+    async def list_accessible_by_user(self, user_id: int, include_global: bool = True) -> list[Skill]:
         """
         查询用户可访问的 skills
 

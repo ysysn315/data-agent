@@ -6,6 +6,7 @@
 
 持久化：save_path 指向的 JSON 文件（原子写，参考 app/mcp/service.py 的注册表写法）。
 """
+
 from __future__ import annotations
 
 import json

@@ -26,38 +26,25 @@ async def get_chat_service(
 async def chat(request: ChatRequest, chat_service: ChatService = Depends(get_chat_service)):
     try:
         logger.info(f"收到对话请求 - Session: {request.Id}")
-        metadata_filters = (
-            request.metadata_filters.model_dump(exclude_none=True)
-            if request.metadata_filters else None
-        )
+        metadata_filters = request.metadata_filters.model_dump(exclude_none=True) if request.metadata_filters else None
         answer = await chat_service.chat(
             request.Id,
             request.Question,
             metadata_filters=metadata_filters,
         )
-        return ChatResponse(
-            answer=answer["answer"],
-            sources=answer["sources"]
-        )
+        return ChatResponse(answer=answer["answer"], sources=answer["sources"])
     except Exception as e:
         logger.error(f"对话请求失败：{e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"对话失败：{str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"对话失败：{str(e)}")
 
 
 @router.post("/chat_stream")
-async def chat_stream(
-        request: ChatRequest,
-        chat_service: ChatService = Depends(get_chat_service)
-):
+async def chat_stream(request: ChatRequest, chat_service: ChatService = Depends(get_chat_service)):
     async def generate():
         try:
             logger.info(f"收到流式对话请求 - Session: {request.Id}")
             metadata_filters = (
-                request.metadata_filters.model_dump(exclude_none=True)
-                if request.metadata_filters else None
+                request.metadata_filters.model_dump(exclude_none=True) if request.metadata_filters else None
             )
             async for chunk in chat_service.chat_stream(
                 request.Id,
@@ -76,5 +63,5 @@ async def chat_stream(
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-        }
+        },
     )

@@ -88,13 +88,9 @@ TOOL_FALLBACK_MESSAGES: Dict[str, str] = {
         "Web search is temporarily unavailable. Continue without live web results and "
         "state that online lookup did not succeed."
     ),
-    "query_log": (
-        "Log retrieval is temporarily unavailable. Try another tool or continue with the "
-        "current evidence."
-    ),
+    "query_log": ("Log retrieval is temporarily unavailable. Try another tool or continue with the current evidence."),
     "query_prometheus_alerts": (
-        "Alert retrieval is temporarily unavailable. Try another tool or continue with the "
-        "current evidence."
+        "Alert retrieval is temporarily unavailable. Try another tool or continue with the current evidence."
     ),
     "default": "The requested tool is temporarily unavailable. Continue with the current context.",
 }

@@ -9,10 +9,10 @@
 - API：TestClient + dependency_overrides 走全部 5 个端点
 - SKILL.md：可解析且依赖展开含 graph_search
 """
+
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -67,6 +67,7 @@ def graph_env(tmp_path):
 
 # ========== extractor：假 LLM 三态 ==========
 
+
 def test_extract_triples_valid_json():
     llm = FakeLLM(
         '[{"subject": "订单", "predicate": "属于", "object": "客户"},'
@@ -97,10 +98,13 @@ def test_extract_triples_invalid_output(loguru_capture):
     assert extract_triples("文本", FakeLLM('{"foo": 1}')) == []
     assert any("无法解析" in r for r in loguru_capture)
     # 坏元素（缺字段/空值/非对象）跳过，好元素保留
-    triples = extract_triples("文本", FakeLLM(
-        '[{"subject": "A", "predicate": "", "object": "B"}, "字符串元素",'
-        ' {"subject": "A", "predicate": "p", "object": "B"}]'
-    ))
+    triples = extract_triples(
+        "文本",
+        FakeLLM(
+            '[{"subject": "A", "predicate": "", "object": "B"}, "字符串元素",'
+            ' {"subject": "A", "predicate": "p", "object": "B"}]'
+        ),
+    )
     assert [t.to_dict()["predicate"] for t in triples] == ["p"]
 
 
@@ -113,13 +117,14 @@ def test_extract_triples_empty_text_skips_llm():
 
 # ========== store：幂等 / 重启持久性 / 镜像失效重建 ==========
 
+
 def test_store_idempotent_add(graph_env):
     make_repo, run = graph_env
     store = GraphStore(make_repo(), runner=run, seed=False)
     t = {"subject": "订单", "predicate": "属于", "object": "客户", "source": "manual"}
 
-    assert store.add_triples([t, t]) == 1      # 批内重复
-    assert store.add_triples([t]) == 0         # 库内已存在
+    assert store.add_triples([t, t]) == 1  # 批内重复
+    assert store.add_triples([t]) == 0  # 库内已存在
     assert store.count() == 1
     # 同 (s,o) 不同谓词是另一条；字段不全的条目被丢弃
     assert store.add_triples([{**t, "predicate": "关联"}, {"subject": "x", "predicate": ""}]) == 1
@@ -135,7 +140,10 @@ def test_store_restart_persistence(graph_env):
     store2 = GraphStore(make_repo(), runner=run, seed=True)
     assert store2.count() == 1
     assert store2.list_triples()[0] == {
-        "subject": "GMV", "predicate": "计算自", "object": "订单项价格", "source": "manual"
+        "subject": "GMV",
+        "predicate": "计算自",
+        "object": "订单项价格",
+        "source": "manual",
     }
     assert store2.graph.has_edge("GMV", "订单项价格")
 
@@ -147,18 +155,19 @@ def test_store_graph_mirror_invalidation(graph_env):
 
     g1 = store.graph
     assert g1.has_edge("A", "B")
-    assert store.graph is g1                       # 未写入 → 复用同一镜像
+    assert store.graph is g1  # 未写入 → 复用同一镜像
 
-    store.add_triples([Triple("B", "q", "C")])     # 有效写入 → 失效
+    store.add_triples([Triple("B", "q", "C")])  # 有效写入 → 失效
     g2 = store.graph
     assert g2 is not g1
     assert g2.has_edge("B", "C") and g2.has_edge("A", "B")
 
-    store.add_triples([Triple("B", "q", "C")])     # 幂等写入（0 新增）→ 不重建
+    store.add_triples([Triple("B", "q", "C")])  # 幂等写入（0 新增）→ 不重建
     assert store.graph is g2
 
 
 # ========== 种子：首启灌种 + 幂等 + 与术语库对齐 ==========
+
 
 def test_seed_on_empty_table_and_idempotent(graph_env):
     make_repo, run = graph_env
@@ -178,19 +187,22 @@ def test_seed_on_empty_table_and_idempotent(graph_env):
 
 # ========== service：查询原语 ==========
 
+
 @pytest.fixture
 def small_graph(graph_env):
     """六条边的已知小图（含正反向路径），供 query/path 断言精确结构。"""
     make_repo, run = graph_env
     store = GraphStore(make_repo(), runner=run, seed=False)
-    store.add_triples([
-        Triple("订单", "属于", "客户"),
-        Triple("订单项", "属于", "订单"),
-        Triple("GMV", "计算自", "订单项价格"),
-        Triple("订单项价格", "属于", "订单项"),
-        Triple("复购率", "统计自", "客户唯一标识"),
-        Triple("客户唯一标识", "属于", "客户"),
-    ])
+    store.add_triples(
+        [
+            Triple("订单", "属于", "客户"),
+            Triple("订单项", "属于", "订单"),
+            Triple("GMV", "计算自", "订单项价格"),
+            Triple("订单项价格", "属于", "订单项"),
+            Triple("复购率", "统计自", "客户唯一标识"),
+            Triple("客户唯一标识", "属于", "客户"),
+        ]
+    )
     return store, GraphService(store)
 
 
@@ -265,6 +277,7 @@ def test_service_extract_and_add_and_stats(graph_env):
 
 # ========== graph_search 门控工具 ==========
 
+
 def test_graph_search_tool_output(graph_env):
     make_repo, run = graph_env
     svc = GraphService(GraphStore(make_repo(), runner=run, seed=True))
@@ -287,6 +300,7 @@ def test_graph_search_tool_output(graph_env):
 
 # ========== API：TestClient + overrides ==========
 
+
 @pytest.fixture
 def client(graph_env):
     from app.core.dependencies import get_graph_service
@@ -296,9 +310,7 @@ def client(graph_env):
     store = GraphStore(make_repo(), runner=run, seed=True)
     svc = GraphService(
         store,
-        llm_provider=lambda: FakeLLM(
-            '[{"subject": "发货时长", "predicate": "计算自", "object": "发货时间"}]'
-        ),
+        llm_provider=lambda: FakeLLM('[{"subject": "发货时长", "predicate": "计算自", "object": "发货时间"}]'),
     )
     app.dependency_overrides[get_graph_service] = lambda: svc
     yield TestClient(app)
@@ -312,10 +324,15 @@ def test_api_graph_full_flow(client):
     assert body["sources"] == {"seed": len(SEED_TRIPLES)}
 
     # 手动添加（一条与种子重复 + 一条新）：幂等
-    resp = client.post("/api/graph/triples", json={"triples": [
-        {"subject": "订单", "predicate": "属于", "object": "客户"},
-        {"subject": "退货单", "predicate": "属于", "object": "订单"},
-    ]})
+    resp = client.post(
+        "/api/graph/triples",
+        json={
+            "triples": [
+                {"subject": "订单", "predicate": "属于", "object": "客户"},
+                {"subject": "退货单", "predicate": "属于", "object": "订单"},
+            ]
+        },
+    )
     assert resp.status_code == 201
     assert resp.json()["added"] == 1 and resp.json()["skipped"] == 1
     assert resp.json()["total"] == len(SEED_TRIPLES) + 1
@@ -346,6 +363,7 @@ def test_api_graph_full_flow(client):
 
 
 # ========== SKILL.md：可解析 + 依赖展开含 graph_search ==========
+
 
 async def test_knowledge_graph_skill_declares_graph_search(skill_service):
     skill = await skill_service.get_skill("knowledge-graph")

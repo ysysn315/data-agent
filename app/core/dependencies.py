@@ -4,6 +4,7 @@
 所有路由必须从这里取实例 —— 不要在路由文件里自定义同名依赖
 （曾因 routes_skills 本地遮蔽 get_skill_service 导致 API 返回空列表）。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -13,7 +14,6 @@ from typing import Optional
 from fastapi import Depends, Header, HTTPException, status
 
 from app.core.settings import settings
-
 
 # ========== 鉴权依赖（F 轮：API Key + 工作空间；开关见 settings.auth_enabled） ==========
 #
@@ -26,14 +26,13 @@ from app.core.settings import settings
 #
 # dev_user 在 demo 里 role=admin，故 admin 守卫在 demo 下同样放行（保持写口全开）。
 
+
 def _dev_user(token: str = "") -> dict:
     """demo 占位用户。保留既有键 id/username（增补 role/workspace_id/token，不减键）。"""
     return {"id": 1, "username": "dev_user", "role": "admin", "workspace_id": None, "token": token}
 
 
-async def get_current_user_optional(
-    authorization: str = Header(None, description="Bearer token")
-) -> Optional[dict]:
+async def get_current_user_optional(authorization: str = Header(None, description="Bearer token")) -> Optional[dict]:
     """获取当前用户（可选登录）。
 
     demo：无 header 或非 Bearer -> None；Bearer -> dev_user 占位（行为与从前一致）。
@@ -50,6 +49,7 @@ async def get_current_user_optional(
         return _dev_user(token)
 
     from app.core.auth import verify_api_key
+
     return await verify_api_key(token)
 
 
@@ -189,8 +189,8 @@ async def get_chat_agent():
         from app.agents.chat_agent import ChatAgent
         from app.agents.middlewares import ToolRuntimeMiddleware
         from app.agents.tools.datetime_tool import get_current_datetime
-        from app.agents.tools.schema_tool import create_schema_search_tool
         from app.agents.tools.graph_tool import create_graph_search_tool
+        from app.agents.tools.schema_tool import create_schema_search_tool
         from app.agents.tools.sql_context_tool import create_sql_context_tool
         from app.agents.tools.sql_tool import create_execute_sql_tool
         from app.core.llm import LLMFactory
@@ -202,9 +202,8 @@ async def get_chat_agent():
 
         if settings.tavily_api_key:
             from app.agents.tools.tavily_tool import create_tavily_search_tool
-            base_tools.append(
-                create_tavily_search_tool(settings.tavily_api_key, settings.tavily_base_url)
-            )
+
+            base_tools.append(create_tavily_search_tool(settings.tavily_api_key, settings.tavily_base_url))
 
         if settings.enable_kb_tool:
             # 知识库检索依赖 Milvus。连不上就显式失败：

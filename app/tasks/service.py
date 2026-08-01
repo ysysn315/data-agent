@@ -9,12 +9,13 @@
 入队走 arq 自己的连接池（ArqRedis，仅用 enqueue_job）。worker 侧写事件时直接用
 arq 注入的 ctx["redis"]（bytes 模式）——写入与 decode 模式无关，读取统一在 text 端。
 """
+
 from __future__ import annotations
 
 import asyncio
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import AsyncIterator, Optional
 
 from redis.asyncio import Redis
@@ -37,7 +38,7 @@ TERMINAL_STATUSES = {"done", "failed"}
 
 
 def _now_iso() -> str:
-    return datetime.now(tz=timezone.utc).isoformat()
+    return datetime.now(tz=UTC).isoformat()
 
 
 def _loads(raw: Optional[str]):
@@ -238,12 +239,14 @@ class TaskService:
                 status_doc = await self.get_status(task_id)
                 status = status_doc["status"] if status_doc else None
                 if status in TERMINAL_STATUSES:
-                    yield _sse({
-                        "type": "done",
-                        "message": f"任务已{status}",
-                        "progress": 1.0 if status == "done" else None,
-                        "payload": {"status": status},
-                    })
+                    yield _sse(
+                        {
+                            "type": "done",
+                            "message": f"任务已{status}",
+                            "progress": 1.0 if status == "done" else None,
+                            "payload": {"status": status},
+                        }
+                    )
                     return
                 await asyncio.sleep(poll_interval)
                 waited += poll_interval

@@ -12,6 +12,7 @@
 我们的 Key 是 128bit 高熵随机串，不存在字典/爆破面，sha256 足够且更快，引 passlib 是错配。
 不引 pyjwt：无 JWT 就不需要。
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -25,8 +26,8 @@ from app.core.settings import settings
 
 # API Key 形如 da- + 32 hex（128bit 熵）。前缀便于人眼/日志识别是本系统的 Key。
 API_KEY_PREFIX = "da-"
-_API_KEY_NBYTES = 16          # 16 bytes -> 32 hex chars
-_API_KEY_PREFIX_LEN = 8       # 明文前 8 位入库便于识别（da- + 5 hex）
+_API_KEY_NBYTES = 16  # 16 bytes -> 32 hex chars
+_API_KEY_PREFIX_LEN = 8  # 明文前 8 位入库便于识别（da- + 5 hex）
 
 # 鉴权成功后对外暴露的用户字段（永不含 api_key_hash）
 _PUBLIC_USER_FIELDS = ("id", "username", "role", "workspace_id", "api_key_prefix", "enabled")
@@ -73,6 +74,7 @@ PROTECTED_ENDPOINTS: list[tuple[str, str, str]] = [
 
 # ========== Key 生成 / 哈希 ==========
 
+
 def generate_api_key() -> tuple[str, str, str]:
     """生成一把新 Key，返回 (明文, sha256_hex, 明文前 8 位)。明文只此一次可见。"""
     plaintext = API_KEY_PREFIX + secrets.token_hex(_API_KEY_NBYTES)
@@ -93,6 +95,7 @@ def mask_api_key(key: str) -> str:
 
 # ========== 内部：仓储装配 ==========
 
+
 def _repos():
     """惰性装配 (UserRepository, WorkspaceRepository)（全局 async engine，主循环 await）。"""
     from app.db import get_sessionmaker
@@ -108,6 +111,7 @@ def _public(user: dict) -> dict:
 
 
 # ========== 建用户 ==========
+
 
 async def create_user(
     username: str,
@@ -164,6 +168,7 @@ async def disable_user(user_id: int) -> Optional[dict]:
 
 # ========== 校验 ==========
 
+
 async def verify_api_key(key: str) -> Optional[dict]:
     """校验一把明文 Key，返回安全用户 dict（不含哈希）或 None。
 
@@ -187,6 +192,7 @@ async def verify_api_key(key: str) -> Optional[dict]:
 
 
 # ========== bootstrap（首启无用户时自建 default 工作空间 + admin） ==========
+
 
 async def bootstrap() -> Optional[str]:
     """auth_enabled 且库中无用户时，自建 default 工作空间 + admin 用户。
@@ -215,7 +221,6 @@ async def bootstrap() -> Optional[str]:
         f"[鉴权 bootstrap] 已创建默认工作空间 '{DEFAULT_WORKSPACE_SLUG}' 与管理员 "
         f"'{DEFAULT_ADMIN_USERNAME}'。\n"
         f"新建 admin API Key: {plaintext}\n"
-        "请立即保存：该明文只此一次出现，库中仅存 sha256 哈希，遗失只能重新签发。\n"
-        + "=" * 60
+        "请立即保存：该明文只此一次出现，库中仅存 sha256 哈希，遗失只能重新签发。\n" + "=" * 60
     )
     return plaintext

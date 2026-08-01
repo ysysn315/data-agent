@@ -33,10 +33,7 @@ class BGEReranker:
                 "Make sure the model can be loaded from the local cache or downloaded."
             ) from e
 
-        logger.info(
-            f"BGE reranker initialized: model={model_name}, device={self.device}, "
-            f"use_fp16={self.use_fp16}"
-        )
+        logger.info(f"BGE reranker initialized: model={model_name}, device={self.device}, use_fp16={self.use_fp16}")
 
     def rerank(self, query: str, documents: List[Dict], top_k: int = None) -> List[Dict]:
         if not documents:
@@ -48,9 +45,7 @@ class BGEReranker:
         try:
             raw_scores = self.reranker.compute_score(pairs)
         except Exception as e:  # noqa: BLE001
-            raise RuntimeError(
-                f"BGE reranker scoring failed (model={self.model_name}, device={self.device})."
-            ) from e
+            raise RuntimeError(f"BGE reranker scoring failed (model={self.model_name}, device={self.device}).") from e
 
         if raw_scores and isinstance(raw_scores[0], list):
             scores = [score[0] for score in raw_scores]
