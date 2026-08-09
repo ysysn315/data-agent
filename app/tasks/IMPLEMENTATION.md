@@ -6,7 +6,7 @@
 模块清单：
 - `app/tasks/events.py` —— 进度事件模型 `TaskEvent(type/message/progress/payload)`
 - `app/tasks/service.py` —— `TaskService`：入队 / 状态 / 事件流（XADD/XRANGE）+ 连接构造
-- `app/tasks/worker.py` —— arq `WorkerSettings` + 两个演示任务
+- `app/tasks/worker.py` —— arq `WorkerSettings` + chat / eval / analysis 三类任务
 - `app/api/routes_tasks.py` —— 提交 / 查询 / SSE 三个端点
 - `get_task_service()`（`app/core/dependencies.py` 末尾）—— 生产环境单例注入
 
@@ -62,13 +62,14 @@ worker 进程轮询队列取到 job，把 `ctx["job_id"]`（即 task_id）和 `c
 任务协程。任务据此 `mark_running` → 逐步 `publish_event` → `mark_done/mark_failed`。task_id
 复用为 job_id，任务无需额外参数就知道"我是谁"，能直接回写自己的状态与事件。
 
-**Redis Streams 做事件流，为什么优于 pub/sub（离线补读）。**
+**Redis Streams 做事件流，为什么优于 pub/sub（历史回放）。**
 - **pub/sub 是"发了就没"**：消息不落地，订阅者不在线就丢。SSE 客户端一旦断连重连，断连
   期间的进度全部丢失；任务先跑、前端后订阅，早期进度也拿不到。
 - **Streams 持久化 + 单调 seq 游标**：`XADD` 落盘（带 TTL），每条事件有 `<ms>-<seq>` id。
-  客户端用 `after_seq`（`XRANGE (seq +`）**断点续读**，重连不丢事件；`XRANGE - +` 还能从头
-  **回放**全部历史进度——正好覆盖"任务已在跑，前端才来订阅"。SSE 端点 `stream_sse` 就是
-  一个"读游标 → 吐帧 → 睡一下再读"的循环，读到终结事件或元数据落终态即补发 `done` 并关闭。
+  Service 内部的 `read_events(after_seq)` 能按游标增量读取，`XRANGE - +` 也能从头回放历史进度。
+  当前 HTTP SSE 端点每次都从 `0-0` 开始，正好覆盖"任务已在跑，前端才来订阅"；它尚未接收
+  `Last-Event-ID/after_seq`，SSE 帧也没有 `id:`，因此**不等于断点续传**。`stream_sse` 是一个
+  "内部游标读取 → 吐帧 → 轮询"循环，读到终结事件或元数据落终态即补发 `done` 并关闭。
 - **代价**：Stream 占内存，需 TTL（本实现 24h）/MAXLEN 管理；pub/sub 零存储。当"进度必须
   可靠、可回放"时，这点存储成本值得。
 
@@ -106,9 +107,9 @@ worker 进程轮询队列取到 job，把 `ctx["job_id"]`（即 task_id）和 `c
 RabbitMQ 或独立 result backend，运维更重。代价是 arq 的编排/路由/监控生态不如 celery 成熟，
 但本项目用不到。
 
-**为什么 Streams 不是 pub/sub。** 见"实现原理"：进度事件要求断连可续、迟到可回放，pub/sub
-"发了就没"做不到；Streams 的持久化 + seq 游标恰好匹配 SSE 的重连语义。取消信号那种"一次性、
-丢了也无所谓"的场景才适合 pub/sub（Yuxi 正是这么分的）。
+**为什么 Streams 不是 pub/sub。** 见"实现原理"：进度事件要求迟到订阅仍可回放，pub/sub
+"发了就没"做不到。Streams 还为未来的断点续读保留了 seq 游标，但当前 API/前端没有贯通重连游标；
+取消信号那种"一次性、丢了也无所谓"的场景才适合 pub/sub（Yuxi 正是这么分的）。
 
 **为什么任务状态放 Redis 不入库（与 D1 持久化层的边界）。**
 - 任务状态/进度是**运行时瞬态**：`queued→running→done` 秒级高频写、事件流每步一写，且只在任务

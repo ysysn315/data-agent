@@ -3,6 +3,8 @@
 > 定位：简历项目，时间有限。原则：**每一项都要能在面试里讲出"为什么这么设计"**，
 > 宁可少而深，不做只能演示不能追问的功能。
 > 参考项目功能全景对照见 REQUIREMENTS.md §10。
+>
+> 状态口径：本页顶部能力盘点按 2026-08-08 当前代码维护；P0/P1 与 D/E/F 轮次保留为开发历史。
 
 ## 0. 现状（已完成 ✅）
 
@@ -13,21 +15,21 @@
 | Skills v2：目录模型/渐进披露/激活门控/远程安装 | Yuxi | ✅ |
 | MCP：注册表/工具加载/技能联动 | Yuxi | ✅ |
 | 工具熔断/重试/降级（ToolRuntimeMiddleware） | my-agent 保留 | ✅ |
-| RAG 链路代码（分块/混合检索/BGE 重排） | my-agent 保留 | ✅（未接回 chat）|
+| RAG 知识库与实验链路 | my-agent 保留 | ⚠️ 主 Chat 已接稠密召回；混合检索/改写/重排仍在独立实验链路 |
 | 只读 SQL 执行（execute_sql，引擎级只读） | SQLBot 思路 | ✅（demo 级）|
-| pytest 测试体系（118 用例，随批次持续增长） | — | ✅ |
-| Text-to-SQL 执行准确率评估 92.9%（28 例）+ 4 模型对比 | my-agent 思路扩展 | ✅ |
+| pytest 测试体系（19 个文件） | — | ✅ 213 passed，5 skipped（外部集成） |
+| Text-to-SQL 执行准确率评估（28 例）+ 模型对比 | my-agent 思路扩展 | ✅ 3 份可区分报告，最高 89.29%（25/28） |
 | Langfuse 调用链追踪（默认关闭） | Yuxi | ✅ |
 | 持久化层（四表入库，内容存 FS/索引存 DB） | Yuxi | ✅（D 轮）|
 | 异步执行（ARQ + Redis Streams + SSE） | Yuxi | ✅（D 轮）|
 | 技能语义匹配（embedding + jieba 回退） | 自研增量 | ✅（D 轮）|
 | Analysis Agent（P-O-R 工作流 + Markdown 报告） | my-agent | ✅（E 轮）|
-| 技能脚本容器沙箱（Docker 一次性容器，真机实测） | Yuxi | ✅（E 轮）|
+| 技能脚本容器沙箱（Docker 一次性容器） | Yuxi | ✅ 可切换；默认 subprocess，真机记录见实现文档 |
 | 知识图谱（三元组抽取 + graph_search 技能） | Yuxi | ✅（E 轮）|
-| 用户体系 + API Key 鉴权 + 工作空间隔离（默认关闭） | Yuxi/SQLBot | ✅（F 轮）|
+| 用户体系 + API Key 鉴权 + workspace-lite（默认关闭） | Yuxi/SQLBot | ✅（F 轮，非全资源租户隔离）|
 | 前端 v2：任务中心 SSE / 图谱 SVG 可视化 / 知识管理 | — | ✅（F 轮）|
 
-## 1. P0 —— demo 跑通闭环（必做，约 1 周）
+## 1. P0 —— demo 跑通闭环（已完成，保留历史计划）
 
 **目标：一句中文问题 → 正确 SQL → 真实数据 → 回答。这是项目的"存在证明"。**
 
@@ -48,7 +50,7 @@
 5. **README + 启动脚本**（0.5 天）
    docker-compose 起 Redis（Milvus 可选），`uvicorn` 一条命令起后端。
 
-## 2. P1 —— 差异化亮点（简历主叙事，约 2 周）
+## 2. P1 —— 差异化亮点（已完成，保留历史计划）
 
 **优先级按"面试可讲深度 ÷ 实现成本"排序。**
 
@@ -83,13 +85,50 @@
 | D ✅ | feat/async-tasks | ARQ + Redis 事件流，长任务提交与进度 SSE | 中 |
 | D ✅ | feat/skill-embedding-match | skills 匹配升级 embedding 召回（复用 app/rag），可回退 jieba | 小 |
 | E ✅ | feat/analysis-agent | P-O-R 工作流 + Markdown 分析报告，长任务走异步通道 | 中大 |
-| E ✅ | feat/script-sandbox | 技能脚本执行升级容器沙箱（只读挂载/资源限制/超时，可切回 subprocess）；远程技能从此可安全启用 | 难⭐ |
+| E ✅ | feat/script-sandbox | 技能脚本可切换一次性容器（只读挂载/资源限制/超时）；远程技能仍默认禁用并需人工审查 | 难⭐ |
 | E ✅ | feat/knowledge-graph | LLM 三元组抽取 + 轻量图存储（SQLite 边表 + NetworkX，Neo4j 留接口）+ 图查询技能 | 难⭐ |
 | F ✅ | feat/auth-workspace | 用户体系 + API Key 真鉴权 + 工作空间（多租户-lite） | 中大 |
 | F ✅ | feat/frontend-v2 | 前端补页：分析报告 / 任务进度 / 图谱 / 示例与术语管理 | 中 |
 | G | feat/row-col-permission | 行列级数据权限（JSONB 规则引擎，作用于 execute_sql 与数据源层），依赖 F | 中大 |
 
 每项继续强制：四段式 IMPLEMENTATION.md、pytest 全绿、中文 commit、验收后 PR。
+
+## 3.1 调研驱动的演进方向（2026-08-03 补充）
+
+> 两份内部技术调研的提炼，已排除需线上流量 / 多集群 / 多租户结算等个人项目不具备的条件。
+> 调研全文见 `docs/research/`（脱敏版，仅保留可复用的技术思路）。
+
+### 架构与知识层（来源：某生产级数据 Agent 平台调研）
+
+该平台是同赛道生产级前辈，**印证了 data-agent 现有关键决策**：单 Agent + SubAgent（非多 Agent）、
+规范前置（非事后 lint）、Skill 内置固定路径优先于每次自主规划、工具熔断降级、TUI + GUI 双层呈现。
+**调研的最大价值是「现有架构被生产级验证」这个叙事点，而非照抄功能**——下列方向按优先级排期，
+低优先级项保留但待真实需求出现再动手：
+
+| 方向 | 说明 | 优先级 |
+|---|---|---|
+| 评测基准层扩展 | 参考 Spider / BIRD / ELT-Bench 建基线，扩展现有 text2sql + RAG evals（已具备基础数据集与指标） | 🔴 高 |
+| 知识飞轮（单人版） | 个人踩坑库 + 采纳反馈蒸馏置信度 + 长期未验证自动降权退场。该平台自认区别于通用 Agent 的核心差异化 | 🟡 中（差异化高，但工作量大、需做深否则被追问穿） |
+| 上下文四层降级 | 历史裁剪 → 截断工具返回 → 模型摘要 → 紧急兜底，按代价从低到高逐层收敛。data-agent 目前只有摘要 | 🟢 低（demo 场景上下文很少爆，待长对话场景出现再做） |
+| 规范分层 | 术语库从单层扩到全局 / 业务线两层 | 🟢 低（收益边际，可有可无） |
+
+**四条方法论**（该平台踩坑总结，可作 data-agent 决策原则）：工具先行（核心工具成功率 80%+ 才上
+知识增强）、能固定路径的不做自主规划、知识晋升需独立命中 + 审核双重门槛、虚拟专家靠蒸馏不靠配规则。
+
+### 沙箱工程（来源：某生产级沙箱平台调研）
+
+该平台是 data-agent sandbox 的生产级放大版，**核心隔离思路被印证**：一次性容器 + 断网 + 只读 +
+资源限额 + 超时兜底回收 + 协议抽象 + 故障降级。三个轻量改进可落地（均对接现有机制，不引入重依赖），
+按优先级排期：
+
+| 改进 | 说明 | 对接点 | 优先级 |
+|---|---|---|---|
+| 资源规格预设档 | `lite` / `standard` / `heavy` 三档，技能 SKILL.md 声明所需档位（轻脚本 / 数据处理 / 重计算） | `skill_sandbox_image/memory/cpus` 配置 | 🔴 高（简单、自洽、能讲清） |
+| 幂等 token 防重试重复执行 | `run()` 接收 `idempotency_key`，重试命中缓存直接返回上次结果，避免有副作用的脚本因重试执行两次 | `TOOL_POLICIES` 重试链路 | 🟡 中（链路绕、key/TTL/缓存存哪要设计；且当前技能脚本少有副作用，待真实场景出现再做） |
+| 工作空间并发配额 | 工作空间维度 `max_concurrent_sandboxes`，超限返回降级文案，防本机 OOM | `auth.py` 工作空间 + `SandboxUnavailableError` | 🟢 低（analysis_agent 多为串行，并发耗尽本机概率低，待并行场景出现再做） |
+
+MicroVM / 预热池 / Nydus 懒加载 / CRIU / 三级配额结算等大规模能力明确不适用，不排期。
+详见 `docs/research/sandbox-platform-research.md`。
 
 ## 4. 暂缓项（非"不做"，提出即可排期）
 
@@ -98,12 +137,12 @@
 - 12 种数据源方言（先用 SQLite + PostgreSQL 验证架构，接新方言只是配置量）
 - 看板/大屏、嵌入式集成、i18n
 
-## 5. 简历叙事对照
+## 5. 当前简历叙事对照
 
 | 简历句 | 支撑点 |
 |---|---|
-| "基于 langchain v1 中间件架构实现 Skills 插件系统（渐进式披露/激活门控），上下文注入成本与技能数量解耦" | Skills v2 + 测试 |
-| "实现 MCP 标准化工具接入，技能激活后懒加载外部工具" | MCP 系统 |
-| "Text-to-SQL 全链路：M-Schema + 分层提示词 + sqlglot 校验 + 引擎级只读" | P0-2/3 + P1-1 |
-| "建立检索与生成双评估体系，SQL 执行准确率 X%" | P1-2 |
-| "工具调用熔断/降级机制，外部依赖故障时 Agent 降级续跑" | ToolRuntimeMiddleware |
+| "Skills 渐进披露、激活门控与 MCP 按需加载；技能脚本可切 Docker 沙箱" | Skills/MCP/Sandbox 实现与测试；默认模式边界 |
+| "M-Schema + 业务语义 + sqlglot AST + SQLite 只读" | Text-to-SQL、知识库、SQL Guard |
+| "多格式 RAG + 混合检索实验链路 + 轻量知识图谱" | 主 Chat/实验链路分层；Graph 实现与测试 |
+| "P-O-R 多步分析 + ARQ/Streams/SSE + 可选 Langfuse" | Analysis、Tasks、Tracing；历史回放而非断点续传 |
+| "28 条 SQL 评测最高 89.29%；40+60 RAG 数据集" | 原始模型报告、RAG 数据集与指标 |

@@ -1,19 +1,19 @@
 # MCP 系统速读（注册表 → 工具加载 → 技能懒加载）
 
 > 设计规格见 [docs/openspec/mcp-system.md](../../docs/openspec/mcp-system.md)（本文不重复，
-> 只讲"全链路怎么串 + 相对 Yuxi 修了哪四个问题"）。分支来源：feat/skills-v2-mcp。
+> 只讲"全链路怎么串 + 相对 Yuxi 修了哪四个问题"）。
 > 定位：把任意 MCP server（图表渲染、数据库连接器等）注册进平台，其工具经 langchain-mcp-adapters
 > 转成 LangChain tools 供 Agent 调用；与 Skills 联动，激活技能后才懒加载对应 server 的工具。
 
 核心文件：
 
 - `models.py` —— `MCPServer`（pydantic）+ `to_client_config()` 按 transport 投影连接配置
-- `service.py` —— JSON 注册表 CRUD + `load_tools`（并行 / 超时 / 缓存 / 失败隔离）+ `test_server`
+- `service.py` —— 注册表 CRUD + JSON→DB 兼容迁移 + `load_tools`（并行 / 超时 / 缓存 / 失败隔离）+ `test_server`
 
 ## ① 功能与用法：一条链路
 
 ```
-MCPServer（注册表 JSON）
+MCPServer（生产依赖注入使用 DB Repository；JSON 仅作迁移源/测试后端）
   └─ to_client_config()               # 按 transport 投影出连接配置
        └─ MultiServerMCPClient(cfg)   # langchain-mcp-adapters 建连
             └─ get_tools()            # 拉取该 server 的工具（LangChain BaseTool）
@@ -43,8 +43,9 @@ API（`/api/mcp/servers`）：GET 列表 / GET 详情 / POST 注册 / PUT 更新
 
 ### 注册表持久化
 
-JSON 文件 `save_dir/mcp_servers.json`，`_save_registry` 走 tmp + rename 原子写；
-`_load_registry` 解析失败**显式 raise 不静默清空**（配置损坏要暴露，不能悄悄丢服务器）。
+生产依赖注入使用 SQLAlchemy `MCPRepository`，数据库为空且存在历史
+`save_dir/mcp_servers.json` 时执行一次性 JSON→DB 迁移，之后数据库是唯一真源。Service 仍保留
+纯 JSON/内存后端供兼容与单元测试使用：JSON 写入走 tmp + rename，解析失败显式报错，不静默清空。
 
 ### load_tools：并行 + 超时 + 缓存 + 失败隔离
 
@@ -89,12 +90,12 @@ JSON 文件 `save_dir/mcp_servers.json`，`_save_registry` 走 tmp + rename 原�
 
 ## ④ 区别与取舍
 
-- **JSON 注册表 vs PostgreSQL**：Yuxi 用 PG 表存 server 配置并做多用户/内置同步（`ensure_builtin_mcp_servers_in_db`）。
-  本项目与 Skills 一致，数据库层整体二期，先用原子写的 JSON 文件顶上；接口不变，二期换存储不动 Service。
+- **轻量 Repository vs 完整平台注册表**：当前已用 SQLAlchemy async Repository 持久化 MCP 配置，
+  也保留 JSON 迁移兼容；但没有 Yuxi 的内置 server 同步、审计和完整租户模型。
 - **懒加载单路径 vs Yuxi 双路径**：Yuxi 既有 `get_tools_from_all_servers`（构建期全量注册）又有技能懒加载。
   本项目只做**技能懒加载这一条主路径**（不激活不连接，最省资源、最贴合"按需披露"），
   "Agent 构建期直接全量配置"的第二条路径按需二期补。
 - **安全边界（stdio = 命令执行面）**：`transport=stdio` 的 `command/args` 可执行任意命令，MCP 配置面
-  本质就是服务器命令执行面。当前 `get_current_user` 是占位鉴权（见 dependencies.py），
-  **生产开放该 API 前必须先落地真实鉴权**；多用户场景还需补 http url 主机白名单、stdio 命令白名单或整体禁用。
+  本质就是服务器命令执行面。`AUTH_ENABLED=true` 时写操作受 admin 守卫保护，但默认 demo 模式关闭鉴权；
+  即使开启鉴权，多用户场景仍需补 http url 主机白名单、stdio 命令白名单或整体禁用。
   Yuxi 同样无 SSRF / 命令白名单，靠 admin-only 兜底 —— 这条边界两边都要靠部署侧闸门，代码层不自作主张放开。

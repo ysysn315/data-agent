@@ -1,4 +1,9 @@
-# Skills 系统 - 对标 Yuxi 差距分析与优化方案
+# Skills 系统 - v1 差距分析与优化方案（历史）
+
+> **文档状态：历史分析。** 本文记录 Skills v1 当时的缺陷与实施计划，章节中的“当前未实现”、
+> P0/P1/P2 和“明确不做”均保留原始上下文，不再作为现状判断。当前实现请看
+> [skills-system.md](skills-system.md) 与 [app/skills/IMPLEMENTATION.md](../../app/skills/IMPLEMENTATION.md)：
+> SQLAlchemy 持久化、embedding+jieba 匹配、Docker 可选沙箱和 knowledge-graph 技能均已落地。
 
 > 分析日期：2026-07-26　分支：`feat/skills-system`
 > **落地记录（2026-07-26，分支 feat/skills-v2-mcp）**：P0 与 P1 已全部实现并通过

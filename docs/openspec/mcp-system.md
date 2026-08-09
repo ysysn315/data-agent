@@ -1,7 +1,7 @@
 # MCP 系统 - OpenSpec（已实现）
 
 > 参考 Yuxi `agents/mcp/service.py` + `mcp_router.py` 简化实现，
-> 并修正其分析中发现的已知问题。分支 feat/skills-v2-mcp。
+> 并修正其分析中发现的已知问题。本文描述当前接线。
 
 ## 1. 模块定位
 
@@ -22,8 +22,8 @@ enabled / disabled_tools。
 
 ## 3. 服务层（app/mcp/service.py）
 
-- **注册表**：JSON 文件（`save_dir/mcp_servers.json`，原子写 tmp+rename），
-  与 Skills 一致暂不引入数据库；损坏时显式报错不静默清空
+- **注册表**：生产依赖注入使用 SQLAlchemy `MCPRepository`；数据库为空时可从历史
+  `save_dir/mcp_servers.json` 一次性迁移。纯 JSON/内存后端继续供兼容与测试使用，损坏时显式报错
 - **工具加载** `load_tools(slugs)`：
   - 并行 gather，单 server 失败/超时隔离（返回 []，不拖垮整体）
   - `asyncio.wait_for` 包裹 get_tools() —— 修正 Yuxi stdio 无超时、子进程挂起卡死请求的问题
@@ -50,9 +50,9 @@ GET 列表 / GET 详情 / POST 注册 / PUT 更新 / DELETE / POST enable|disabl
 ## 6. 安全边界（重要）
 
 MCP 配置面 = 服务器命令执行面（stdio transport 可执行任意命令）：
-- 当前项目无真实鉴权（get_current_user 为占位），**生产必须先落地鉴权再开放该 API**
+- `AUTH_ENABLED=true` 时写操作要求 admin；默认 demo 模式关闭鉴权，因此不能直接对不可信网络开放
 - Yuxi 同样无 URL/SSRF 校验、无 stdio 命令白名单（admin-only 是它唯一的闸），
-  本项目二期若做多用户，需增加：http url 主机白名单、stdio 命令白名单或整体禁用
+  本项目若进入多用户场景，仍需增加：http url 主机白名单、stdio 命令白名单或整体禁用
 
 ## 7. 测试
 

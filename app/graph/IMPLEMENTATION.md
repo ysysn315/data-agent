@@ -46,8 +46,8 @@ GMV -[计算自]-> 订单项价格
 
 供模型做**指标口径溯源**（"GMV 怎么算出来的"）与**实体关联分析**（"订单和卖家
 什么关系"）；实体名未精确命中时返回相近实体提示（"相近实体：客单价"），模型可
-据此二次调用。注：`graph_search` 挂进 `app/core/dependencies.get_chat_agent` 的
-gated_tools 列表由合并时统一处理（本分支不改该列表）。
+据此二次调用。`graph_search` 已挂进 `app/core/dependencies.get_chat_agent` 的
+`gated_tools`，并由 Skills 中间件在 knowledge-graph 激活后解锁。
 
 依赖注入：`app/core/dependencies.get_graph_service()` 单例；新依赖 `networkx>=3`
 （pyproject「知识图谱」分组）。数据链路一览：

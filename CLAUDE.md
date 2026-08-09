@@ -1,116 +1,123 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+本文件给在此仓库中工作的代码 Agent 使用。与用户交流、代码注释、提交信息和设计文档统一使用中文。
 
-（与用户交流、写代码注释、commit、设计文档，一律用中文。）
+## 仓库定位
 
-## 工作区布局
+`data-agent` 是当前活跃项目。相邻的 `my-agent-original/`、`yuxi-reference/`、`sqlbot-reference/` 只用于设计对照；除非用户明确要求，不要修改参考仓库，也不要把参考实现的行为当成本仓库事实。
 
-`/Users/ysn/projects` 不是一个仓库，而是装着四个独立 git 仓库的工作区：
+当前事实入口：
 
-| 目录 | 角色 | 对 data-agent 的贡献 |
-|---|---|---|
-| `data-agent/` | **当前活跃项目**，所有新工作都在这里 | — |
-| `my-agent-original/` | 只读。data-agent 的前身 | 底座：LangGraph Agent、整条 RAG 链路、evals、FastAPI 分层 |
-| `yuxi-reference/` | 只读。上游参考（语析 Yuxi） | 平台层：Skills、MCP、中间件、异步执行、多租户 |
-| `sqlbot-reference/` | 只读。上游参考（DataEase SQLBot） | 数据域：Text-to-SQL、M-Schema、方言提示词、行列权限 |
+- 对外能力与已知边界：`README.md`
+- 当前/后续状态：`docs/openspec/roadmap.md`
+- 模块实现：各目录下 `IMPLEMENTATION*.md`
+- 历史需求：`REQUIREMENTS.md`，仅作基线，不代表当前状态
 
-三个参考仓库当**文档**用，不要改、不要提交。加功能前先看哪个参考项目已解决过，
-读完它的实现再动手 —— 这是一个刻意的融合项目：**my-agent 是身体，Yuxi 是架构，SQLBot 是领域**。
-`data-agent/REQUIREMENTS.md` §0 记录了每项能力的出处规划。
-
-`yuxi-reference/` 自带 CLAUDE.md/AGENTS.md，只在改那个目录时生效（基本不该发生）。
-
-## data-agent
-
-中文项目「智能数据分析 Agent 平台」：FastAPI + langchain v1 create_agent，
-Text-to-SQL + RAG，Skills 插件化 + MCP 标准化工具接入。
-当前分支 `feat/skills-v2-mcp`：应用可启动、22 个 pytest 用例全绿。
-
-### 常用命令
+## 常用命令
 
 ```bash
-cd data-agent
-cp .env.example .env        # LLM_API_KEY 必填（创建 LLM 时显式校验）
+cd /Users/ysn/projects/data-agent
 
-# 依赖（uv + pyproject.toml，Python 3.11）
-uv pip install -p .venv -r pyproject.toml --group dev
+# 依赖
+uv sync
+
+# 演示数据
+.venv/bin/python scripts/import_ecommerce.py --synthetic --db ./data/ecommerce.db
 
 # 测试
-.venv/bin/python -m pytest tests/ -q
-.venv/bin/python -m pytest tests/test_skills_middleware.py -q   # 单文件
+.venv/bin/python -m pytest -q
+.venv/bin/python -m pytest tests/test_skills_middleware.py -q
 
-# 启动（chat 默认不依赖 Milvus；需要知识库检索时 ENABLE_KB_TOOL=true 并起 Milvus）
+# 后端
 .venv/bin/uvicorn app.main:app --reload --port 9900
 
-# RAG 评估（数据集需从 my-agent-original 迁回，见 roadmap P1-2）
-.venv/bin/python -m evals.rag.run_retrieval_eval
+# 前端
+cd frontend && npm install && npm run dev
+
+# 异步任务（需 Redis）
+docker compose up -d redis
+.venv/bin/arq app.tasks.worker.WorkerSettings
+
+# Text-to-SQL 评测
+.venv/bin/python -m evals.text2sql.run_execution_eval --limit 10
 ```
 
-基础设施按需：Redis（会话）:6379、Milvus（知识库，可关）:19530。
-`my-agent-original/docker-compose.yml` 可整套拉起。
-本地 BGE 重排/向量是重依赖（torch），已惰性导入，需要时另装：`uv pip install torch FlagEmbedding`。
+默认 Chat/Text-to-SQL 不依赖 Milvus、Redis、Docker 或 Langfuse。知识库工具需 `ENABLE_KB_TOOL=true` + Milvus；Docker 技能沙箱需 `SKILL_SANDBOX_MODE=docker`；Langfuse 需开关和两把 key 同时就绪。
 
-### 架构：四个关键接缝
+RAG 评测依赖外部语料、Milvus、Embedding 和可选重排模型，迁移后仍有配置字段需要整理。运行前先读 `evals/rag/README.md`，不要把仓库中的历史 baseline 当作当前可复现实验结果。
 
-**`app/core/llm.py` — LLMFactory。** 所有 LLM 调用必须走这里（ChatOpenAI + 自定义
-base_url，任意 OpenAI 兼容端点）。这是为了解除 my-agent 绑死 ChatTongyi 的教训，
-**不要再引入任何厂商专属 chat 类**。embedding 同理（`app/rag/embeddings.py`）。
+## 当前事实基线（2026-08-08）
 
-**`app/skills/` — Skills v2（目录模型 + 三段式）。** 一个 skill 是一个目录
-（SKILL.md + 可选 scripts/）。运行时：披露（system prompt 只注入名称+描述）→
-激活（模型调 `read_skill(slug)`，middleware 拦截结果写 state.activated_skills）→
-解锁（该技能声明的门控工具变为可见；声明的 MCP 工具懒加载）。
-langchain v1 的两个硬约束：门控本地工具必须挂 `AgentMiddleware.tools` 构建期注册；
-动态 MCP 工具必须在 `wrap_tool_call` 里 `request.override(tool=实例)` 接管执行。
-设计文档：`docs/openspec/skills-system.md`。
+- `213 passed, 5 skipped`，共 19 个测试文件。
+- 5 个内置技能：schema-retrieval、sql-generation、sqlite-query、data-visualization、knowledge-graph。
+- Text-to-SQL 有 3 份可区分的模型报告，最高 `89.29%（25/28）`；`execution_latest.json` 当前是 23/28。
+- 主 Chat 的知识库工具只接 Milvus 稠密召回与元数据后过滤；BM25/RRF、查询改写、扩展和重排在独立实验链路。
+- 技能脚本默认 `subprocess`；Docker 是可切换的一次性容器执行器。
+- Redis Streams 能保存并回放历史事件，但 HTTP SSE 未暴露 `Last-Event-ID/after_seq`，前端不自动重连。
+- Langfuse 默认关闭且只覆盖部分 Agent 图入口，不得描述成全链路可观测闭环。
 
-**`app/mcp/` — MCP 注册表与工具加载。** JSON 文件注册表（save_dir/mcp_servers.json），
-MultiServerMCPClient 拉工具，带超时/失败隔离/配置哈希缓存。
-注意：stdio transport = 服务器命令执行面，当前无真实鉴权，API 不能对外。
-设计文档：`docs/openspec/mcp-system.md`。
+## 关键架构接缝
 
-**`app/agents/tool_runtime.py` + `app/agents/middlewares.py` — 工具熔断。** 每个工具
-调用经 ToolRuntimeMiddleware 走重试/超时/熔断/降级（TOOL_POLICIES 按工具名配置），
-失败返回降级文案而不是抛异常。熔断状态是进程级全局的，测试间要
-`reset_tool_runtime_state()`。新工具加 TOOL_POLICIES 条目，不要自造错误处理。
+### LLM 与 Embedding
 
-其余分层沿袭 my-agent：`api/ → services/ → agents|rag|skills|mcp|tasks → clients/`，
-路由统一挂 `/api`；单例一律从 `app/core/dependencies.py` 取
-（不要在路由文件里定义同名依赖 —— 曾因遮蔽 get_skill_service 导致 API 恒返回空；
-注意 asyncio.Lock 不可重入 —— get_chat_agent 曾因锁内套锁死锁）。
+所有聊天模型通过 `app/core/llm.py` 创建，避免在业务模块直接引入厂商专属 chat 类。Embedding 统一走 `app/rag/embeddings.py`。推理模型的 `reasoning_content` 与最终答案分流，避免思考文本污染历史消息。
 
-F 轮新增：**`app/core/auth.py`**（API Key 鉴权 + 工作空间，`AUTH_ENABLED` 默认 False
-逐字节保持 demo 行为；开启后 bootstrap 自动签发 admin Key 打日志一次；保护清单单一事实源
-`auth.PROTECTED_ENDPOINTS`，MCP 写口限 admin）。前端已含任务中心/图谱可视化/知识管理页。
+### Skills / MCP
 
-E 轮新增：**`app/graph/`**（三元组抽取 + SQLite/NetworkX 图存储，graph_search 门控工具）、
-**`app/agents/analysis_agent.py`**（P-O-R 工作流，每步复用 ChatAgent 完整技能三段式）、
-**`app/skills/sandbox.py`**（脚本执行可切 Docker 一次性容器，`SKILL_SANDBOX_MODE=docker`；
-本机 colima 需挂载 /private/var/folders，见 IMPLEMENTATION-sandbox.md 附录）。
+一个 Skill 是 `SKILL.md + 可选 scripts/` 的目录。运行时流程：
 
-D 轮新增两个基础模块：**`app/db/`** —— SQLAlchemy 2.0 async 持久化（SQLite 起步，
-`database_url` 一行切 PG；skills 表只存元数据与 dir_path，SKILL.md 正文永不入库，
-对齐 Yuxi"内容存 FS、索引存 DB"）；**`app/tasks/`** —— ARQ 异步任务 + Redis Streams
-事件流 + SSE（worker 启动：`arq app.tasks.worker.WorkerSettings`；任务状态在 Redis
-不入库）。技能匹配已升级 embedding 召回 + jieba 回退（`app/skills/matching.py`）。
+1. system prompt 只披露名称和描述；
+2. 模型调用 `read_skill(slug)` 读取正文并激活；
+3. 下一轮解锁该技能声明的本地工具，或懒加载对应 MCP server 工具。
 
-### 约定
+LangChain v1 的两个约束：
 
-- **全中文**：注释、docstring、SKILL.md、设计文档、commit（Conventional Commits，
-  中文主题 + 中文要点列表；把刻意的简化/欠账写进 commit body，这是项目的记账习惯）。
-- **先 spec 后码**：非平凡子系统先在 `docs/openspec/` 写设计（定位→设计→文件结构→
-  API→与参考项目差异）。
-- 配置进 `Settings`（pydantic-settings）+ 同步 `.env.example`；日志用 loguru。
-- 安全既定决策：脚本执行是无隔离 subprocess，所以**远程安装的 skill 默认
-  enabled=False**；execute_sql 引擎级只读。放松任何一条前先看
-  `docs/openspec/skills-system.md` §5。
+- 本地门控工具必须在构建期进入 `AgentMiddleware.tools`，请求期只控制模型可见性；
+- 动态 MCP 工具构建期不存在，执行时必须通过 `request.override(tool=实例)` 接管。
 
-### 路线图
+新增技能时同步检查 `dependencies.tools/mcps/skills`、依赖展开和门控测试。
 
-`docs/openspec/roadmap.md`：P0（demo 闭环）与 P1（sqlglot 校验、评估体系、SQL 示例库、
-术语库、前端）已完成；§3 是 P2+ 的 D/E/F/G 四轮子代理推进计划（持久化 → 分析Agent/
-容器沙箱/知识图谱 → 用户体系/前端 v2 → 行列权限），难任务可给子代理升级 fable-high。
-注意：**没有"明确不做"清单** —— 旧版那节措辞过重已更正为"暂缓项"，用户提出即可排期。
-协作节奏：每轮分支 → PR → 等用户合并；每个功能配四段式 IMPLEMENTATION.md。
-已验证成果：Text-to-SQL 执行准确率 92.9%（28 例、4 模型对比在 evals/text2sql/reports/）。
+### 工具运行时与脚本沙箱
+
+`ToolRuntimeMiddleware` 统一处理工具超时、重试、熔断和错误回喂。新增外部工具时优先补 `TOOL_POLICIES`，不要在每个工具里重复实现重试。
+
+`run_skill_script` 先校验技能已启用、脚本位于该技能 `scripts/` 下，再交给配置选择的 runner：
+
+- `subprocess`：默认，只有路径、超时与输出长度限制，没有进程隔离；
+- `docker`：一次性容器，断网、只读根文件系统/挂载、CPU/内存/PID 限额和超时回收。
+
+远程技能仍默认禁用，必须人工审查后启用。Docker 模式也不是生产级多租户代码沙箱。
+
+### Text-to-SQL
+
+主链路是 M-Schema → 术语/SQL 示例 → LLM 生成 → sqlglot AST 校验 → SQLite `mode=ro` 执行。校验失败应以可供模型自纠的工具结果返回，不要用异常直接中断 Agent。
+
+列校验采取“宁漏报、不误报”：多表、CTE、子查询无法可靠确定列归属时保守跳过，由数据库执行错误和只读模式兜底。
+
+### RAG 与图谱
+
+文档上传负责解析、表格语义化、分块、Embedding 和 Milvus 写入。主 Chat 使用 `VectorStore` 的稠密检索；不要在未修改接线前声称主链路已使用 BM25、查询改写或 BGE 重排。
+
+图谱是 SQLite + NetworkX 的轻量实现，LLM 抽取需显式调用接口；它不是 Neo4j/GraphRAG，也没有自动接入文档上传。
+
+### 持久化、鉴权与异步任务
+
+- 应用配置数据通过 SQLAlchemy 2.0 async Repository 持久化；技能正文仍在文件系统，数据库保存索引/元数据。
+- `AUTH_ENABLED=false` 保持 demo 模式；开启后才启用 API Key 守卫。workspace-lite 不是全资源多租户隔离。
+- ARQ 负责后台执行，Redis Hash 保存任务状态，Redis Streams 保存阶段事件，SSE 负责传输。任务运行态带 TTL，不进入业务关系库。
+
+## 开发约定
+
+- 改动前先看目标目录最近的 `IMPLEMENTATION*.md`；若文档与代码冲突，以代码和测试为准，并在同一改动中修正文档。
+- 非平凡子系统先更新 OpenSpec，再实现代码；历史方案文档保留原始决策，但必须在顶部标明是否仍代表当前状态。
+- 依赖注入统一走 `app/core/dependencies.py`，不要在路由里声明同名依赖。
+- 配置进入 `Settings` 并同步 `.env.example`；日志使用 loguru。
+- 工作区可能有用户未提交改动。修改前先看 `git status`/`git diff`，不得覆盖无关内容。
+- 每修一个缺陷补一条能在修复前失败的回归测试。
+
+## 文档维护规则
+
+- README 只保留当前能力、运行方式、可信数字和已知边界，不记录逐轮开发史。
+- `docs/interview-guide.md` 的数字必须能回到测试或原始报告。
+- `REQUIREMENTS.md` 与旧差距分析是历史基线；不要把其中“未实现/二期”直接复制到当前文档。
+- 不使用会快速腐化的 PR 数量、分支名和“当前第 N 个测试”作核心叙事；测试总数只在有本轮实跑证据时更新。

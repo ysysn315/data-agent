@@ -2,7 +2,7 @@
 
 本项目有**两套评估**，共用一个理念：*不靠感觉说"Agent 挺准"，而是拿数据集量化它到底多准*。
 
-- `evals/rag/` —— **检索/生成评估**（从 my-agent-original 迁回的强项，见 §3）。
+- `evals/rag/` —— **检索/生成评估**（迁移后的数据集、指标、实验脚本与历史 baseline，见 §3）。
 - `evals/text2sql/` —— **Text-to-SQL 执行准确率评估**（本次新增，项目差异化亮点）。
 
 > 简历叙事对照（roadmap §5）："建立检索与生成双评估体系，SQL 执行准确率 X%"。
@@ -14,16 +14,20 @@
 
 ### 1. RAG 评估（`evals/rag/`）
 
-针对知识库检索链路（分块 → 混合检索 → BGE 重排 → 生成）：
+针对独立 RAG 实验链路（分块 → 混合检索 → 重排 → 生成）。注意：主 Chat 当前只接
+Milvus 稠密召回与元数据后过滤，完整实验链路尚未接回主 Chat：
 
 - **检索指标**：Hit@k、Recall@k、MRR、Precision@k、NDCG@k、MAP（`metrics.py`）。
 - **生成指标**：关键词召回 keyword_recall、来源命中 source_hit，以及严格版
   事实点召回/幻觉惩罚/来源精确率（`metrics.py` 的 `*_strict`）。
-- **数据集**：`datasets/rag_retrieval_cases.json`(40 例)、`rag_generation_cases*.json`。
+- **数据集**：`datasets/rag_retrieval_cases.json`（40 例）、
+  `rag_generation_cases_formal_template.json`（60 条分层模板）等。
 - **基线**：`baselines/retrieval_baseline.json`、`generation_baseline.json`——
   改检索参数（top_k / hybrid / rerank）后与基线对比，看是涨还是跌。
 
-跑（需 Milvus + 向量/重排依赖，见根 CLAUDE.md）：
+运行需要 Milvus、Embedding、可选重排模型和测试语料。迁移后脚本仍引用已调整的配置字段，
+部分语料目录也未随仓库提交；以下是入口而不是“开箱即得 baseline”的保证，执行前先按
+`evals/rag/README.md` 的检查清单修正配置：
 
 ```bash
 .venv/bin/python -m evals.rag.run_retrieval_eval      # 检索
@@ -49,9 +53,10 @@ LLMFactory 调 LLM 生成 SQL → `sql_guard.validate_sql` 校验 → 执行 →
 串起来做端到端度量。
 
 - 数据集 `dataset.json`：28 例，难度分层 `tags` ∈ {单表聚合, 多表JOIN, 时间过滤, TopN, CTE}。
-- 运行期依赖 `validate_sql`，**依赖 PR #5（fix/sql-guard-select-alias）合并**，
-  否则 `ORDER BY 别名` 类生成会被误判校验失败而拉低分数。
-- 离线测试（`tests/test_text2sql_eval.py`）不受此影响：它用**原生 sqlite3** 跑 golden。
+- 当前仓库有 3 份可区分的模型报告：qwen3.7-plus 25/28（89.29%）、
+  qwen3-coder-plus 24/28（85.71%）、qwen3-coder-flash 23/28（82.14%）。
+  `execution_latest.json` 当前与 coder-flash 相同，不代表最高成绩。
+- 离线测试（`tests/test_text2sql_eval.py`）用原生 sqlite3 跑 golden，避免依赖 LLM 与网络。
 
 ---
 
@@ -120,7 +125,6 @@ LLMFactory 调 LLM 生成 SQL → `sql_guard.validate_sql` 校验 → 执行 →
    CI，也无法稳定复现。所以 `tests/test_text2sql_eval.py` 只测**确定性**部分 ——
    golden 能跑通、归一化对比的正/反例、报告聚合；把"模型到底多准"留给 `run_execution_eval`
    这个需要真实 LLM 的线下脚本。测试守护"评估工具本身正确"，脚本产出"模型准确率数字"。
-4. **为什么离线测试执行 golden 用原生 sqlite3 而非 validate_sql**：main 上 `sql_guard`
-   有一个 SELECT 别名误报 bug（`ORDER BY <别名>` 被当未知列，PR #5 待合并）。测试是
-   "标准答案基准"的守护，不该被这条待修 bug 干扰，故直接用原生 sqlite3；运行期脚本才走
-   `validate_sql`（并在文件头注明依赖 #5）。
+4. **为什么离线测试执行 golden 用原生 sqlite3 而非 validate_sql**：golden 是评测标准答案，
+   只需要证明能在目标数据库执行并产生结果；把运行期策略校验耦合进 golden 守护，会让校验策略变化
+   反过来污染评测基准。模型生成 SQL 的运行期链路仍走 `validate_sql`。

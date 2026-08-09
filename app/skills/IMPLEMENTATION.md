@@ -1,18 +1,20 @@
 # Skills v2 系统速读（目录模型 + 渐进式披露 + 激活门控）
 
 > 设计规格见 [docs/openspec/skills-system.md](../../docs/openspec/skills-system.md)（本文不重复其表格，
-> 只做"代码怎么落地 + 为什么这么选"的实现速读）。分支来源：feat/skills-v2-mcp。
+> 只做"代码怎么落地 + 为什么这么选"的实现速读）。
 > 定位：把 Yuxi 的三段式技能机制（披露 → 激活 → 解锁）搬进本项目，让"能力 = 一段提示词模板 + 可选门控工具"，
 > 不激活不占 system prompt、不解锁不进模型视野。
 
 核心文件：
 
 - `models.py` —— SKILL.md 解析（`SkillContent.parse`）、`Skill`（含 `dir_path`）、`ExpandedSkills`（披露/门控投影）
-- `service.py` —— 加载 / 查询 / 依赖展开 / jieba 中文匹配 / 目录原子导入
-- `tools.py` —— `read_skill`（激活入口）/ `run_skill_script`（subprocess + 路径校验 + 超时）
+- `service.py` —— 加载 / 查询 / 依赖展开 / 目录原子导入
+- `matching.py` —— embedding 语义匹配 + jieba 回退
+- `tools.py` —— `read_skill`（激活入口）/ `run_skill_script`（统一脚本执行入口）
+- `sandbox.py` —— subprocess / Docker 两种 runner
 - `middleware.py` —— `SkillsMiddleware`（真实 langchain v1 `AgentMiddleware`，三段式主实现）
 - `remote_install.py` —— git clone 整目录安装，默认 `enabled=False`
-- `buildin/` —— 4 个内置技能（schema-retrieval / sql-generation / data-visualization / sqlite-query）
+- `buildin/` —— 5 个内置技能（schema-retrieval / sql-generation / data-visualization / sqlite-query / knowledge-graph）
 
 ## ① 功能与用法：一次"各州销售额"跑通三段式
 
@@ -76,12 +78,16 @@
 保证文件系统与存储层一致，不留半个损坏技能。删除时 `resolve().relative_to(save_dir/skills)` 校验，
 只删 `save_dir` 管辖内的目录，绝不误删内置技能目录。
 
-### 远程安装默认禁用的安全逻辑
+### 脚本执行与远程安装边界
 
-`run_skill_script` 是**无隔离 subprocess**（REQUIREMENTS §9 决策，不做重沙箱），防护仅三层：
-脚本路径必须落在 `<skill>/scripts/` 内（`relative_to` 校验拦路径穿越）、30s 超时、8000 字输出截断。
-正因执行无隔离，`remote_install.py` 的 `_import_one` 强制 `enabled=False` —— 远程技能可能夹带
-可执行脚本，必须人工审查内容后经 API 显式启用。远程安装走 `git clone --depth 1`，不依赖任何外部 CLI。
+`run_skill_script` 先校验技能已启用、脚本路径位于 `<skill>/scripts/` 内，再把执行交给配置选择的 runner：
+
+- 默认 `subprocess`：本地进程执行，提供路径校验、超时和输出截断，但没有进程隔离；
+- 可选 `docker`：一次性容器，断网、只读根文件系统/技能挂载、CPU/内存/PID 限额和超时回收。
+
+两种模式都不等于生产级多租户沙箱，因此 `remote_install.py` 的 `_import_one` 仍强制
+`enabled=False`。远程技能可能夹带可执行脚本，必须人工审查后经 API 显式启用。远程安装走
+`git clone --depth 1`，不依赖额外 CLI。Docker 细节见 `IMPLEMENTATION-sandbox.md`。
 
 ## ③ Yuxi 是怎么做的（对照 yuxi-reference）
 
@@ -109,13 +115,13 @@
 在 [skills-system.md §7 的差异表](../../docs/openspec/skills-system.md) 基础上补"为什么"：
 
 - **`read_skill` 专用工具 vs Yuxi 沙箱 `read_file` + 路径解析**：Yuxi 有每 thread 的容器沙箱文件系统，
-  技能以 `/home/gem/skills/<slug>/SKILL.md` 存在，读文件即读技能，激活靠路径匹配。本项目没有沙箱，
-  一个只读 `SkillService` 的专用工具就是最小且最稳的边界 —— 不用解析路径、不会读到技能之外的东西。
+  技能以 `/home/gem/skills/<slug>/SKILL.md` 存在，读文件即读技能，激活靠路径匹配。本项目的 Docker
+  只隔离单次技能脚本，并不提供每 thread 通用文件系统；因此只读 `SkillService` 专用工具仍是最小边界，
+  不用解析路径，也不会读到技能目录之外的文件。
 - **git clone vs npx skills CLI**：Yuxi 远程安装 shell 出 npx CLI 再抓屏解析输出。git clone 无外部 CLI
   依赖、退出码 / stderr 是稳定的结构化信号，解析不易碎；`--depth 1` 也省带宽。
-- **内存 + 目录 vs PostgreSQL**：整个数据库层是二期。内置技能走内存缓存，用户 / 远程技能落盘为目录，
-  `InMemorySkillRepository` 顶着 API。一份目录 + 一个内存表就近可 diff、可测，演示期完全够用，
-  接了 PG 也只需换 Repository 实现，Service/Middleware 不动。
-- **subprocess + 默认禁用 vs 容器沙箱**：容器沙箱是 Yuxi 多租户的刚需，本项目单机演示不值得这份复杂度。
-  取而代之的是"无隔离但默认禁用远程技能 + 路径校验 + 超时 + 输出截断"，把风险面收敛到"人工审查后才启用"。
-  这是一处**记账式**的取舍：明确不做隔离，用"默认禁用"兜住风险，需要多租户时再上沙箱。
+- **文件系统正文 + 数据库索引**：当前 Repository 已接 SQLAlchemy async；技能正文和脚本继续放目录，
+  数据库保存元数据与 `dir_path`。这样既能事务化管理索引，也保留 SKILL.md 可直接检查和覆盖的特性。
+- **subprocess 默认 + Docker 可切换**：本地开发默认零额外依赖；需要执行不受信任脚本时可切一次性
+  Docker 容器。即使使用 Docker，远程技能仍默认禁用，因为当前没有非 root、capability drop、
+  `no-new-privileges`、租户配额等生产级硬化。
