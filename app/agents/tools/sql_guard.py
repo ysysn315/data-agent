@@ -25,6 +25,33 @@ _ANSI_PATTERN = re.compile(r"\x1b\[[0-9;]*m")
 # `WITH ... SELECT` 经 sqlglot 解析后最外层就是 Select（with 挂在 args 上），
 # 而 `WITH ... INSERT` 最外层是 Insert，不在此列 —— 这正是 AST 判断优于字符串首词之处。
 _ALLOWED_ROOT = (exp.Select, exp.Union)
+_FORBIDDEN_WRITE_NODES = (
+    exp.Alter,
+    exp.Command,
+    exp.Copy,
+    exp.Create,
+    exp.Delete,
+    exp.Drop,
+    exp.Insert,
+    exp.Merge,
+    exp.Transaction,
+    exp.Update,
+)
+
+_FORBIDDEN_FUNCTIONS = {
+    "sqlite": {"load_extension", "readfile", "writefile"},
+    "postgres": {
+        "dblink",
+        "lo_export",
+        "lo_import",
+        "pg_ls_dir",
+        "pg_read_binary_file",
+        "pg_read_file",
+        "pg_sleep",
+        "set_config",
+    },
+    "mysql": {"benchmark", "get_lock", "load_file", "release_lock", "sleep"},
+}
 
 
 @dataclass
@@ -139,13 +166,15 @@ def validate_sql(
     sql: str,
     schema: dict[str, list[str]] | None = None,
     default_limit: int = 1000,
+    dialect: str = "sqlite",
 ) -> GuardResult:
-    """校验并规范化一条 SQLite 只读查询。
+    """校验并规范化一条只读查询。
 
     参数:
         sql: 待校验的 SQL 文本。
         schema: {表名: [列名, ...]}，提供时校验表 / 列是否存在；None 则跳过该项。
         default_limit: 最外层无 LIMIT 时自动补的行数上限。
+        dialect: sqlglot 解析和回写方言（sqlite/postgres/mysql）。
 
     返回:
         GuardResult。ok=True 时 fixed_sql 可直接执行（可能已补 LIMIT）；
@@ -156,7 +185,7 @@ def validate_sql(
 
     # 1. 语法解析（多语句会被拆成多条，便于单语句校验）
     try:
-        statements = sqlglot.parse(sql, dialect="sqlite")
+        statements = sqlglot.parse(sql, dialect=dialect)
     except ParseError as e:
         return GuardResult(ok=False, error=f"SQL 语法错误：{_clean_parse_error(e)}")
 
@@ -180,6 +209,22 @@ def validate_sql(
             ok=False,
             error=f"只允许 SELECT / WITH 查询（禁止 {kind} 等写操作）",
         )
+
+    # SELECT 也可能带副作用：SELECT ... INTO、FOR UPDATE 锁，以及部分数据库
+    # 暴露的文件/扩展/锁函数。只读数据库账号仍是最终边界，这里先拦常见高风险入口。
+    for node_type in _FORBIDDEN_WRITE_NODES:
+        nested = next(root.find_all(node_type), None)
+        if nested is not None:
+            return GuardResult(ok=False, error=f"只读查询禁止包含 {type(nested).__name__.upper()} 操作")
+    if any(True for _ in root.find_all(exp.Into)):
+        return GuardResult(ok=False, error="只读查询禁止 SELECT INTO")
+    if any(True for _ in root.find_all(exp.Lock)):
+        return GuardResult(ok=False, error="只读查询禁止 FOR UPDATE / FOR SHARE 等锁语句")
+    forbidden = _FORBIDDEN_FUNCTIONS.get(dialect, set())
+    for function in root.find_all(exp.Anonymous):
+        name = (function.name or "").lower()
+        if name in forbidden:
+            return GuardResult(ok=False, error=f"只读查询禁止调用高风险函数：{name}")
 
     # 4. 表名 / 列名校验（schema 已知时）
     real_tables = _extract_real_tables(root)
@@ -206,5 +251,5 @@ def validate_sql(
     if root.args.get("limit") is None:
         root = root.limit(default_limit)
 
-    fixed_sql = root.sql(dialect="sqlite")
+    fixed_sql = root.sql(dialect=dialect)
     return GuardResult(ok=True, fixed_sql=fixed_sql)

@@ -1,4 +1,4 @@
-"""持久化层 - SQLAlchemy 2.0 Declarative 模型（五张表）
+"""持久化层 - SQLAlchemy 2.0 Declarative 模型。
 
 对齐 Yuxi 的关键设计（backend/.../postgres/models_business.py:229-273 的 Skill 表）：
 **技能正文存文件系统，数据库只存元数据索引**。因此 skills 表刻意不含 content 列，
@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -104,9 +104,6 @@ class TerminologyModel(Base):
 
 # ========== 知识图谱（E 轮追加；本段 import 就近声明，不改动文件头部） ==========
 
-from sqlalchemy import UniqueConstraint  # noqa: E402
-
-
 class GraphTripleModel(Base):
     """graph_triples 表：知识图谱三元组（轻量版图谱的唯一持久化层）。
 
@@ -169,3 +166,78 @@ class UserModel(Base):
     api_key_prefix: Mapped[str] = mapped_column(String(16), nullable=False, default="")
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
+
+
+# ========== 外部数据源 + 语义元数据 ==========
+
+
+class DataSourceModel(Base):
+    """用户接入的数据源。
+
+    connection_config 只保存主机、端口、库名、schema 或受限 SQLite 路径等非敏感字段；
+    用户名/密码整体加密后放在 encrypted_credentials，任何 API 投影都不得返回后者。
+    workspace_id=0 是关闭鉴权时的 demo 工作空间，启用鉴权后使用真实工作空间 ID。
+    """
+
+    __tablename__ = "data_sources"
+    __table_args__ = (UniqueConstraint("workspace_id", "name", name="uq_data_sources_workspace_name"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    workspace_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(256), nullable=False)
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    connection_config: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    encrypted_credentials: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="ready")
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    schema_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
+
+
+class DataSourceTableModel(Base):
+    """数据源中的表/视图及三层注释：物理注释、AI 草稿、人工审核结果。"""
+
+    __tablename__ = "data_source_tables"
+    __table_args__ = (
+        UniqueConstraint("datasource_id", "schema_name", "table_name", name="uq_datasource_table_name"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    datasource_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    schema_name: Mapped[str] = mapped_column(String(256), nullable=False, default="")
+    table_name: Mapped[str] = mapped_column(String(256), nullable=False)
+    table_type: Mapped[str] = mapped_column(String(32), nullable=False, default="table")
+    physical_comment: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    ai_comment: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    reviewed_comment: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    review_status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
+    physical_signature: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
+
+
+class DataSourceColumnModel(Base):
+    """表字段的物理信息、AI 语义草稿、已审核语义和真实外键关系。"""
+
+    __tablename__ = "data_source_columns"
+    __table_args__ = (UniqueConstraint("table_id", "column_name", name="uq_datasource_column_name"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    table_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    column_name: Mapped[str] = mapped_column(String(256), nullable=False)
+    data_type: Mapped[str] = mapped_column(String(256), nullable=False, default="UNKNOWN")
+    ordinal_position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    nullable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    primary_key: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    physical_comment: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    ai_comment: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    reviewed_comment: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    ai_synonyms: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    reviewed_synonyms: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    references: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    review_status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
+    physical_signature: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)

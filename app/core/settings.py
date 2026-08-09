@@ -56,6 +56,13 @@ class Settings(BaseSettings):
     # 演示数据源（Kaggle Brazilian E-Commerce 导入的 SQLite）
     sqlite_db_path: str = "./data/ecommerce.db"
 
+    # 用户数据源平台：SQLite 只允许访问此目录；远程用户名/密码用 Fernet key 加密落库。
+    # allowed_hosts 为空表示不额外限制（连接/同步仍是 admin-only）；生产环境建议配置白名单。
+    datasource_sqlite_root: str = "./data/datasources"
+    datasource_secret_key: str = ""
+    datasource_allowed_hosts: list[str] = []
+    datasource_remote_enabled: bool = False
+
     # API Key 鉴权 + 工作空间隔离（F 轮，详见 app/core/IMPLEMENTATION-auth.md）
     # False = demo 模式：占位 dev_user、读写全开，行为与鉴权落地前完全一致（默认）。
     # True  = 启用鉴权：写操作需 Bearer API Key（da- 前缀），MCP/技能启停需 admin；

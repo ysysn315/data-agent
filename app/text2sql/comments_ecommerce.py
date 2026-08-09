@@ -1,7 +1,9 @@
-"""演示库（Kaggle Brazilian E-Commerce / Olist）表与字段的中文注释字典。
+"""演示库（Kaggle Brazilian E-Commerce / Olist）表与字段的兼容注释字典。
 
 SQLite 没有原生的表/字段注释（COMMENT），M-Schema 生成时无法从库里读到中文含义。
 这里用一份手工维护的注释字典补齐：表名 → {表注释 + 字段注释}。
+它只用于未选择平台数据源时的固定演示库和历史评测；用户接入的数据源由
+app/datasources 自动扫描、AI 生成草稿并经人工审核后入元数据表，不应扩展本字典。
 
 约定（对齐 SQLBot 的 custom_comment 语义，见 backend/apps/datasource/crud/table.py）：
 - 只对确有业务含义的字段写注释；字典里没有的字段，M-Schema 输出时省略注释部分，**不编造**。

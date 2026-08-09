@@ -1,7 +1,7 @@
 """Text-to-SQL 核心模块。
 
 - m_schema: 从 SQLite 库生成 SQLBot 风格的 M-Schema 表结构描述
-- comments_ecommerce: 演示库（Brazilian E-Commerce）表/字段中文注释字典
+- comments_ecommerce: 固定演示库兼容注释字典（用户数据源不走此处）
 
 设计与取舍见 app/text2sql/IMPLEMENTATION.md。
 """

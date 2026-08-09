@@ -6,6 +6,8 @@ from typing import AsyncIterator, Optional
 from loguru import logger
 
 from app.agents.chat_agent import ChatAgent
+from app.datasources.context import use_datasource
+from app.datasources.service import normalize_workspace_id
 from app.services.session_store import SessionStore
 
 
@@ -19,11 +21,14 @@ class ChatService:
         session_id: str,
         question: str,
         metadata_filters: Optional[dict] = None,
+        datasource_id: Optional[int] = None,
+        workspace_id: Optional[int] = None,
     ) -> dict:
         history = self.session_store.get_history(session_id)
         summary = self.session_store.get_summary(session_id)
 
-        answer = await self.agent.chat(question, history=history, summary=summary)
+        with use_datasource(datasource_id, normalize_workspace_id(workspace_id)):
+            answer = await self.agent.chat(question, history=history, summary=summary)
 
         self.session_store.add_message(session_id, "user", question)
         self.session_store.add_message(session_id, "assistant", answer)
@@ -34,18 +39,21 @@ class ChatService:
         session_id: str,
         question: str,
         metadata_filters: Optional[dict] = None,
+        datasource_id: Optional[int] = None,
+        workspace_id: Optional[int] = None,
     ) -> AsyncIterator[str]:
         history = self.session_store.get_history(session_id)
         summary = self.session_store.get_summary(session_id)
 
         collected_content: list[str] = []
-        async for chunk in self.agent.chat_stream(question, history=history, summary=summary):
-            # chat_agent yield {"type": "reasoning"|"content", "text": str}
-            text = chunk.get("text", "")
-            if text:
-                yield text  # 思考与答案都推给前端展示
-            if chunk.get("type") == "content":
-                collected_content.append(text)  # 仅最终答案入会话历史
+        with use_datasource(datasource_id, normalize_workspace_id(workspace_id)):
+            async for chunk in self.agent.chat_stream(question, history=history, summary=summary):
+                # chat_agent yield {"type": "reasoning"|"content", "text": str}
+                text = chunk.get("text", "")
+                if text:
+                    yield text  # 思考与答案都推给前端展示
+                if chunk.get("type") == "content":
+                    collected_content.append(text)  # 仅最终答案入会话历史
 
         # 只存最终答案（content），思考过程不入历史，保持与非流式 chat() 一致
         answer = "".join(collected_content)

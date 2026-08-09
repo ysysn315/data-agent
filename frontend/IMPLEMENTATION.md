@@ -10,6 +10,7 @@
 | 页面 | 说明 | 主要接口 |
 |---|---|---|
 | 智能对话 | Text-to-SQL / RAG 对话，支持流式与快速两种模式，可清空会话 | `POST /api/chat_stream`、`POST /api/chat`、`DELETE /api/chat/clear/{id}` |
+| 数据源管理 | 接入/同步数据源，生成 AI 语义草稿，逐表审核并预览正式 M-Schema | `/api/datasources*` |
 | Skills 管理 | 技能卡片列表（按来源分组），点击看详情（frontmatter + 正文），启停开关 | `GET /api/skills`、`GET /api/skills/{slug}`、`POST /api/skills/{slug}/enable\|disable` |
 | MCP 管理 | server 列表，测试连接拉工具列表，启停开关 | `GET /api/mcp/servers`、`POST /api/mcp/servers/{slug}/test\|enable\|disable` |
 | 知识库管理 | 上传文档建索引（迁移自 my-agent，接口一致） | `POST /api/upload` |
@@ -43,6 +44,7 @@ frontend/
 │   ├── styles/main.css   # 全局暗色主题，CSS 变量
 │   └── views/
 │       ├── ChatView.vue    # 对话（SSE 解析）
+│       ├── DataSourcesView.vue # 数据源接入与语义审核
 │       ├── SkillsView.vue  # Skills 管理（新增）
 │       ├── McpView.vue     # MCP 管理（新增）
 │       ├── UploadView.vue  # 知识库上传（迁移）
@@ -50,7 +52,7 @@ frontend/
 ```
 
 **页面组织**：沿用迁移源的「单页 + v-if 切换视图」方案，没有引入 vue-router。
-页面数量少（5 个），用不上路由的懒加载与地址栏同步，一个 `currentView` ref
+页面数量仍较少，用不上路由的懒加载与地址栏同步，一个 `currentView` ref
 足够，保持零额外依赖。
 
 **SSE 解析（ChatView）**：后端 `chat_stream` 以 SSE 逐块下发，每条形如
@@ -62,6 +64,15 @@ frontend/
   （迁移源按 `\n` 切且不缓冲，长回复下会偶发丢字）。
 - `content` 追加到当前 assistant 消息并滚动到底；`error` 追加错误文案；
   `done` 不需特殊处理，流结束循环自然退出。
+
+聊天顶部会读取 `/api/datasources` 展示当前工作空间数据源；请求把选中 ID 放进
+`ChatRequest.datasource_id`。切换数据源时主动清空当前会话，避免上一数据库的表名、
+字段和结果继续留在对话历史。选中值只保存在 localStorage，真正的租户归属仍由后端校验。
+
+**数据源页（DataSourcesView）**：SQLite 填允许目录内路径，PostgreSQL/MySQL 填结构化
+连接参数；密码输入框提交后立即清空。页面按 `physical/ai/reviewed` 三层元数据显示
+AI 草稿，批准时逐字段提交，拒绝时不让草稿进入正式 M-Schema。连接/同步/删除在后端
+仍由 admin 守卫，前端按钮不是权限边界。
 
 **Skills 页**：`GET /api/skills?enabled_only=false` 一次取全量（含被禁用的，
 否则默认只返回启用的、页面上无法再启用它们）。按 `source_type`（builtin/upload/
@@ -114,6 +125,8 @@ CSS 变量复刻了 Yuxi 的卡片/详情/开关交互，视觉与对话页统�
 - 打包为单 chunk（~1MB，主要是 highlight.js）,构建有体积告警但不影响使用；
   如需优化可按需引入 highlight.js 语言包或做代码分割。
 - 会话列表来自后端进程内存（SessionStore），后端重启即清空。
+- 鉴权模式尚无独立登录/密钥管理页；当前数据源管理 UI 主要面向默认 demo 模式，
+  开启 `AUTH_ENABLED` 后需由统一网关或后续前端 API Key 注入层补 Authorization header。
 
 ## 五、v2 页面（任务中心 / 知识图谱 / 知识管理）
 

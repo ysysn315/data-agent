@@ -4,9 +4,9 @@
 
 ## 当前状态
 
-本文描述 **2026-08-08 当前代码**。实现事实以代码、测试和评测原始报告为准；历史需求与差距分析仅用于解释设计过程。
+本文描述 **2026-08-09 当前代码**。实现事实以代码、测试和评测原始报告为准；历史需求与差距分析仅用于解释设计过程。
 
-- 自动化测试：`213 passed, 5 skipped`。跳过项为当前环境不可用的真实 Docker 容器与 Redis worker 集成测试。
+- 自动化测试：`233 passed, 5 skipped`。跳过项为当前环境不可用的真实 Docker 容器与 Redis worker 集成测试。
 - Text-to-SQL：28 条分层用例；仓库内 3 份可区分的模型报告，最高执行准确率为 **89.29%（25/28）**。
 - RAG：主 Chat 已接入 Milvus 稠密召回；BM25/RRF、查询改写与 BGE 重排完整组装在独立实验链路，尚未接回主 Chat。
 - 沙箱与追踪均为可选能力：技能脚本默认使用 `subprocess`，可切换 Docker；Langfuse 默认关闭。
@@ -14,7 +14,7 @@
 ## 核心能力
 
 - **Skills/MCP 插件体系**：system prompt 只披露技能名称与描述，模型按需读取正文并激活技能，之后才解锁本地门控工具或懒加载 MCP 工具。阶段测量中，提示词注入开销约由 1183 降至 150 tokens/请求。
-- **Text-to-SQL 可靠链路**：M-Schema、分层提示词、业务术语和 SQL 示例共同提供上下文；`sqlglot` AST 校验单语句、只读、表列和 LIMIT，SQLite `mode=ro` 再做引擎级兜底。
+- **Text-to-SQL 可靠链路**：支持工作空间接入 SQLite/PostgreSQL/MySQL，自动扫描物理 Schema，LLM 生成业务语义草稿，人工审核后才进入 M-Schema；`sqlglot` 按方言校验单语句、只读、表列和 LIMIT，数据库只读账号/事务再兜底。
 - **RAG 知识库**：支持 TXT/Markdown/PDF/DOCX/HTML/CSV/JSON/Excel；表格会转换为带统计摘要的语义文本，分块后写入 Milvus。独立实验链路提供 BM25+向量 RRF、查询改写/扩展和 BGE/LLM 重排。
 - **轻量知识图谱**：显式调用 LLM 抽取业务三元组，SQLite 持久化，NetworkX 提供实体邻域与关系路径查询，并通过门控技能接入 Agent。它不是 GraphRAG，也不面向大规模图计算。
 - **多步分析与异步任务**：Analysis Agent 按 Planner → Operation → Reflection 运行；ARQ 承载长任务，Redis Hash/Streams 保存状态与事件，SSE 推送进度并支持迟到订阅回放历史事件。
@@ -34,12 +34,13 @@ flowchart TB
     ANALYSIS --> CHAT
     MW --> SKILLS["5 个内置 Skills"]
     MW --> MCP["按技能懒加载 MCP 工具"]
-    MW --> SQL["Schema / 术语 / SQL 校验与执行"]
+    MW --> SQL["数据源目录 / 语义审核 / SQL 校验与执行"]
     MW --> KB["Milvus 知识库工具（可选）"]
     MW --> GRAPH["轻量知识图谱工具"]
 
     TASKS --> REDIS[("Redis Hash + Streams")]
-    SQL --> BIZDB[("只读电商 SQLite")]
+    SQL --> CATALOG[("已审核语义目录")]
+    SQL --> BIZDB[("只读 SQLite / PostgreSQL / MySQL")]
     SKILLS --> APPDB[("应用 SQLite / PostgreSQL")]
     GRAPH --> APPDB
     KB --> MILVUS[("Milvus")]
@@ -49,12 +50,13 @@ flowchart TB
 
 ```text
 中文问题
+  → 选择当前工作空间数据源
   → 披露技能名称与描述
   → read_skill 激活 schema / SQL 技能
-  → 检索 M-Schema、术语与 SQL 示例
+  → 检索自动扫描且经人工审核的 M-Schema、术语与 SQL 示例
   → LLM 生成 SQL
-  → sqlglot AST 校验与自动 LIMIT
-  → SQLite mode=ro 执行
+  → sqlglot 按数据源方言做 AST 校验与自动 LIMIT
+  → 只读连接执行
   → Agent 解释结果
 ```
 
@@ -102,6 +104,9 @@ uv sync
 # 配置 LLM：编辑 .env，至少设置 LLM_API_KEY / LLM_BASE_URL / LLM_MODEL
 cp .env.example .env
 
+# 若接 PostgreSQL/MySQL，再生成并固定 DATASOURCE_SECRET_KEY（不要提交 .env）
+.venv/bin/python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+
 # 后端
 .venv/bin/uvicorn app.main:app --reload --port 9900
 
@@ -140,6 +145,7 @@ app/
 ├── api/          # FastAPI 路由
 ├── core/         # 配置、依赖注入、鉴权、LLM、Langfuse
 ├── db/           # SQLAlchemy async 持久化
+├── datasources/  # 数据源连接器、结构快照、凭证加密、语义审核与运行时
 ├── graph/        # 三元组抽取、SQLite/NetworkX 查询
 ├── mcp/          # MCP 注册、测试、加载与缓存
 ├── rag/          # 文档解析、分块、检索、改写、重排
@@ -150,7 +156,7 @@ evals/
 ├── text2sql/     # 28 条执行准确率评测与原始报告
 └── rag/          # 检索/生成数据集、指标和历史 baseline
 frontend/         # Vue 3 前端
-tests/            # 19 个测试文件
+tests/            # 20 个测试文件
 ```
 
 ## 文档索引
@@ -161,6 +167,7 @@ tests/            # 19 个测试文件
 - [Skills 系统](app/skills/IMPLEMENTATION.md) / [Skills OpenSpec](docs/openspec/skills-system.md)
 - [MCP 系统](app/mcp/IMPLEMENTATION.md)
 - [Text-to-SQL](app/text2sql/IMPLEMENTATION.md) / [SQL 安全校验](app/agents/tools/IMPLEMENTATION-sql-guard.md)
+- [数据源与语义审核方案](docs/openspec/datasource-semantic-metadata.md)
 - [RAG 评测](evals/rag/README.md) / [评测体系](evals/IMPLEMENTATION.md)
 - [知识图谱](app/graph/IMPLEMENTATION.md)
 - [Analysis Agent](app/agents/IMPLEMENTATION-analysis.md)

@@ -46,7 +46,7 @@ _VALID_ROLES = {ROLE_ADMIN, ROLE_MEMBER}
 # "哪些口受保护、要什么级别" 全部集中在这里；路由文件只是按此挂 Depends，
 # tests/test_auth.py 会遍历 app.routes 逐口断言与本清单一致（防止漏挂/挂错）。
 # level: "login" = 需登录（admin 或 member 皆可）；"admin" = 仅 admin。
-# 读接口一律不入清单 —— 保持开放（demo 观感）。
+# 普通资源读接口保持开放；数据库连接摘要与 Schema 属于租户敏感信息，数据源读口也需登录。
 PROTECTED_ENDPOINTS: list[tuple[str, str, str]] = [
     # SQL 示例库 / 术语库：运营写口，需登录
     ("POST", "/api/sql-examples", "login"),
@@ -69,6 +69,16 @@ PROTECTED_ENDPOINTS: list[tuple[str, str, str]] = [
     ("POST", "/api/mcp/servers/{slug}/enable", "admin"),
     ("POST", "/api/mcp/servers/{slug}/disable", "admin"),
     ("POST", "/api/mcp/servers/{slug}/test", "admin"),
+    # 数据源：远程建连/同步具有网络访问面，只允许 admin；目录、AI 草稿与审核按工作空间登录隔离
+    ("POST", "/api/datasources", "admin"),
+    ("GET", "/api/datasources", "login"),
+    ("GET", "/api/datasources/{datasource_id}", "login"),
+    ("DELETE", "/api/datasources/{datasource_id}", "admin"),
+    ("POST", "/api/datasources/{datasource_id}/sync", "admin"),
+    ("POST", "/api/datasources/{datasource_id}/semantic-draft", "login"),
+    ("GET", "/api/datasources/{datasource_id}/metadata", "login"),
+    ("PUT", "/api/datasources/{datasource_id}/metadata/{table_id}/review", "login"),
+    ("GET", "/api/datasources/{datasource_id}/m-schema", "login"),
 ]
 
 

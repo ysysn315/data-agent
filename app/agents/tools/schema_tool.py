@@ -5,14 +5,16 @@ from pathlib import Path
 from langchain_core.tools import tool
 from loguru import logger
 
+from app.datasources.context import current_selection
 from app.text2sql.comments_ecommerce import ECOMMERCE_COMMENTS
 from app.text2sql.m_schema import generate_m_schema
 
 
-def create_schema_search_tool(db_path: str):
-    """创建绑定到指定 SQLite 库的 schema 检索工具。
+def create_schema_search_tool(db_path: str, datasource_runtime=None):
+    """创建 schema 检索工具。
 
-    当前实现：demo 只有 6 张表，直接**全量返回** M-Schema，无需召回。
+    请求选择平台数据源时读取其已审核目录；未选择时兼容原演示 SQLite。
+    当前实现直接全量返回 M-Schema；表多时再引入按问题召回。
     二期演进：表多时应换成 schema embedding 召回（对齐 SQLBot
     backend/apps/datasource/crud/table.py 的 save_table_embedding + 余弦相似度），
     只返回与 question 最相关的 top-N 张表，避免 token 爆炸。
@@ -28,13 +30,21 @@ def create_schema_search_tool(db_path: str):
             question: 用户的自然语言问题（当前 demo 全量返回，未据此过滤；
                       二期会用它做 embedding 召回相关表）
         """
-        if not Path(db_path).exists():
-            return f"数据库文件不存在: {db_path}（请先导入演示数据集，见 REQUIREMENTS §5）"
-
         try:
-            m_schema = generate_m_schema(db_path, comments=ECOMMERCE_COMMENTS)
+            selection = current_selection()
+            if selection is not None:
+                if datasource_runtime is None:
+                    return "当前 Agent 未配置平台数据源运行时"
+                m_schema = datasource_runtime.get_m_schema(
+                    selection.datasource_id,
+                    selection.workspace_id,
+                )
+            else:
+                if not Path(db_path).exists():
+                    return f"数据库文件不存在: {db_path}（请先导入演示数据集，见 REQUIREMENTS §5）"
+                m_schema = generate_m_schema(db_path, comments=ECOMMERCE_COMMENTS)
         except Exception as e:  # noqa: BLE001 —— 工具边界，任何异常都转成模型可读的提示
-            logger.warning(f"M-Schema 生成失败: {e} | db={db_path}")
+            logger.warning(f"M-Schema 生成失败: {e}")
             return f"读取表结构失败: {e}"
 
         if not m_schema.strip():

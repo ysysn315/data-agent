@@ -1,13 +1,13 @@
 # 持久化层实现说明（app/db）
 
-D 轮最大的一块：把此前「内存 + JSON 落盘」的存储实现换成数据库，**上层 API 不变**。
-SQLAlchemy 2.0 async，SQLite 起步、PostgreSQL 就绪。
+SQLAlchemy 2.0 async 持久化层：应用库默认 SQLite，可切 PostgreSQL。最初承接
+Skills/MCP/术语/示例，后续追加图谱、用户/工作空间和数据源语义目录。
 
 ---
 
 ## ① 功能与配置
 
-四张表，各自对应一块原本散落在内存/JSON 里的状态：
+当前表按领域分组如下：
 
 | 表 | 领域对象 | 原存储 | 说明 |
 |---|---|---|---|
@@ -15,6 +15,10 @@ SQLAlchemy 2.0 async，SQLite 起步、PostgreSQL 就绪。
 | `mcp_servers` | `app/mcp/models.MCPServer` | `save_dir/mcp_servers.json` | 字段与 MCPServer 全字段一一对应 |
 | `sql_examples` | dict | `save_dir/sql_examples.json` | question→SQL few-shot 示例库 |
 | `terminology` | dict | `save_dir/terminology.json` | 业务术语库（term 唯一键） |
+| `graph_triples` | 图谱三元组 | 内存图 | NetworkX 的持久化事实源 |
+| `workspaces` / `users` | 工作空间与 API Key 用户 | 无 | workspace-lite 与鉴权 |
+| `data_sources` | 用户数据源 | 固定 `SQLITE_DB_PATH` | 非敏感配置、加密凭证、同步状态 |
+| `data_source_tables` / `data_source_columns` | 物理结构与语义 | 演示注释字典 | 物理/AI/人工三层元数据 |
 
 **唯一配置项** `settings.database_url`（`app/core/settings.py`），默认：
 
@@ -62,6 +66,9 @@ postgresql+asyncpg://user:pwd@localhost:5432/data_agent
 - 采用 **autocommit-per-operation**（对齐 Yuxi）：每个方法自开 session、自提交，
   不把事务边界泄漏给上层。
 - **正文永远从 `dir_path/SKILL.md` 现读**（`_read_content`），数据库不存正文。
+- 数据源目录单独放在 `app/datasources/repository.py`。首次接入把数据源和完整快照放在
+  同一事务；同步在一次事务中 upsert 表列、删除消失对象并更新结构哈希；一批 AI 草稿
+  也在全部解析成功后一次提交，避免跨方法 autocommit 造成半批状态。
 
 ### JSON→DB 一次性迁移 & 种子幂等
 三个同步门面只改了 `_load` / `_save` 两个私有方法（`if self._repo: ... else: <原 JSON 逻辑>`），
@@ -115,9 +122,9 @@ CRUD/检索逻辑一行没动，所以老的 JSON 路径（测试用）行为完
   开发与 CI 都不用起数据库容器。代码用的是双通用列类型 + 纯 ORM 语句，`database_url` 一行切 PG，
   迁移成本已经前置消化。PG 的并发/MVCC 优势在当前写入量级（管理端偶发 CRUD）用不上。
 
-- **为什么不上 alembic**：起步阶段 schema 还在快速变动，`create_all` 幂等建表足够；此刻维护
-  迁移脚本的成本大于收益，还容易出现「模型改了、忘了写迁移」的漂移。二期表结构稳定、有了线上数据
-  必须无损演进时再引入 alembic（那时正好用它的 autogenerate 对着现有模型补第一版基线）。
+- **为什么当前还没上 alembic**：起步阶段 schema 还在快速变动，`create_all` 幂等建表足够；此刻维护
+  迁移脚本的成本大于收益。现在数据源目录已包含用户审核资产，部署到持久环境前必须引入 Alembic；
+  `create_all` 只会创建新表，不会替已有表加列，不能作为线上升级机制。
 
 - **为什么内置技能不入库**：内置技能是随代码发布的资产（`app/skills/buildin/` 下的目录），
   版本即代码版本，天然由 Git 管理。让它们入库反而要处理「代码更新了、库里是旧版」的同步问题。
