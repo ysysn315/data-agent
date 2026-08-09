@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from langchain_core.tools import tool
 
+from app.datasources.context import current_selection
 from app.text2sql.examples import ExampleStore
 from app.text2sql.terminology import TermStore
 
@@ -27,6 +28,14 @@ def create_sql_context_tool(example_store: ExampleStore, term_store: TermStore):
         参数:
             question: 用户的自然语言问题
         """
+        if current_selection() is not None:
+            # 现有术语/示例表尚未带 datasource_id/workspace_id。平台数据源请求必须
+            # 禁用这份全局兼容数据，避免把演示库或其它数据源的口径/SQL 串入当前租户。
+            return (
+                "当前平台数据源未配置数据源级术语和历史 SQL 示例；"
+                "请只依据 schema_search 返回的已审核 M-Schema 生成 SQL。"
+            )
+
         term_hits = term_store.match(question)
         examples = example_store.search(question, top_k=3)
 

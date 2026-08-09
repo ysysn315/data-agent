@@ -10,6 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.agents.tools.sql_context_tool import create_sql_context_tool
+from app.datasources.context import use_datasource
 from app.text2sql.examples import SEED_EXAMPLES, ExampleStore
 from app.text2sql.terminology import TermStore
 
@@ -115,6 +116,18 @@ def test_sql_context_tool_empty(tmp_path):
     tool = create_sql_context_tool(ex, tm)
     out = tool.invoke({"question": "xyzzy 无关问题"})
     assert "未命中" in out
+
+
+def test_platform_datasource_does_not_receive_global_sql_context(tmp_path):
+    ex = ExampleStore(tmp_path / "e.json")
+    tm = TermStore(tmp_path / "t.json")
+    tool = create_sql_context_tool(ex, tm)
+
+    with use_datasource(12, 34):
+        out = tool.invoke({"question": "各州的复购率是多少"})
+
+    assert "未配置数据源级术语" in out
+    assert "customer_state" not in out
 
 
 # ========== SKILL.md 依赖展开 ==========

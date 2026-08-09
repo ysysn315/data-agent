@@ -4,7 +4,7 @@
 # ChatResponse: answer (str), sources (list, 可选)
 from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class MetadataFilters(BaseModel):
@@ -28,6 +28,7 @@ class ChatRequest(BaseModel):
     Id: str
     Question: str
     metadata_filters: Optional[MetadataFilters] = None
+    datasource_id: Optional[int] = Field(default=None, ge=1)
 
 
 class ChatResponse(BaseModel):

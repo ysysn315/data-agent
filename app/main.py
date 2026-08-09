@@ -6,6 +6,7 @@ from app.api import (
     routes_analysis,  # E 轮：分析 Agent（P-O-R）
     routes_auth,  # F 轮：用户体系 + API Key 鉴权
     routes_chat,
+    routes_datasources,
     routes_graph,
     routes_knowledge,
     routes_mcp,
@@ -66,3 +67,4 @@ app.include_router(routes_knowledge.router, prefix="/api")
 app.include_router(routes_tasks.router, prefix="/api")
 app.include_router(routes_analysis.router, prefix="/api")
 app.include_router(routes_auth.router, prefix="/api")  # F 轮：用户体系 + API Key 鉴权
+app.include_router(routes_datasources.router, prefix="/api")

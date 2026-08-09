@@ -90,7 +90,61 @@ _mcp_service = None
 _chat_agent = None
 _example_store = None
 _term_store = None
+_datasource_service = None
+_datasource_runtime = None
+_datasource_connectors = None
 _init_lock = asyncio.Lock()
+
+
+def _get_datasource_connectors():
+    global _datasource_connectors
+    if _datasource_connectors is None:
+        from app.datasources.connectors import ConnectorRegistry
+
+        _datasource_connectors = ConnectorRegistry()
+    return _datasource_connectors
+
+
+def get_datasource_service():
+    """数据源管理单例；LLM 仅在生成语义草稿时惰性创建。"""
+    global _datasource_service
+    if _datasource_service is None:
+        from app.core.llm import LLMFactory
+        from app.datasources.repository import DataSourceRepository
+        from app.datasources.security import CredentialCipher
+        from app.datasources.service import DataSourceService
+        from app.db import ensure_initialized, get_sessionmaker
+
+        ensure_initialized()
+        _datasource_service = DataSourceService(
+            repository=DataSourceRepository(get_sessionmaker()),
+            cipher=CredentialCipher(settings.datasource_secret_key),
+            connectors=_get_datasource_connectors(),
+            sqlite_root=settings.datasource_sqlite_root,
+            allowed_hosts=settings.datasource_allowed_hosts,
+            remote_enabled=settings.auth_enabled and settings.datasource_remote_enabled,
+            llm_provider=LLMFactory.create_llm,
+        )
+    return _datasource_service
+
+
+def get_datasource_runtime():
+    """Agent 工具使用的同步数据源运行时。"""
+    global _datasource_runtime
+    if _datasource_runtime is None:
+        from app.datasources.repository import DataSourceRepository
+        from app.datasources.runtime import DataSourceRuntime
+        from app.datasources.security import CredentialCipher
+        from app.db import ensure_initialized, get_sessionmaker, run_sync
+
+        ensure_initialized()
+        _datasource_runtime = DataSourceRuntime(
+            repository=DataSourceRepository(get_sessionmaker()),
+            cipher=CredentialCipher(settings.datasource_secret_key),
+            connectors=_get_datasource_connectors(),
+            runner=run_sync,
+        )
+    return _datasource_runtime
 
 
 def get_example_store():
@@ -221,8 +275,8 @@ async def get_chat_agent():
 
         # 技能声明的门控工具：构建期注册，read_skill 激活后才对模型可见
         gated_tools = [
-            create_execute_sql_tool(settings.sqlite_db_path),
-            create_schema_search_tool(settings.sqlite_db_path),
+            create_execute_sql_tool(settings.sqlite_db_path, datasource_runtime=get_datasource_runtime()),
+            create_schema_search_tool(settings.sqlite_db_path, datasource_runtime=get_datasource_runtime()),
             create_sql_context_tool(get_example_store(), get_term_store()),
             create_graph_search_tool(get_graph_service()),
         ]
@@ -248,12 +302,16 @@ def reset_singletons() -> None:
     只清业务单例引用；持久化 engine/后台循环是进程级、守护线程常驻，
     NullPool 无常驻连接，不随单例重置销毁（如需换库调 app.db.reset_engine）。
     """
-    global _skill_service, _mcp_service, _chat_agent, _example_store, _term_store, _task_service, _graph_service
+    global _skill_service, _mcp_service, _chat_agent, _example_store, _term_store
+    global _task_service, _graph_service, _datasource_service, _datasource_runtime, _datasource_connectors
     _skill_service = None
     _mcp_service = None
     _chat_agent = None
     _example_store = None
     _term_store = None
+    _datasource_service = None
+    _datasource_runtime = None
+    _datasource_connectors = None
     _task_service = None
     _graph_service = None
 

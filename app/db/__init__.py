@@ -4,7 +4,7 @@ D 轮落地：把此前「内存 + JSON 落盘」的存储实现换成数据库�
 SQLite 起步、PostgreSQL 就绪（只改 settings.database_url 一行）。
 
 模块划分：
-- models.py：Declarative 五张表（skills / mcp_servers / sql_examples / terminology）
+- models.py：应用、图谱、用户/工作空间与数据源语义目录的 Declarative 表
 - engine.py：async engine / session 单例、建表、sync→async 桥接
 - repositories.py：async 数据访问层（技能仓储对齐 InMemorySkillRepository 契约）
 

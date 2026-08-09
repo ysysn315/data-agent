@@ -61,6 +61,9 @@
       <div v-if="currentView === 'graph'" class="view-container">
         <GraphView />
       </div>
+      <div v-if="currentView === 'datasources'" class="view-container">
+        <DataSourcesView />
+      </div>
       <div v-if="currentView === 'knowledge'" class="view-container">
         <KnowledgeView />
       </div>
@@ -79,6 +82,7 @@ import SkillsView from './views/SkillsView.vue'
 import McpView from './views/McpView.vue'
 import UploadView from './views/UploadView.vue'
 import GraphView from './views/GraphView.vue'
+import DataSourcesView from './views/DataSourcesView.vue'
 import KnowledgeView from './views/KnowledgeView.vue'
 import StatusView from './views/StatusView.vue'
 
@@ -97,6 +101,7 @@ const navGroups = [
   {
     label: '平台管理',
     items: [
+      { id: 'datasources', name: '数据源管理' },
       { id: 'graph', name: '知识图谱' },
       { id: 'knowledge', name: '知识管理' },
       { id: 'skills', name: 'Skills 技能' },
@@ -112,6 +117,7 @@ const icons = {
   tasks: `<svg viewBox="0 0 20 20" fill="none"><path d="M3.5 5.6l1.5 1.5L7.8 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.5 11.4l1.5 1.5L7.8 9.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 6h5.5M11 12h5.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`,
   upload: `<svg viewBox="0 0 20 20" fill="none"><ellipse cx="10" cy="4.5" rx="6.5" ry="2.5" stroke="currentColor" stroke-width="1.6"/><path d="M3.5 4.5v11c0 1.4 2.9 2.5 6.5 2.5s6.5-1.1 6.5-2.5v-11" stroke="currentColor" stroke-width="1.6"/><path d="M3.5 10c0 1.4 2.9 2.5 6.5 2.5s6.5-1.1 6.5-2.5" stroke="currentColor" stroke-width="1.6"/></svg>`,
   graph: `<svg viewBox="0 0 20 20" fill="none"><circle cx="5" cy="6" r="2.1" stroke="currentColor" stroke-width="1.6"/><circle cx="15" cy="5" r="2.1" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="15" r="2.1" stroke="currentColor" stroke-width="1.6"/><path d="M7 6.4l5.8-.9M6.6 7.7l4.6 5.5M13.7 7l-1.4 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`,
+  datasources: `<svg viewBox="0 0 20 20" fill="none"><ellipse cx="10" cy="4" rx="6" ry="2.3" stroke="currentColor" stroke-width="1.6"/><path d="M4 4v8c0 1.3 2.7 2.3 6 2.3 1.2 0 2.3-.1 3.2-.4M4 8c0 1.3 2.7 2.3 6 2.3 3.3 0 6-1 6-2.3V4" stroke="currentColor" stroke-width="1.6"/><path d="M15.5 13v4M13.5 15h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`,
   knowledge: `<svg viewBox="0 0 20 20" fill="none"><path d="M10 5.6C8.5 4.4 6.4 4.1 4 4.4v10c2.4-.3 4.5 0 6 1.2 1.5-1.2 3.6-1.5 6-1.2v-10c-2.4-.3-4.5 0-6 1.2Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 5.6v10" stroke="currentColor" stroke-width="1.6"/></svg>`,
   skills: `<svg viewBox="0 0 20 20" fill="none"><path d="M10 2.5l1.8 3.6 4 .6-2.9 2.8.7 4-3.6-1.9-3.6 1.9.7-4L4.2 6.7l4-.6L10 2.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M16.5 14.5l.6 1.2 1.4.2-1 1 .2 1.3-1.2-.6-1.2.6.2-1.3-1-1 1.4-.2.6-1.2Z" fill="currentColor"/></svg>`,
   mcp: `<svg viewBox="0 0 20 20" fill="none"><path d="M7 3v4M13 3v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M5 7h10v3a5 5 0 0 1-4 4.9V17h-2v-2.1A5 5 0 0 1 5 10V7Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>`,

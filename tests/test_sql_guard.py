@@ -214,3 +214,33 @@ def test_select_alias_in_order_by_not_false_positive(sql_guard_db):
     )
     assert result.ok, result.error
     assert "LIMIT 1000" in result.fixed_sql
+
+
+@pytest.mark.parametrize(
+    ("dialect", "sql", "keyword"),
+    [
+        ("sqlite", "SELECT load_extension('/tmp/x')", "load_extension"),
+        ("postgres", "SELECT pg_read_file('/etc/passwd')", "pg_read_file"),
+        ("mysql", "SELECT LOAD_FILE('/etc/passwd')", "load_file"),
+        ("mysql", "SELECT SLEEP(30)", "sleep"),
+    ],
+)
+def test_dangerous_read_functions_are_rejected(dialect, sql, keyword):
+    result = validate_sql(sql, dialect=dialect)
+    assert result.ok is False
+    assert keyword in result.error
+
+
+def test_select_for_update_is_rejected():
+    result = validate_sql("SELECT order_id FROM orders FOR UPDATE", dialect="postgres")
+    assert result.ok is False
+    assert "锁语句" in result.error
+
+
+def test_writable_cte_is_rejected():
+    result = validate_sql(
+        "WITH removed AS (DELETE FROM orders RETURNING order_id) SELECT * FROM removed",
+        dialect="postgres",
+    )
+    assert result.ok is False
+    assert "DELETE" in result.error

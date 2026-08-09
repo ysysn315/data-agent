@@ -85,9 +85,9 @@ get_admin_user             ──(管理员守卫：role!=admin→403)
 
 | 级别 | 端点 |
 |---|---|
-| login | sql-examples / terminology 写口；skills 增删改、远程安装 |
-| admin | skills 启停；MCP 全部写口 + 连接测试 |
-| 开放 | 一切 GET 读口（demo 观感） |
+| login | sql-examples / terminology 写口；skills 增删改、远程安装；数据源目录、AI 草稿与审核 |
+| admin | skills 启停；MCP 全部写口 + 连接测试；数据源接入、同步和删除 |
+| 开放 | 普通 Skills/MCP/知识管理读口；数据源连接摘要与 Schema 例外，必须登录 |
 
 `tests/test_auth.py` 既对清单做矩阵化行为断言（逐口 no-key→401 / member 对 admin 口→403 /
 登录口放行），又用 OpenAPI schema 校验清单里每个端点都真实注册，防止清单与路由漂移。
@@ -95,6 +95,8 @@ get_admin_user             ──(管理员守卫：role!=admin→403)
 **工作空间隔离（lite）**：技能上传/远程安装时把 `workspace_id` 写进 `skills.share_config`
 JSON（复用既有列，零迁移；`share_config` 本就是"可见范围"语义的载体）。`list_skills` 在
 `auth_enabled=True` 且非 admin 时过滤为「本 workspace + 内置」；admin 全见；demo 完全不过滤。
+数据源则把 `workspace_id` 作为 `data_sources` 的独立列，所有详情、结构、审核和运行时查询都按
+`(datasource_id, workspace_id)` 回读；即使模型生成其它 ID，也无法通过工具参数切换（ID 不对模型暴露）。
 
 ---
 
@@ -128,14 +130,17 @@ JSON（复用既有列，零迁移；`share_config` 本就是"可见范围"语�
   真要多租户 SSO 再上 OIDC，接口分层（get_current_user/admin）已为其预留。
 - **为什么不引 passlib**：passlib 是给**用户口令**做慢哈希（bcrypt/argon2，故意加盐加轮次抗离线爆破）。
   我们的 Key 是 128bit 高熵随机串，不存在字典/爆破面，sha256 足够且更快——引 passlib 是错配。
-- **为什么默认关**：`auth_enabled=False` 保证 demo / 简历演示 / 现有 190+ 测试**零改动**跑通，
+- **为什么默认关**：`auth_enabled=False` 保证 demo / 简历演示 / 现有全量测试无鉴权前置负担，
   开发者本地不必先建用户才能点接口。鉴权是"生产开关"而非"默认负担"，通过依赖链设计让开/关只切一处。
-- **为什么读开放、写保护**：读接口（技能列表、术语、MCP 列表）是 demo 观感的主体，开放它们让
-  未登录也能浏览；写接口才改状态、才需归属与审计，故只在写口设闸。这也把鉴权的攻击面收敛到少数几个口。
+- **为什么大多数读开放、数据源读口例外**：技能列表、术语、MCP 列表是 demo 观感主体，可开放浏览；
+  数据库主机摘要、表列结构和业务语义本身属于租户敏感资产，因此数据源 GET 也必须登录并做工作空间过滤。
 - **为什么 MCP 全写口 + 连接测试要 admin**：`transport=stdio` 的 `command/args` 等价于在服务器上
   执行任意命令，MCP 配置面本质是命令执行面（见 `app/mcp/IMPLEMENTATION.md` §4）。Yuxi 同样无
   SSRF/命令白名单、靠 admin-only 兜底——这条边界代码层不自作主张放开，故 MCP 写口与 `/test`
   （会真正拉起命令/连接）一律升到 admin；技能启停决定"哪些技能对模型可见"，同属高权，也归 admin。
+- **为什么数据源接入/同步要 admin**：远程建连有 SSRF 与内网探测面，SQLite 路径也涉及宿主机读取。
+  因此 API 不接收任意 URL、SQLite 限根目录、远程主机可配白名单，且真正连接的三个接口只允许 admin；
+  远程连接还默认关闭，必须同时开启鉴权与 `DATASOURCE_REMOTE_ENABLED`；普通 member 只负责同工作空间内的业务语义审核。
 - **lite 的边界（留给后续轮次）**：一个用户一把 Key（无轮换/过期）、一个用户一个工作空间（无跨空间共享、
-  无部门树）、workspace 隔离只落在 skills（数据源行列级权限是 G 轮 `feat/row-col-permission` 的事）。
+  无部门树）、workspace 隔离已覆盖 skills 与数据源目录，但数据库行列级权限仍依赖只读账号和数据库授权。
   这些都是"接口已分层、扩展只加列/加表"的增量，不是重构。

@@ -5,7 +5,7 @@ sqlbot-reference/backend/apps/datasource/crud/table.py:72-93、
 templates/template.yaml 中 <m-schema> 的说明）。相比原始 DDL，它更紧凑、
 把中文注释直接贴在字段旁，利于模型对齐"字段含义 → SQL 标识符"。
 
-本模块从 SQLite 库读取真实结构（PRAGMA table_info），再用注释字典
+本模块是固定演示 SQLite 的兼容生成器：从库读取真实结构（PRAGMA table_info），再用注释字典
 （comments_ecommerce.ECOMMERCE_COMMENTS 或调用方传入）补齐中文含义，
 输出如下格式：
 
@@ -16,6 +16,8 @@ templates/template.yaml 中 <m-schema> 的说明）。相比原始 DDL，它更�
 - 表/字段无注释时，省略 ", 注释" 部分，**绝不编造**（对齐 SQLBot custom_comment 为空即不输出）。
 - 类型取 SQLite 声明类型（PRAGMA 的 type 列）；SQLite 时间列通常声明为 TEXT。
 - 多张表之间以空行分隔。
+
+用户接入的数据源改由 app/datasources/m_schema.py 基于已审核元数据渲染。
 
 与 SQLBot 的差异：SQLBot 每个字段单独一行（多行 M-Schema），这里压成单行
 `[(...), (...)]` 更省 token，语义等价；demo 表字段少，可读性无损。

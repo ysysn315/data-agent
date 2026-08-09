@@ -1,6 +1,6 @@
 # SQL 校验层实现说明（sql_guard）
 
-roadmap P1-1。在 `execute_sql` 真正把 SQL 交给 SQLite 之前，用 sqlglot 把语句解析成
+在 `execute_sql` 把 SQL 交给当前 SQLite/PostgreSQL/MySQL 数据源之前，用 sqlglot 按连接器方言解析
 AST 做一遍语法 / 只读 / 表列存在性校验，并在缺 LIMIT 时自动补齐。核心文件：
 
 - `app/agents/tools/sql_guard.py` —— 纯函数 `validate_sql`，不依赖数据库连接
@@ -18,6 +18,7 @@ r = validate_sql(
     "SELECT price FROM orders",
     schema={"orders": ["order_id", "customer_state", "price"]},
     default_limit=1000,
+    dialect="sqlite",  # 平台数据源运行时传 postgres / mysql
 )
 # r.ok == True
 # r.fixed_sql == "SELECT price FROM orders LIMIT 1000"   # 自动补了 LIMIT
@@ -47,7 +48,7 @@ r = validate_sql(
 
 ### AST 解析与只读判断
 
-`sqlglot.parse(sql, dialect="sqlite")` 把文本解析成语句列表。据此：
+`sqlglot.parse(sql, dialect=dialect)` 把文本解析成语句列表。据此：
 
 - **单语句约束**：`parse` 会把分号分隔的多条语句拆成多个元素，`len > 1` 直接拒。
 - **只读约束**：判断**最外层节点类型**，只放行 `(exp.Select, exp.Union)`。这是「AST 层
@@ -84,7 +85,7 @@ tables = {t.name for t in root.find_all(exp.Table) if t.name and t.name not in c
 ```python
 if root.args.get("limit") is None:  # 最外层没有 LIMIT
     root = root.limit(default_limit)  # AST 层挂上 LIMIT 节点
-fixed_sql = root.sql(dialect="sqlite")  # 由 AST 回写文本
+fixed_sql = root.sql(dialect=dialect)  # 按当前数据源方言回写文本
 ```
 
 判断和改写都在 AST 上做：`root.args["limit"]` 直接看最外层查询有没有 LIMIT 节点
@@ -119,13 +120,12 @@ CTE 别名排除。本实现从一开始就按修复后的写法规避了这个�
   上下文。返回「表 orders 不存在列 bad，可用列：…」这类带候选的中文报错，模型能据此改写
   SQL 自纠；抛异常会中断 Agent 循环，白白丢掉自纠机会。SQLBot 在服务端流程里是 `raise
   SingleMessageError`（面向后端异常处理），场景不同。
-- **保留引擎级只读（mode=ro）双保险**：`validate_sql` 是「逻辑校验」，仍可能有 sqlglot 未
-  覆盖的边角（新语法、方言差异）。`sqlite URI mode=ro` 是「物理兜底」，任何漏网写操作在
-  引擎层直接失败。再加上最前面的 `_is_select_only` 关键词快筛，构成三层防护，任何一层都
-  不单独可信。
-- **schema 现取不缓存**：演示库可能刚被导入 / 替换，缓存会读到过期结构造成误报；而单库
-  `sqlite_master + PRAGMA table_info` 开销极小。简单、不易错，优先于微优化。
+- **保留数据库级只读双保险**：`validate_sql` 是逻辑校验，仍可能有新语法与方言边角。
+  演示/平台 SQLite 使用 URI `mode=ro`；PostgreSQL 事务设置 `READ ONLY`；MySQL 还要求
+  部署方提供只读账号。再加 `_is_select_only` 快筛，任何单层都不被视为绝对安全。
+- **schema 来源分两条**：平台数据源使用最近一次同步且按工作空间隔离的目录快照；未选择平台
+  数据源时，演示库继续现取 `sqlite_master + PRAGMA table_info`，避免固定评测库替换后读到旧缓存。
 - **列校验偏保守**：多表 / 子查询 / CTE 等无法唯一确定列归属的场景一律跳过，宁可漏报不
   误报 —— 误报会把合法 SQL 拦下、误导模型反复重写，代价高于漏报（漏报由引擎兜底）。
-- **允许查 sqlite_master**：`execute_sql` 在 schema 里显式放行 `sqlite_master`，让模型能
-  查表结构（文档承诺的用法），否则会被当未知表拦下。
+- **仅 SQLite 兼容放行 sqlite_master**：平台查询应优先调用 `schema_search`；为了兼容旧演示
+  技能，SQLite schema 仍显式放行 `sqlite_master`，PostgreSQL/MySQL 不做同类私有表放行。

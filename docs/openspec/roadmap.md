@@ -4,7 +4,7 @@
 > 宁可少而深，不做只能演示不能追问的功能。
 > 参考项目功能全景对照见 REQUIREMENTS.md §10。
 >
-> 状态口径：本页顶部能力盘点按 2026-08-08 当前代码维护；P0/P1 与 D/E/F 轮次保留为开发历史。
+> 状态口径：本页顶部能力盘点按 2026-08-09 当前代码维护；P0/P1 与 D/E/F 轮次保留为开发历史。
 
 ## 0. 现状（已完成 ✅）
 
@@ -16,18 +16,19 @@
 | MCP：注册表/工具加载/技能联动 | Yuxi | ✅ |
 | 工具熔断/重试/降级（ToolRuntimeMiddleware） | my-agent 保留 | ✅ |
 | RAG 知识库与实验链路 | my-agent 保留 | ⚠️ 主 Chat 已接稠密召回；混合检索/改写/重排仍在独立实验链路 |
-| 只读 SQL 执行（execute_sql，引擎级只读） | SQLBot 思路 | ✅（demo 级）|
-| pytest 测试体系（19 个文件） | — | ✅ 213 passed，5 skipped（外部集成） |
+| 数据源接入 + 自动 Schema 扫描 + AI 语义草稿/人工审核 | SQLBot 思路 + 自研闭环 | ✅ SQLite/PG/MySQL；真实远端 smoke 待环境 |
+| 只读 SQL 执行（execute_sql，按方言 AST + 数据库只读） | SQLBot 思路 | ✅ |
+| pytest 测试体系（20 个文件） | — | ✅ 233 passed，5 skipped（外部集成） |
 | Text-to-SQL 执行准确率评估（28 例）+ 模型对比 | my-agent 思路扩展 | ✅ 3 份可区分报告，最高 89.29%（25/28） |
 | Langfuse 调用链追踪（默认关闭） | Yuxi | ✅ |
-| 持久化层（四表入库，内容存 FS/索引存 DB） | Yuxi | ✅（D 轮）|
+| 持久化层（应用状态、图谱、用户与数据源语义目录） | Yuxi | ✅（D 轮起，持续扩展）|
 | 异步执行（ARQ + Redis Streams + SSE） | Yuxi | ✅（D 轮）|
 | 技能语义匹配（embedding + jieba 回退） | 自研增量 | ✅（D 轮）|
 | Analysis Agent（P-O-R 工作流 + Markdown 报告） | my-agent | ✅（E 轮）|
 | 技能脚本容器沙箱（Docker 一次性容器） | Yuxi | ✅ 可切换；默认 subprocess，真机记录见实现文档 |
 | 知识图谱（三元组抽取 + graph_search 技能） | Yuxi | ✅（E 轮）|
 | 用户体系 + API Key 鉴权 + workspace-lite（默认关闭） | Yuxi/SQLBot | ✅（F 轮，非全资源租户隔离）|
-| 前端 v2：任务中心 SSE / 图谱 SVG 可视化 / 知识管理 | — | ✅（F 轮）|
+| 前端 v2：任务中心 / 图谱 / 知识管理 / 数据源语义审核 | — | ✅ |
 
 ## 1. P0 —— demo 跑通闭环（已完成，保留历史计划）
 

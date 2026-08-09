@@ -3,9 +3,13 @@
     <!-- 顶部工具条：会话信息 + 清空 -->
     <div class="chat-toolbar">
       <span class="session-label">会话：{{ sessionId }}</span>
-      <button class="btn btn-secondary small" @click="clearSession" :disabled="isLoading">
-        清空会话
-      </button>
+      <div class="toolbar-right">
+        <select v-model="selectedDatasource" class="datasource-select" @change="changeDatasource" :disabled="isLoading">
+          <option value="">演示数据源</option>
+          <option v-for="source in datasources" :key="source.id" :value="String(source.id)">{{ source.name }}</option>
+        </select>
+        <button class="btn btn-secondary small" @click="clearSession" :disabled="isLoading">清空会话</button>
+      </div>
     </div>
 
     <!-- 对话历史 -->
@@ -105,7 +109,7 @@
 </template>
 
 <script setup>
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, onMounted } from 'vue'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 
@@ -131,11 +135,19 @@ const inputText = ref('')
 const chatMode = ref('stream')
 const isLoading = ref(false)
 const messagesContainer = ref(null)
+const datasources = ref([])
+const selectedDatasource = ref(localStorage.getItem('data-agent:selected-datasource') || '')
 
 // 单页会话 ID，对应后端 ChatRequest.Id
 const sessionId = 'session-' + Date.now()
 
 const renderMarkdown = (text) => marked.parse(text || '')
+
+const requestBody = (question) => ({
+  Id: sessionId,
+  Question: question,
+  datasource_id: selectedDatasource.value ? Number(selectedDatasource.value) : null,
+})
 
 const scrollToBottom = () => {
   nextTick(() => {
@@ -152,7 +164,7 @@ const streamChat = async (question, assistantMessage) => {
   const response = await fetch('/api/chat_stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ Id: sessionId, Question: question })
+    body: JSON.stringify(requestBody(question))
   })
 
   const reader = response.body.getReader()
@@ -193,7 +205,7 @@ const quickChat = async (question, assistantMessage) => {
   const response = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ Id: sessionId, Question: question })
+    body: JSON.stringify(requestBody(question))
   })
   const data = await response.json()
   assistantMessage.content = data.answer || ''
@@ -234,6 +246,24 @@ const clearSession = async () => {
   }
   messages.value = []
 }
+
+const changeDatasource = async () => {
+  if (selectedDatasource.value) localStorage.setItem('data-agent:selected-datasource', selectedDatasource.value)
+  else localStorage.removeItem('data-agent:selected-datasource')
+  await clearSession()
+}
+
+onMounted(async () => {
+  try {
+    const response = await fetch('/api/datasources')
+    if (!response.ok) return
+    datasources.value = await response.json()
+    if (selectedDatasource.value && !datasources.value.some((source) => String(source.id) === selectedDatasource.value)) {
+      selectedDatasource.value = ''
+      localStorage.removeItem('data-agent:selected-datasource')
+    }
+  } catch (e) { /* 数据源列表失败时仍可使用演示库 */ }
+})
 </script>
 
 <style scoped>
@@ -247,6 +277,8 @@ const clearSession = async () => {
   background: color-mix(in srgb, var(--bg-surface) 70%, transparent);
   backdrop-filter: blur(8px);
 }
+.toolbar-right { display: flex; align-items: center; gap: 8px; }
+.datasource-select { max-width: 220px; padding: 5px 9px; font-size: 12px; }
 
 /* 消息区 */
 .chat-messages {
