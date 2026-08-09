@@ -107,9 +107,7 @@ class DataSourceService:
             return ConnectionSpec(kind=kind, config=config), config, None
 
         if not self._remote_enabled:
-            raise DataSourceConfigError(
-                "远程数据源需同时启用 AUTH_ENABLED=true 和 DATASOURCE_REMOTE_ENABLED=true"
-            )
+            raise DataSourceConfigError("远程数据源需同时启用 AUTH_ENABLED=true 和 DATASOURCE_REMOTE_ENABLED=true")
 
         host = str(payload.get("host") or "").strip()
         database = str(payload.get("database") or "").strip()
@@ -243,8 +241,7 @@ class DataSourceService:
                     "primary_key": column.get("primary_key"),
                     "native_comment": _clean_text(column.get("physical_comment"), 1000),
                     "references": {
-                        str(key): _clean_text(value, 256)
-                        for key, value in (column.get("references") or {}).items()
+                        str(key): _clean_text(value, 256) for key, value in (column.get("references") or {}).items()
                     },
                 }
                 for column in columns
@@ -253,8 +250,7 @@ class DataSourceService:
         prompt = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
         if len(prompt) > MAX_DRAFT_PROMPT_CHARS:
             raise SemanticDraftError(
-                f"表 {table.get('table_name')} 的结构描述过大，超过单次 AI 草稿上限 "
-                f"{MAX_DRAFT_PROMPT_CHARS} 字符"
+                f"表 {table.get('table_name')} 的结构描述过大，超过单次 AI 草稿上限 {MAX_DRAFT_PROMPT_CHARS} 字符"
             )
         return prompt
 
@@ -300,9 +296,7 @@ class DataSourceService:
                 raise SemanticDraftError(f"字段 {name} 的 synonyms 必须是数组")
             synonyms = tuple(
                 dict.fromkeys(
-                    value
-                    for value in (_clean_text(raw, 64) for raw in raw_synonyms[:5])
-                    if value and value != name
+                    value for value in (_clean_text(raw, 64) for raw in raw_synonyms[:5]) if value and value != name
                 )
             )
             columns.append(
@@ -330,19 +324,13 @@ class DataSourceService:
         selected_ids = None if table_ids is None else set(table_ids)
         if selected_ids == set():
             raise SemanticDraftError("table_ids 不能为空数组；省略该字段表示全部表")
-        tables = [
-            table
-            for table in catalog["tables"]
-            if selected_ids is None or int(table["id"]) in selected_ids
-        ]
+        tables = [table for table in catalog["tables"] if selected_ids is None or int(table["id"]) in selected_ids]
         if selected_ids is not None and selected_ids - {int(table["id"]) for table in tables}:
             raise DataSourceNotFoundError("请求包含不存在的数据表")
         if not tables:
             raise SemanticDraftError("没有可生成语义草稿的数据表")
         if len(tables) > MAX_DRAFT_TABLES:
-            raise SemanticDraftError(
-                f"单次最多生成 {MAX_DRAFT_TABLES} 张表，请通过 table_ids 分批提交"
-            )
+            raise SemanticDraftError(f"单次最多生成 {MAX_DRAFT_TABLES} 张表，请通过 table_ids 分批提交")
 
         llm = self._llm_provider()
         drafts: list[TableDraft] = []
@@ -384,9 +372,7 @@ class DataSourceService:
         cleaned_columns = [
             {
                 "name": str(column.get("name") or ""),
-                "comment": _clean_text(column.get("comment"), 1000)
-                if column.get("comment") is not None
-                else None,
+                "comment": _clean_text(column.get("comment"), 1000) if column.get("comment") is not None else None,
                 "synonyms": list(
                     dict.fromkeys(
                         value

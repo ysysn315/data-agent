@@ -104,6 +104,7 @@ class TerminologyModel(Base):
 
 # ========== 知识图谱（E 轮追加；本段 import 就近声明，不改动文件头部） ==========
 
+
 class GraphTripleModel(Base):
     """graph_triples 表：知识图谱三元组（轻量版图谱的唯一持久化层）。
 
@@ -200,9 +201,7 @@ class DataSourceTableModel(Base):
     """数据源中的表/视图及三层注释：物理注释、AI 草稿、人工审核结果。"""
 
     __tablename__ = "data_source_tables"
-    __table_args__ = (
-        UniqueConstraint("datasource_id", "schema_name", "table_name", name="uq_datasource_table_name"),
-    )
+    __table_args__ = (UniqueConstraint("datasource_id", "schema_name", "table_name", name="uq_datasource_table_name"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     datasource_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)

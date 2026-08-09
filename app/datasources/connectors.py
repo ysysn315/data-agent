@@ -69,9 +69,7 @@ class SQLiteConnector:
                     column_rows = conn.execute(f"PRAGMA table_info({quoted})").fetchall()
                     fk_rows = conn.execute(f"PRAGMA foreign_key_list({quoted})").fetchall()
                     references = {
-                        row[3]: {"table": row[2], "column": row[4]}
-                        for row in fk_rows
-                        if row[3] and row[2] and row[4]
+                        row[3]: {"table": row[2], "column": row[4]} for row in fk_rows if row[3] and row[2] and row[4]
                     }
                     columns = tuple(
                         ColumnSnapshot(
@@ -204,9 +202,7 @@ class SQLAlchemyConnector:
                 for table_name, table_type in sorted(table_names):
                     raw_columns = inspector.get_columns(table_name, schema=schema_name)
                     pk_columns = set(
-                        (inspector.get_pk_constraint(table_name, schema=schema_name) or {}).get(
-                            "constrained_columns"
-                        )
+                        (inspector.get_pk_constraint(table_name, schema=schema_name) or {}).get("constrained_columns")
                         or []
                     )
                     fk_by_column: dict[str, dict[str, str]] = {}

@@ -165,9 +165,7 @@ class DataSourceRepository:
     async def list_sources(self, workspace_id: int) -> list[dict]:
         async with self._sm() as session:
             stmt = (
-                select(DataSourceModel)
-                .where(DataSourceModel.workspace_id == workspace_id)
-                .order_by(DataSourceModel.id)
+                select(DataSourceModel).where(DataSourceModel.workspace_id == workspace_id).order_by(DataSourceModel.id)
             )
             rows = (await session.execute(stmt)).scalars().all()
             return [self._source_to_public(row) for row in rows]

@@ -26,9 +26,7 @@ class CredentialCipher:
 
     def _fernet(self) -> Fernet:
         if not self._key:
-            raise DataSourceConfigError(
-                "远程数据源需要配置 DATASOURCE_SECRET_KEY（Fernet key），不允许明文保存凭证"
-            )
+            raise DataSourceConfigError("远程数据源需要配置 DATASOURCE_SECRET_KEY（Fernet key），不允许明文保存凭证")
         try:
             return Fernet(self._key.encode("utf-8"))
         except (TypeError, ValueError) as exc:

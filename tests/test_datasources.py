@@ -85,9 +85,7 @@ class _FakeSemanticLLM:
 
 @pytest.fixture
 async def datasource_env(tmp_path):
-    engine, sessionmaker = create_engine_and_sessionmaker(
-        f"sqlite+aiosqlite:///{tmp_path / 'catalog.db'}"
-    )
+    engine, sessionmaker = create_engine_and_sessionmaker(f"sqlite+aiosqlite:///{tmp_path / 'catalog.db'}")
     await init_db(engine)
     repo = DataSourceRepository(sessionmaker)
     cipher = CredentialCipher(Fernet.generate_key().decode("ascii"))
@@ -235,9 +233,7 @@ async def test_ai_draft_is_not_active_until_review(datasource_env):
     assert result == {"datasource_id": source["id"], "drafted_table_count": 2, "status": "pending"}
 
     production_schema = await datasource_env["service"].get_m_schema(source["id"], None)
-    review_preview = await datasource_env["service"].get_m_schema(
-        source["id"], None, include_pending=True
-    )
+    review_preview = await datasource_env["service"].get_m_schema(source["id"], None, include_pending=True)
     assert "orders 业务表" not in production_schema
     assert "orders 业务表" in review_preview
 
@@ -320,9 +316,7 @@ async def test_remote_credentials_are_encrypted_and_never_returned(datasource_en
                 name="events",
                 table_type="table",
                 physical_comment="",
-                columns=(
-                    ColumnSnapshot("event_id", "BIGINT", 0, primary_key=True),
-                ),
+                columns=(ColumnSnapshot("event_id", "BIGINT", 0, primary_key=True),),
             ),
         )
     )
@@ -372,9 +366,7 @@ async def test_remote_credentials_are_encrypted_and_never_returned(datasource_en
     assert connectors.last_spec.credentials["password"] == "do-not-store-plaintext"
 
     async with datasource_env["sessionmaker"]() as session:
-        row = (
-            await session.execute(select(DataSourceModel).where(DataSourceModel.id == result["id"]))
-        ).scalar_one()
+        row = (await session.execute(select(DataSourceModel).where(DataSourceModel.id == result["id"]))).scalar_one()
         assert "do-not-store-plaintext" not in row.encrypted_credentials
         assert "reader" not in json.dumps(row.connection_config)
         assert datasource_env["cipher"].decrypt(row.encrypted_credentials) == {
