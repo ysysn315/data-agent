@@ -4,18 +4,18 @@
 
 ## 当前状态
 
-本文描述 **2026-08-09 当前代码**。实现事实以代码、测试和评测原始报告为准；历史需求与差距分析仅用于解释设计过程。
+本文描述当前分支代码（2026-08-12）。实现事实以代码、测试和评测原始报告为准；历史需求与差距分析仅用于解释设计过程。
 
-- 自动化测试：`233 passed, 5 skipped`。跳过项为当前环境不可用的真实 Docker 容器与 Redis worker 集成测试。
+- 自动化测试：`238 passed, 5 skipped`（当前工作区）；跳过项为当前环境不可用的真实 Docker 容器与 Redis worker 集成测试。
 - Text-to-SQL：28 条分层用例；仓库内 3 份可区分的模型报告，最高执行准确率为 **89.29%（25/28）**。
-- RAG：主 Chat 已接入 Milvus 稠密召回；BM25/RRF、查询改写与 BGE 重排完整组装在独立实验链路，尚未接回主 Chat。
+- RAG：主 Chat 已接入 Milvus 稠密召回，并在知识库单例首次初始化时恢复 BM25 索引，统一走查询改写/扩展、BM25+向量 RRF 与可选重排；BGE 本地重排仍需额外安装，未配置时回退 LLM/融合排序。
 - 沙箱与追踪均为可选能力：技能脚本默认使用 `subprocess`，可切换 Docker；Langfuse 默认关闭。
 
 ## 核心能力
 
 - **Skills/MCP 插件体系**：system prompt 只披露技能名称与描述，模型按需读取正文并激活技能，之后才解锁本地门控工具或懒加载 MCP 工具。阶段测量中，提示词注入开销约由 1183 降至 150 tokens/请求。
 - **Text-to-SQL 可靠链路**：支持工作空间接入 SQLite/PostgreSQL/MySQL，自动扫描物理 Schema，LLM 生成业务语义草稿，人工审核后才进入 M-Schema；`sqlglot` 按方言校验单语句、只读、表列和 LIMIT，数据库只读账号/事务再兜底。
-- **RAG 知识库**：支持 TXT/Markdown/PDF/DOCX/HTML/CSV/JSON/Excel；表格会转换为带统计摘要的语义文本，分块后写入 Milvus。独立实验链路提供 BM25+向量 RRF、查询改写/扩展和 BGE/LLM 重排。
+- **RAG 知识库**：支持 TXT/Markdown/PDF/DOCX/HTML/CSV/JSON/Excel；表格会转换为带统计摘要的语义文本，分块后写入 Milvus。主 Chat 与独立实验链路共用 BM25+向量 RRF、查询改写/扩展和可选 BGE/LLM 重排。
 - **轻量知识图谱**：显式调用 LLM 抽取业务三元组，SQLite 持久化，NetworkX 提供实体邻域与关系路径查询，并通过门控技能接入 Agent。它不是 GraphRAG，也不面向大规模图计算。
 - **多步分析与异步任务**：Analysis Agent 按 Planner → Operation → Reflection 运行；ARQ 承载长任务，Redis Hash/Streams 保存状态与事件，SSE 推送进度并支持迟到订阅回放历史事件。
 - **运行安全与降级**：工具调用支持超时、重试、三态熔断和错误回喂；技能脚本可切换到一次性 Docker 容器，以断网、只读挂载、资源限额和超时回收收敛执行风险。
@@ -53,7 +53,8 @@ flowchart TB
   → 选择当前工作空间数据源
   → 披露技能名称与描述
   → read_skill 激活 schema / SQL 技能
-  → 检索自动扫描且经人工审核的 M-Schema、术语与 SQL 示例
+  → schema_search 读取自动扫描且经人工审核的 M-Schema（当前为所选 Schema 全量返回）
+  → 未选平台数据源时，可补充演示库的全局术语与 SQL 示例
   → LLM 生成 SQL
   → sqlglot 按数据源方言做 AST 校验与自动 LIMIT
   → 只读连接执行
@@ -64,8 +65,8 @@ flowchart TB
 
 | 层次 | 当前接线 | 能力边界 |
 |---|---|---|
-| 主 Chat | Agent 工具 → query embedding → Milvus 稠密召回 → Python 元数据后过滤 | 未装配查询改写、BM25 语料缓存和 reranker |
-| 独立实验链路 | 查询改写/扩展 → Milvus + BM25 → RRF → BGE/LLM 重排 → RAG 生成 | 用于实验与评测，不应描述成主 Chat 的线上检索路径 |
+| 主 Chat | Agent 工具 → 知识库单例首次初始化恢复 BM25 → 查询改写/扩展 → Milvus + BM25 → RRF → 元数据过滤 → 可选重排 | BGE 本地模型需额外安装；Milvus 是持久化真相源，BM25 为受上限约束的进程内派生索引 |
+| 独立实验链路 | 与主 Chat 共用检索组件，可独立切换模型/开关 → RAG 生成 | 用于实验与评测，不等于生产级评测闭环 |
 
 ## 评测结果
 
@@ -135,7 +136,7 @@ docker compose up -d redis
 .venv/bin/python -m evals.text2sql.run_execution_eval --limit 10
 ```
 
-RAG 评测依赖 Milvus、Embedding、可选重排模型和测试语料；当前脚本与配置存在迁移后的字段差异，运行前请先看 [RAG 评测说明](evals/rag/README.md)，不要把 baseline 当成当前可复现结果。
+RAG 评测依赖 Milvus、Embedding、LLM、可选重排模型和测试语料；运行前请先看 [RAG 评测说明](evals/rag/README.md)，不要把历史 baseline 当成当前可复现结果。
 
 ## 项目结构
 
@@ -156,7 +157,7 @@ evals/
 ├── text2sql/     # 28 条执行准确率评测与原始报告
 └── rag/          # 检索/生成数据集、指标和历史 baseline
 frontend/         # Vue 3 前端
-tests/            # 20 个测试文件
+tests/            # 21 个测试文件
 ```
 
 ## 文档索引
@@ -186,9 +187,12 @@ tests/            # 20 个测试文件
 
 ## 已知边界
 
-- 主 Chat 的知识库路径尚未接入完整混合检索、查询改写和重排链路。
-- 顶层 Chat 请求的 `metadata_filters` 尚未贯通知识库工具；来源字段也未形成完整响应契约。
-- RAG 评测脚本迁移后仍有配置字段和测试语料依赖需要整理。
+- `schema_search(question)` 尚未使用问题做相关表筛选；演示库返回全部 6 张表，平台数据源返回所选 Schema 的全部表，大库仍需表级召回与 token 预算。
+- `datasource_id` 当前只贯通同步/流式 Chat；Analysis Agent、ARQ 后台对话任务与 Text-to-SQL 评测仍使用演示数据源。
+- 前端尚无登录/API Key 注入层；启用鉴权后的远程数据源管理需通过 API、统一网关或后续登录页操作。
+- 主 Chat 已接入完整 RAG 检索组装；本地 BGE 重排需要安装 `torch`/`FlagEmbedding`，否则使用配置的 LLM 重排或融合顺序。
+- 顶层 Chat 请求的 `metadata_filters` 已合并到知识库工具过滤条件；非流式 Chat 和 API 流式 SSE 的 `sources` 均来自实际命中的文档。
+- RAG 评测脚本已改为复用 `LLMFactory` 和当前配置字段；仍需要 Milvus、Embedding 服务与测试语料，历史报告不等于本次主链路的线上指标。
 - Docker 沙箱不是默认执行模式，也不是生产级多租户代码执行平台。
 - SSE API 能回放 Redis Streams 中已有事件，但尚未暴露 `Last-Event-ID/after_seq`，前端也未做自动重连，因此不宣称断点续传。
 - Langfuse 默认关闭，当前只在部分 Agent 图入口注入 callbacks，没有会话标签、反馈评分或完整 tracing 闭环。

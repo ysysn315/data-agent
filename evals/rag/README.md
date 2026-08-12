@@ -1,15 +1,15 @@
 # RAG 评测说明
 
-本目录包含 RAG 数据集、指标、历史 baseline 和实验脚本。它评估的是**独立 RAG 实验链路**，不等同于当前主 Chat 的实际检索接线。
+本目录包含 RAG 数据集、指标、历史 baseline 和实验脚本。它用于独立切换模型/参数做评测；主 Chat 现在也共用同一套检索组件，但本目录的生成评测仍不是线上请求的自动回归。
 
 ## 当前能力边界
 
 | 路径 | 当前能力 |
 |---|---|
-| 主 Chat | query embedding → Milvus 稠密召回 → Python 元数据后过滤 |
+| 主 Chat | 知识库单例首次初始化恢复 BM25 → 查询改写/扩展 → Milvus + BM25 → RRF → Python 元数据后过滤 → 可选重排 |
 | 独立实验链路 | 查询改写/扩展 → Milvus + BM25 → RRF → BGE/LLM 重排 → 去重 → RAG 生成 |
 
-主 Chat 创建的 VectorStore 没有从既有文档恢复 BM25 语料，也没有注入 QueryRewriter 或 reranker。因此不能用本目录的完整实验拓扑描述主 Chat。
+主 Chat 与上传/文档列表共用一个 VectorStore；知识库单例首次初始化时从 Milvus 分批恢复 BM25。主 Chat 默认使用配置的 LLM 作为重排兜底，本地 BGE 仍需显式安装并在代码/配置中注入。评测脚本也统一通过 `LLMFactory` 使用当前 OpenAI 兼容配置，不再依赖已移除的 `ChatTongyi`/旧配置字段。
 
 ## 数据集
 
@@ -43,12 +43,12 @@
 
 1. Milvus 已启动，collection 维度与当前 Embedding 模型一致；
 2. 当前 `.env` 已配置 Embedding/LLM 所需的 key、base URL 和 model；
-3. 脚本中的配置字段与 `app/core/settings.py` 当前名称一致；
+3. 脚本通过 `LLMFactory` 使用 `app/core/settings.py` 当前配置字段；
 4. 实验所需的正式文档与噪声文档目录存在；
 5. 使用 BGE 时已按需安装 torch/FlagEmbedding 并准备模型缓存；
 6. 输出单独落到带模型、数据集和配置标识的报告，不覆盖历史 baseline。
 
-当前迁移状态下，第 3、4 项尚未完全满足，因此本目录不是开箱即跑的可复现实验包。修复前可离线检查数据集和指标单元逻辑，但不要把失败归因于 RAG 算法本身。
+第 4 项依赖仓库外的正式文档目录；若缺少语料，本目录仍不是开箱即跑的可复现实验包。可先离线检查数据集和指标单元逻辑，但不要把缺少外部依赖归因于 RAG 算法本身。
 
 ## 知识库辅助脚本
 

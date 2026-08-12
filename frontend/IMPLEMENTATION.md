@@ -13,7 +13,7 @@
 | 数据源管理 | 接入/同步数据源，生成 AI 语义草稿，逐表审核并预览正式 M-Schema | `/api/datasources*` |
 | Skills 管理 | 技能卡片列表（按来源分组），点击看详情（frontmatter + 正文），启停开关 | `GET /api/skills`、`GET /api/skills/{slug}`、`POST /api/skills/{slug}/enable\|disable` |
 | MCP 管理 | server 列表，测试连接拉工具列表，启停开关 | `GET /api/mcp/servers`、`POST /api/mcp/servers/{slug}/test\|enable\|disable` |
-| 知识库管理 | 上传文档建索引（迁移自 my-agent，接口一致） | `POST /api/upload` |
+| 知识库管理 | 上传文档建索引、读取真实 Milvus 文档列表 | `POST /api/upload`、`GET /api/documents` |
 | 系统状态 | API / Milvus / Redis 健康与会话统计 | `GET /health`、`GET /api/milvus/health`、`GET /api/chat/sessions` |
 
 本地启动：
@@ -127,6 +127,8 @@ CSS 变量复刻了 Yuxi 的卡片/详情/开关交互，视觉与对话页统�
 - 会话列表来自后端进程内存（SessionStore），后端重启即清空。
 - 鉴权模式尚无独立登录/密钥管理页；当前数据源管理 UI 主要面向默认 demo 模式，
   开启 `AUTH_ENABLED` 后需由统一网关或后续前端 API Key 注入层补 Authorization header。
+- 数据源选择目前只在 ChatView 生效；TasksView/Analysis 任务请求尚未携带 `datasource_id`，
+  因此其示例文案和执行路径仍面向演示库。
 
 ## 五、v2 页面（任务中心 / 知识图谱 / 知识管理）
 

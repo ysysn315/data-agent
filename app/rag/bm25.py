@@ -11,10 +11,15 @@ class BM25Retriever:
 
     def index(self, documents: List[Dict]):
         self.documents = documents
+        if not documents:
+            self.bm25 = None
+            return
         tokenized = [list(jieba.cut(doc["content"])) for doc in documents]
         self.bm25 = BM25Okapi(tokenized)
 
     def search(self, query: str, top_k: int = 10) -> List[Dict]:
+        if self.bm25 is None or not self.documents:
+            return []
         tokenized_query = list(jieba.cut(query))
         scores = self.bm25.get_scores(tokenized_query)
         top_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:top_k]

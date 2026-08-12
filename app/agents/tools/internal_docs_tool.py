@@ -2,6 +2,8 @@ from typing import Any, Dict
 
 from langchain.tools import tool
 
+from app.rag.context import current_metadata_filters, record_sources
+
 
 async def _search_docs(retriever: Any, query: str, metadata_filters: Dict[str, Any]):
     if hasattr(retriever, "retrieve_multi_query"):
@@ -39,7 +41,7 @@ def create_docs_tool(retriever: Any):
         timestamp_to: int = 0,
     ) -> str:
         """Query the internal document knowledge base."""
-        metadata_filters = {
+        explicit_filters = {
             "doc_type": doc_type or None,
             "title": title or None,
             "title_contains": title_contains or None,
@@ -53,10 +55,14 @@ def create_docs_tool(retriever: Any):
             "timestamp_from": timestamp_from or None,
             "timestamp_to": timestamp_to or None,
         }
+        # 顶层 ChatRequest 可提供过滤条件；模型在工具参数里显式传值时优先。
+        explicit_filters = {key: value for key, value in explicit_filters.items() if value is not None}
+        metadata_filters = {**current_metadata_filters(), **explicit_filters}
 
         docs = await _search_docs(retriever, query, metadata_filters)
         if not docs:
             return "未找到相关文档"
+        record_sources([str((doc.get("metadata") or {}).get("source", "")) for doc in docs])
 
         result = []
         for i, doc in enumerate(docs, 1):

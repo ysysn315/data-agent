@@ -18,6 +18,10 @@
 
 未传 `datasource_id` 时，`schema_search` 和 `execute_sql` 继续使用 `settings.sqlite_db_path`，保证原有演示和评测不受影响。
 
+这里的 `schema_search` 目前是“按请求读取 Schema 目录”，还不是语义召回：参数保留了
+`question`，但当前不会用它筛选表。演示库返回全部 6 张表；选择平台数据源后返回该数据源
+当前 Schema 的全部表。表级 embedding/关键词召回、外键邻接扩展和 token 预算尚未实现。
+
 ## 二、数据源接入
 
 ### 连接参数与安全
@@ -100,7 +104,8 @@ SQLite 使用 URI `mode=ro` 并用 progress handler 限时；PostgreSQL 在事�
 
 ## 八、当前边界
 
-- 当前全量注入一个 schema 的 M-Schema；大库需要表级 embedding/关键词召回和 token 预算；
+- `schema_search(question)` 当前未按问题筛表，而是全量注入一个 Schema 的 M-Schema；大库需要表级 embedding/关键词召回、关联表扩展和 token 预算；
+- 请求级 `datasource_id` 目前只贯通 `/api/chat` 与 `/api/chat_stream`；Analysis Agent、ARQ 后台对话任务和执行准确率评测仍固定使用演示库；
 - 没有行列级数据权限，租户隔离只覆盖数据源目录，数据面权限依赖只读数据库账号；
 - 术语和历史 SQL 示例尚未按数据源建模，平台数据源请求当前会禁用全局兼容库；
 - 没有凭证轮换 API、定时 schema 同步和审批历史表；

@@ -49,6 +49,11 @@ class Settings(BaseSettings):
     doc_chunk_max_size: int = 800
     doc_chunk_overlap: int = 100
     rag_top_k: int = 3
+    rag_enable_hybrid: bool = True
+    rag_enable_query_rewrite: bool = True
+    rag_enable_rerank: bool = True
+    rag_bm25_max_documents: int = 50000
+    rag_restore_batch_size: int = 1000
 
     # 知识库工具开关：Milvus 未部署时设为 False，chat 不再依赖 Milvus
     enable_kb_tool: bool = False

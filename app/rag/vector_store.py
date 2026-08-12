@@ -5,7 +5,7 @@
 
 import json
 import re
-from typing import Dict, List, Optional
+from typing import Dict, Iterable, List, Optional
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from loguru import logger
@@ -28,6 +28,8 @@ class VectorStore:
         dense_top_k: int = 10,
         enable_rerank: bool = True,
         enable_hybrid: bool = True,
+        max_bm25_documents: int = 50000,
+        restore_batch_size: int = 1000,
     ):
         self.milvus = milvus_client
         self.embedding = embedding_service
@@ -36,8 +38,10 @@ class VectorStore:
         self.dense_top_k = dense_top_k
         self.enable_rerank = enable_rerank
         self.enable_hybrid = enable_hybrid
-        self.bm25_retriever = None  # 新增
-        self.all_chunks = []  # 新增：存储所有文档用于 BM25
+        self.max_bm25_documents = max(1, max_bm25_documents)
+        self.restore_batch_size = max(1, restore_batch_size)
+        self.bm25_retriever = None
+        self.all_chunks: List[Dict] = []
         logger.info("向量存储初始化完成")
 
     async def insert(self, chunks: List[Dict]) -> None:
@@ -51,16 +55,144 @@ class VectorStore:
             self.milvus.collection.insert(data)
             self.milvus.collection.flush()
             logger.info(f"成功插入 {len(chunks)} 个文档块")
-            self.all_chunks.extend(chunks)
             if self.enable_hybrid:
-                from app.rag.bm25 import BM25Retriever
-
-                self.bm25_retriever = BM25Retriever()
-                self.bm25_retriever.index(self.all_chunks)
+                self._upsert_bm25_chunks(chunks)
 
         except Exception as e:
             logger.error(f"插入文档失败: {str(e)}")
             raise Exception(f"插入文档失败: {str(e)}")
+
+    def _upsert_bm25_chunks(self, chunks: Iterable[Dict]) -> None:
+        """把新写入的 chunk 合并进进程内 BM25 索引。
+
+        Milvus 是持久化真相源，BM25 只是本地派生索引；这里仅维护内存副本，
+        服务重启时由 ``restore_bm25_index`` 从 Milvus 重建。
+        """
+        self.all_chunks.extend(chunks)
+        if len(self.all_chunks) > self.max_bm25_documents:
+            self.all_chunks = self.all_chunks[-self.max_bm25_documents :]
+            logger.warning(
+                "BM25 文档数超过上限，已保留最近 %s 个 chunk；Milvus 中的完整数据不受影响",
+                self.max_bm25_documents,
+            )
+        from app.rag.bm25 import BM25Retriever
+
+        self.bm25_retriever = BM25Retriever()
+        self.bm25_retriever.index(self.all_chunks)
+
+    @staticmethod
+    def _normalize_metadata(value) -> Dict:
+        if isinstance(value, dict):
+            return dict(value)
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+                return dict(parsed) if isinstance(parsed, dict) else {}
+            except (TypeError, ValueError):
+                return {}
+        return {}
+
+    @staticmethod
+    def _document_key(doc: Dict) -> tuple:
+        """生成跨稠密/BM25 去重键，优先使用稳定的 source+chunk_index。"""
+        metadata = doc.get("metadata") or {}
+        chunk_index = metadata.get("chunk_index")
+        if chunk_index is not None:
+            return (metadata.get("source", ""), chunk_index)
+        return (metadata.get("source", ""), doc.get("content", ""))
+
+    def _iter_persisted_chunks(self) -> Iterable[Dict]:
+        """逐批读取 Milvus 中已有的文本块，供索引恢复和文档列表复用。"""
+        collection = self.milvus.collection
+        iterator = None
+        try:
+            if hasattr(collection, "query_iterator"):
+                iterator = collection.query_iterator(
+                    batch_size=self.restore_batch_size,
+                    limit=-1,
+                    # QueryIterator 需要主键推进游标；即使业务只用 content/metadata，
+                    # 也必须把 id 放进返回字段。
+                    output_fields=["id", "content", "metadata"],
+                )
+                while True:
+                    batch = iterator.next()
+                    # pymilvus 返回空列表结束；某些兼容客户端会返回 None。
+                    if not batch:
+                        break
+                    for row in batch:
+                        content = row.get("content", "")
+                        if content:
+                            yield {
+                                "content": content,
+                                "metadata": self._normalize_metadata(row.get("metadata")),
+                            }
+            else:
+                # 兼容未提供 query_iterator 的旧版 pymilvus；仅作为回退路径。
+                rows = collection.query(expr="id >= 0", output_fields=["id", "content", "metadata"])
+                for row in rows:
+                    content = row.get("content", "")
+                    if content:
+                        yield {
+                            "content": content,
+                            "metadata": self._normalize_metadata(row.get("metadata")),
+                        }
+        finally:
+            if iterator is not None and hasattr(iterator, "close"):
+                iterator.close()
+
+    async def restore_bm25_index(self) -> int:
+        """从 Milvus 恢复 BM25 语料，解决服务重启后只剩稠密检索的问题。"""
+        if not self.enable_hybrid:
+            self.all_chunks = []
+            self.bm25_retriever = None
+            return 0
+
+        chunks = []
+        for chunk in self._iter_persisted_chunks():
+            chunks.append(chunk)
+            if len(chunks) >= self.max_bm25_documents:
+                break
+        self.all_chunks = chunks
+        if chunks:
+            from app.rag.bm25 import BM25Retriever
+
+            self.bm25_retriever = BM25Retriever()
+            self.bm25_retriever.index(chunks)
+        else:
+            self.bm25_retriever = None
+        logger.info("BM25 索引恢复完成：%s 个 chunk", len(chunks))
+        return len(chunks)
+
+    async def list_documents(self) -> List[Dict]:
+        """从 Milvus 聚合真实文档列表，而不是读取上传目录的临时文件。"""
+        documents: Dict[str, Dict] = {}
+        for chunk in self._iter_persisted_chunks():
+            metadata = chunk.get("metadata") or {}
+            source = str(metadata.get("source") or "").strip()
+            if not source:
+                continue
+            item = documents.setdefault(
+                source,
+                {
+                    "source": source,
+                    "title": metadata.get("title") or source,
+                    "doc_type": metadata.get("doc_type") or "text",
+                    "chunk_count": 0,
+                    "ingested_at": metadata.get("ingested_at") or metadata.get("timestamp"),
+                    "sheet_names": set(),
+                },
+            )
+            item["chunk_count"] += 1
+            sheet_name = metadata.get("sheet_name")
+            if sheet_name:
+                item["sheet_names"].add(str(sheet_name))
+
+        result = []
+        for item in documents.values():
+            item["sheet_names"] = sorted(item["sheet_names"])
+            result.append(item)
+        result.sort(key=lambda item: (item.get("ingested_at") or 0, item["source"]), reverse=True)
+        return result
 
     def _truncate(self, text: str, max_len: int = 260) -> str:
         text = (text or "").strip().replace("\n", " ")
@@ -121,6 +253,7 @@ class VectorStore:
         query: str,
         top_k: int = 3,
         metadata_filters: Optional[Dict] = None,
+        rerank: Optional[bool] = None,
     ) -> List[Dict]:
         try:
             normalized_filters = normalize_metadata_filters(metadata_filters)
@@ -139,7 +272,11 @@ class VectorStore:
             docs = []
             for hit in results[0]:
                 docs.append(
-                    {"content": hit.entity.get("content"), "metadata": hit.entity.get("metadata"), "score": hit.score}
+                    {
+                        "content": hit.entity.get("content"),
+                        "metadata": self._normalize_metadata(hit.entity.get("metadata")),
+                        "score": hit.score,
+                    }
                 )
             # ===== 新增：混合检索融合 =====
             if self.enable_hybrid and self.bm25_retriever is not None:
@@ -166,28 +303,10 @@ class VectorStore:
                 f"[VectorStore.search] 候选数={len(docs)} "
                 f"(dense_top_k={self.dense_top_k}, top_k={top_k}, candidate_limit={candidate_limit})"
             )
-            if self.enable_rerank and len(docs) > 1:
-                if self.reranker is not None:
-                    docs = self.reranker.rerank(query, docs, top_k=candidate_limit)
-                    logger.info("[VectorStore.search] Rerank 模型重排完成")
-
-                elif self.reranker_llm is not None:
-                    try:
-                        prompt = self._build_rerank_prompt(query, docs)
-                        messages = [
-                            SystemMessage(content="你是一个严格输出JSON的重排序器。"),
-                            HumanMessage(content=prompt),
-                        ]
-                        resp = await self.reranker_llm.ainvoke(messages)
-                        raw = resp.content if hasattr(resp, "content") else str(resp)
-                        order = self._safe_parse_order(raw, n=len(docs))
-                        if order is not None:
-                            docs = [docs[i] for i in order]
-                            logger.info(f"[VectorStore.search] rerank 成功，order={order}")
-                        else:
-                            logger.warning(f"rerank JSON 解析失败 raw={raw!r}")
-                    except Exception as e:
-                        logger.warning(f"rerank 失败，已回退向量排序: {e}")
+            if rerank is None:
+                rerank = self.enable_rerank
+            if rerank:
+                docs = await self.rerank_documents(query, docs, top_k=candidate_limit)
             after = [(d.get("metadata") or {}).get("source", "") for d in docs[:3]]
             logger.info(f"[VectorStore.search] top3 before={before} after={after}")
             docs = docs[:top_k]
@@ -198,15 +317,45 @@ class VectorStore:
             logger.error(f"检索文档失败: {str(e)}")
             raise Exception(f"检索文档失败: {str(e)}")
 
+    async def rerank_documents(self, query: str, docs: List[Dict], top_k: Optional[int] = None) -> List[Dict]:
+        """对候选文档执行配置的重排；多查询检索会在跨查询融合后只调用一次。"""
+        if not docs or not self.enable_rerank or len(docs) <= 1:
+            return docs[:top_k] if top_k else docs
+        limit = top_k or len(docs)
+        if self.reranker is not None:
+            docs = self.reranker.rerank(query, docs, top_k=limit)
+            logger.info("[VectorStore.search] Rerank 模型重排完成")
+            return docs
+
+        if self.reranker_llm is None:
+            return docs[:limit]
+        try:
+            prompt = self._build_rerank_prompt(query, docs)
+            messages = [
+                SystemMessage(content="你是一个严格输出JSON的重排序器。"),
+                HumanMessage(content=prompt),
+            ]
+            resp = await self.reranker_llm.ainvoke(messages)
+            raw = resp.content if hasattr(resp, "content") else str(resp)
+            order = self._safe_parse_order(raw, n=len(docs))
+            if order is not None:
+                docs = [docs[i] for i in order]
+                logger.info("[VectorStore.search] rerank 成功，order=%s", order)
+            else:
+                logger.warning("rerank JSON 解析失败 raw=%r", raw)
+        except Exception as e:
+            logger.warning("rerank 失败，已回退融合排序: %s", e)
+        return docs[:limit]
+
     def _rrf_merge(self, vector_docs: List[Dict], bm25_docs: List[Dict], top_k: int, k: int = 60) -> List[Dict]:
         """简单的 RRF 融合"""
         scores = {}
         for rank, doc in enumerate(bm25_docs):
-            key = doc["content"][:100]
+            key = self._document_key(doc)
             scores[key] = scores.get(key, {"doc": doc, "score": 0})
             scores[key]["score"] += 1 / (k + rank + 1)
         for rank, doc in enumerate(vector_docs):
-            key = doc["content"][:100]
+            key = self._document_key(doc)
             scores[key] = scores.get(key, {"doc": doc, "score": 0})
             scores[key]["score"] += 1 / (k + rank + 1)
         return [v["doc"] for v in sorted(scores.values(), key=lambda x: x["score"], reverse=True)[:top_k]]
@@ -220,7 +369,8 @@ class VectorStore:
         """
         try:
             # 先查询出所有匹配的文档 ID
-            expr = f"metadata['source'] == '{source}'"
+            escaped_source = source.replace("\\", "\\\\").replace("'", "\\'")
+            expr = f"metadata['source'] == '{escaped_source}'"
 
             # 查询匹配的文档
             results = self.milvus.collection.query(expr=expr, output_fields=["id"])
@@ -235,11 +385,19 @@ class VectorStore:
             # 按 ID 删除
             delete_expr = f"id in {ids}"
             self.milvus.collection.delete(delete_expr)
+            if hasattr(self.milvus.collection, "flush"):
+                self.milvus.collection.flush()
 
             # 新增：同步删除 all_chunks 并重建 BM25 索引
             self.all_chunks = [c for c in self.all_chunks if c.get("metadata", {}).get("source") != source]
-            if self.enable_hybrid and self.bm25_retriever is not None:
-                self.bm25_retriever.index(self.all_chunks)
+            if self.enable_hybrid:
+                if self.all_chunks:
+                    from app.rag.bm25 import BM25Retriever
+
+                    self.bm25_retriever = BM25Retriever()
+                    self.bm25_retriever.index(self.all_chunks)
+                else:
+                    self.bm25_retriever = None
 
             logger.info(f"已删除来源为 {source} 的 {len(ids)} 个文档")
 

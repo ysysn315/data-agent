@@ -8,7 +8,7 @@ from app.rag.query_rewriter import QueryRewriter
 
 
 class RAGService:
-    def __init__(self, vector_store, llm):
+    def __init__(self, vector_store, llm, query_rewriter: Optional[QueryRewriter] = None):
         self.vector_store = vector_store
         self.llm = llm
         self.prompt = ChatPromptTemplate.from_template(
@@ -28,7 +28,7 @@ class RAGService:
 回答：
 """.strip()
         )
-        self.query_rewriter = QueryRewriter(llm) if llm else None
+        self.query_rewriter = query_rewriter or (QueryRewriter(llm) if llm else None)
         logger.info("RAG 服务初始化完成")
 
     async def retrieve(
@@ -86,13 +86,23 @@ class RAGService:
                 q,
                 top_k=top_k,
                 metadata_filters=metadata_filters,
+                rerank=False,
             )
             for doc in docs:
-                content_key = doc.get("content", "")[:100]
+                metadata = doc.get("metadata") or {}
+                chunk_index = metadata.get("chunk_index")
+                content_key = (
+                    (metadata.get("source", ""), chunk_index)
+                    if chunk_index is not None
+                    else (metadata.get("source", ""), doc.get("content", ""))
+                )
                 if content_key not in seen_content:
                     all_docs.append(doc)
                     seen_content.add(content_key)
-        return all_docs[:top_k]
+        if not all_docs:
+            return []
+        # 多查询先合并候选，再统一重排；避免每个改写查询各自截断后顺序互相覆盖。
+        return await self.vector_store.rerank_documents(query, all_docs, top_k=top_k)
 
     def format_docs(self, docs: List[Dict]) -> str:
         if not docs:

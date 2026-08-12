@@ -293,7 +293,7 @@ async def run_one(model_name: str, cases):
                 rag_service=rag_service,
                 question=question,
                 model_name=model_name,
-                api_key=settings.dashscope_api_key,
+                api_key=settings.llm_api_key,
             )
             answer = out.get("answer", "")
             sources = out.get("sources", [])
