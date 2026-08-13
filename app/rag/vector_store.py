@@ -3,8 +3,10 @@
 # 向量存储模块
 # TODO: 任务 12.2 - 实现 VectorStore 类
 
+import asyncio
 import json
 import re
+from collections import deque
 from typing import Dict, Iterable, List, Optional
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -19,6 +21,8 @@ from app.rag.metadata_filters import (
 
 
 class VectorStore:
+    _PERSISTED_OUTPUT_FIELDS = ["id", "content", "metadata"]
+
     def __init__(
         self,
         milvus_client: MilvusClient,
@@ -75,10 +79,7 @@ class VectorStore:
                 "BM25 文档数超过上限，已保留最近 %s 个 chunk；Milvus 中的完整数据不受影响",
                 self.max_bm25_documents,
             )
-        from app.rag.bm25 import BM25Retriever
-
-        self.bm25_retriever = BM25Retriever()
-        self.bm25_retriever.index(self.all_chunks)
+        self._rebuild_bm25_sync(self.all_chunks)
 
     @staticmethod
     def _normalize_metadata(value) -> Dict:
@@ -101,6 +102,22 @@ class VectorStore:
             return (metadata.get("source", ""), chunk_index)
         return (metadata.get("source", ""), doc.get("content", ""))
 
+    @staticmethod
+    def _document_source(doc: Dict) -> str:
+        """提取文档来源，统一处理缺失 metadata 和空白值。"""
+        return str((doc.get("metadata") or {}).get("source") or "").strip()
+
+    @classmethod
+    def _row_to_chunk(cls, row: Dict) -> Optional[Dict]:
+        """把 Milvus 返回行转换为统一的 chunk 结构。"""
+        content = row.get("content", "")
+        if not content:
+            return None
+        return {
+            "content": content,
+            "metadata": cls._normalize_metadata(row.get("metadata")),
+        }
+
     def _iter_persisted_chunks(self) -> Iterable[Dict]:
         """逐批读取 Milvus 中已有的文本块，供索引恢复和文档列表复用。"""
         collection = self.milvus.collection
@@ -112,7 +129,7 @@ class VectorStore:
                     limit=-1,
                     # QueryIterator 需要主键推进游标；即使业务只用 content/metadata，
                     # 也必须把 id 放进返回字段。
-                    output_fields=["id", "content", "metadata"],
+                    output_fields=self._PERSISTED_OUTPUT_FIELDS,
                 )
                 while True:
                     batch = iterator.next()
@@ -120,55 +137,64 @@ class VectorStore:
                     if not batch:
                         break
                     for row in batch:
-                        content = row.get("content", "")
-                        if content:
-                            yield {
-                                "content": content,
-                                "metadata": self._normalize_metadata(row.get("metadata")),
-                            }
+                        chunk = self._row_to_chunk(row)
+                        if chunk is not None:
+                            yield chunk
             else:
                 # 兼容未提供 query_iterator 的旧版 pymilvus；仅作为回退路径。
-                rows = collection.query(expr="id >= 0", output_fields=["id", "content", "metadata"])
+                rows = collection.query(expr="id >= 0", output_fields=self._PERSISTED_OUTPUT_FIELDS)
                 for row in rows:
-                    content = row.get("content", "")
-                    if content:
-                        yield {
-                            "content": content,
-                            "metadata": self._normalize_metadata(row.get("metadata")),
-                        }
+                    chunk = self._row_to_chunk(row)
+                    if chunk is not None:
+                        yield chunk
         finally:
             if iterator is not None and hasattr(iterator, "close"):
                 iterator.close()
 
+    def _load_bm25_chunks_sync(self) -> List[Dict]:
+        """同步读取 BM25 语料，并与增量写入保持“保留尾部”策略一致。"""
+        chunks = deque(maxlen=self.max_bm25_documents)
+        for chunk in self._iter_persisted_chunks():
+            chunks.append(chunk)
+        return list(chunks)
+
+    def _rebuild_bm25_sync(self, chunks: List[Dict]) -> None:
+        self.all_chunks = chunks
+        if not chunks:
+            self.bm25_retriever = None
+            return
+
+        from app.rag.bm25 import BM25Retriever
+
+        self.bm25_retriever = BM25Retriever()
+        self.bm25_retriever.index(chunks)
+
     async def restore_bm25_index(self) -> int:
-        """从 Milvus 恢复 BM25 语料，解决服务重启后只剩稠密检索的问题。"""
+        """从 Milvus 恢复 BM25 语料，解决服务重启后只剩稠密检索的问题。
+
+        Milvus 查询和 BM25 建索引都是同步操作，放到线程中避免阻塞事件循环；
+        调用方仍可在单例初始化锁内等待恢复完成，确保返回的 VectorStore 可直接用于混合检索。
+        """
         if not self.enable_hybrid:
             self.all_chunks = []
             self.bm25_retriever = None
             return 0
 
-        chunks = []
-        for chunk in self._iter_persisted_chunks():
-            chunks.append(chunk)
-            if len(chunks) >= self.max_bm25_documents:
-                break
-        self.all_chunks = chunks
-        if chunks:
-            from app.rag.bm25 import BM25Retriever
-
-            self.bm25_retriever = BM25Retriever()
-            self.bm25_retriever.index(chunks)
-        else:
-            self.bm25_retriever = None
+        chunks = await asyncio.to_thread(self._load_bm25_chunks_sync)
+        await asyncio.to_thread(self._rebuild_bm25_sync, chunks)
         logger.info("BM25 索引恢复完成：%s 个 chunk", len(chunks))
         return len(chunks)
 
-    async def list_documents(self) -> List[Dict]:
-        """从 Milvus 聚合真实文档列表，而不是读取上传目录的临时文件。"""
+    def _list_documents_sync(self) -> List[Dict]:
+        """同步扫描 Milvus 并聚合真实文档列表，避免在事件循环中阻塞。
+
+        这里不复用 BM25 的 chunk 上限：文档列表必须反映 Milvus 中所有已持久化
+        的 source；聚合后只保留每个 source 的摘要，内存开销按文档数而不是 chunk 数增长。
+        """
         documents: Dict[str, Dict] = {}
         for chunk in self._iter_persisted_chunks():
             metadata = chunk.get("metadata") or {}
-            source = str(metadata.get("source") or "").strip()
+            source = self._document_source(chunk)
             if not source:
                 continue
             item = documents.setdefault(
@@ -193,6 +219,10 @@ class VectorStore:
             result.append(item)
         result.sort(key=lambda item: (item.get("ingested_at") or 0, item["source"]), reverse=True)
         return result
+
+    async def list_documents(self) -> List[Dict]:
+        """从 Milvus 聚合真实文档列表，而不是读取上传目录的临时文件。"""
+        return await asyncio.to_thread(self._list_documents_sync)
 
     def _truncate(self, text: str, max_len: int = 260) -> str:
         text = (text or "").strip().replace("\n", " ")
@@ -391,13 +421,7 @@ class VectorStore:
             # 新增：同步删除 all_chunks 并重建 BM25 索引
             self.all_chunks = [c for c in self.all_chunks if c.get("metadata", {}).get("source") != source]
             if self.enable_hybrid:
-                if self.all_chunks:
-                    from app.rag.bm25 import BM25Retriever
-
-                    self.bm25_retriever = BM25Retriever()
-                    self.bm25_retriever.index(self.all_chunks)
-                else:
-                    self.bm25_retriever = None
+                self._rebuild_bm25_sync(self.all_chunks)
 
             logger.info(f"已删除来源为 {source} 的 {len(ids)} 个文档")
 

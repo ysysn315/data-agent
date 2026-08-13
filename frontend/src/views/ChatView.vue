@@ -166,7 +166,7 @@ const scrollToBottom = () => {
 }
 
 // 解析后端 SSE：每条形如 `data: {"type": "...", "data": "..."}`。
-// 后端定义了三种 type：content（增量文本）/ done（结束）/ error（异常）。
+// 后端定义了四种 type：content（增量文本）/ sources（来源）/ done（结束）/ error（异常）。
 // 逐块读取时需要跨 read 缓冲不完整的行，避免把 JSON 截断。
 const streamChat = async (question, assistantMessage) => {
   const response = await fetch('/api/chat_stream', {

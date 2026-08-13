@@ -5,6 +5,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from loguru import logger
 
 from app.rag.query_rewriter import QueryRewriter
+from app.rag.vector_store import VectorStore
 
 
 class RAGService:
@@ -89,13 +90,7 @@ class RAGService:
                 rerank=False,
             )
             for doc in docs:
-                metadata = doc.get("metadata") or {}
-                chunk_index = metadata.get("chunk_index")
-                content_key = (
-                    (metadata.get("source", ""), chunk_index)
-                    if chunk_index is not None
-                    else (metadata.get("source", ""), doc.get("content", ""))
-                )
+                content_key = VectorStore._document_key(doc)
                 if content_key not in seen_content:
                     all_docs.append(doc)
                     seen_content.add(content_key)
@@ -148,7 +143,7 @@ class RAGService:
                 "question": question,
             }
         )
-        sources = list(set(doc.get("metadata", {}).get("source", "未知来源") for doc in docs))
+        sources = list({VectorStore._document_source(doc) or "未知来源" for doc in docs})
         return {"answer": result, "sources": sources}
 
     async def generate_answer_stream(

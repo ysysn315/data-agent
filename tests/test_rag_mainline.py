@@ -10,6 +10,7 @@ from app.core.dependencies import get_vector_store
 from app.main import app
 from app.rag.context import current_sources, use_metadata_filters
 from app.rag.vector_store import VectorStore
+from app.services.chat_service import ChatService
 from app.services.rag_service import RAGService
 
 
@@ -137,6 +138,23 @@ async def test_restore_bm25_and_list_documents_from_milvus():
 
 
 @pytest.mark.asyncio
+async def test_restore_bm25_keeps_tail_when_capped():
+    collection = _Collection(_rows())
+    store = VectorStore(
+        _Milvus(collection),
+        _Embedding(),
+        enable_rerank=False,
+        max_bm25_documents=2,
+    )
+
+    assert await store.restore_bm25_index() == 2
+    assert [chunk["content"] for chunk in store.all_chunks] == [
+        "订单表的字段说明",
+        "客户表的字段说明",
+    ]
+
+
+@pytest.mark.asyncio
 async def test_hybrid_search_uses_restored_bm25_candidates():
     rows = _rows()
     collection = _Collection(
@@ -234,3 +252,36 @@ async def test_documents_endpoint_reads_shared_vector_store():
             "sheet_names": [],
         }
     ]
+
+
+@pytest.mark.asyncio
+async def test_chat_stream_always_returns_structured_events():
+    class _Agent:
+        async def chat_stream(self, _question, history=None, summary=""):
+            yield {"type": "content", "text": "第一段"}
+            yield {"type": "content", "text": "第二段"}
+
+    class _SessionStore:
+        def __init__(self):
+            self.messages = []
+
+        def get_history(self, _session_id):
+            return []
+
+        def get_summary(self, _session_id):
+            return ""
+
+        def add_message(self, session_id, role, content):
+            self.messages.append((session_id, role, content))
+
+    session_store = _SessionStore()
+    service = ChatService(_Agent(), session_store)
+
+    events = [event async for event in service.chat_stream("s1", "问题")]
+
+    assert events == [
+        {"type": "content", "data": "第一段"},
+        {"type": "content", "data": "第二段"},
+        {"type": "sources", "data": []},
+    ]
+    assert session_store.messages == [("s1", "user", "问题"), ("s1", "assistant", "第一段第二段")]

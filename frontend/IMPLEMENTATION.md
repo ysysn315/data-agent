@@ -56,7 +56,8 @@ frontend/
 足够，保持零额外依赖。
 
 **SSE 解析（ChatView）**：后端 `chat_stream` 以 SSE 逐块下发，每条形如
-`data: {"type": "content"|"done"|"error", "data": "..."}`。前端用
+`data: {"type": "content"|"sources"|"done"|"error", "data": "..."}`。其中
+`ChatService.chat_stream` 始终输出结构化的 `content`/`sources` 事件，前端用
 `ReadableStream` 的 reader 循环读取，关键点：
 
 - 用 `buffer` 跨 `read()` 缓冲不完整的行，按 `\n\n`（SSE 事件分隔）切分，

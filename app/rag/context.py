@@ -37,7 +37,7 @@ def current_sources() -> list[str]:
 
 @contextmanager
 def use_metadata_filters(filters: dict | None) -> Iterator[None]:
-    filter_token = _metadata_filters.set(dict(filters or {}) or None)
+    filter_token = _metadata_filters.set(filters or {})
     source_token = _sources.set([])
     try:
         yield

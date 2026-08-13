@@ -3,6 +3,7 @@ from typing import Any, Dict
 from langchain.tools import tool
 
 from app.rag.context import current_metadata_filters, record_sources
+from app.rag.vector_store import VectorStore
 
 
 async def _search_docs(retriever: Any, query: str, metadata_filters: Dict[str, Any]):
@@ -62,7 +63,7 @@ def create_docs_tool(retriever: Any):
         docs = await _search_docs(retriever, query, metadata_filters)
         if not docs:
             return "未找到相关文档"
-        record_sources([str((doc.get("metadata") or {}).get("source", "")) for doc in docs])
+        record_sources([VectorStore._document_source(doc) for doc in docs])
 
         result = []
         for i, doc in enumerate(docs, 1):

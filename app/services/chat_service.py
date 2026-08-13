@@ -46,8 +46,7 @@ class ChatService:
         metadata_filters: Optional[dict] = None,
         datasource_id: Optional[int] = None,
         workspace_id: Optional[int] = None,
-        include_sources: bool = False,
-    ) -> AsyncIterator[str | dict]:
+    ) -> AsyncIterator[dict]:
         history = self.session_store.get_history(session_id)
         summary = self.session_store.get_summary(session_id)
 
@@ -61,8 +60,7 @@ class ChatService:
                 # chat_agent yield {"type": "reasoning"|"content", "text": str}
                 text = chunk.get("text", "")
                 if text:
-                    # 默认保持原有字符串流；API 路由可选择附带结构化来源事件。
-                    yield {"type": "content", "data": text} if include_sources else text
+                    yield {"type": "content", "data": text}
                 if chunk.get("type") == "content":
                     collected_content.append(text)  # 仅最终答案入会话历史
             sources = current_sources()
@@ -73,5 +71,4 @@ class ChatService:
             self.session_store.add_message(session_id, "user", question)
             self.session_store.add_message(session_id, "assistant", answer)
         logger.info(f"流式对话完成 - Session: {session_id}, 长度: {len(answer)}")
-        if include_sources:
-            yield {"type": "sources", "data": sources}
+        yield {"type": "sources", "data": sources}
