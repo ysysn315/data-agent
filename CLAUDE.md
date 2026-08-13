@@ -44,14 +44,14 @@ docker compose up -d redis
 
 默认 Chat/Text-to-SQL 不依赖 Milvus、Redis、Docker 或 Langfuse。知识库工具需 `ENABLE_KB_TOOL=true` + Milvus；Docker 技能沙箱需 `SKILL_SANDBOX_MODE=docker`；Langfuse 需开关和两把 key 同时就绪。
 
-RAG 评测依赖外部语料、Milvus、Embedding 和可选重排模型，迁移后仍有配置字段需要整理。运行前先读 `evals/rag/README.md`，不要把仓库中的历史 baseline 当作当前可复现实验结果。
+RAG 评测依赖外部语料、Milvus、Embedding 和可选重排模型。运行前先读 `evals/rag/README.md`，不要把仓库中的历史 baseline 当作当前可复现实验结果。
 
-## 当前事实基线（2026-08-08）
+## 当前事实基线（2026-08-13）
 
-- `213 passed, 5 skipped`，共 19 个测试文件。
+- pytest/CI 结果以实际运行环境为准；Docker/Redis 不可用时，外部集成用例会按环境跳过。
 - 5 个内置技能：schema-retrieval、sql-generation、sqlite-query、data-visualization、knowledge-graph。
 - Text-to-SQL 有 3 份可区分的模型报告，最高 `89.29%（25/28）`；`execution_latest.json` 当前是 23/28。
-- 主 Chat 的知识库工具只接 Milvus 稠密召回与元数据后过滤；BM25/RRF、查询改写、扩展和重排在独立实验链路。
+- 主 Chat 的知识库工具已接入 Milvus 稠密召回、BM25 恢复、查询改写/扩展、RRF、元数据过滤和可选重排；BM25 是受上限约束的进程内派生索引。
 - 技能脚本默认 `subprocess`；Docker 是可切换的一次性容器执行器。
 - Redis Streams 能保存并回放历史事件，但 HTTP SSE 未暴露 `Last-Event-ID/after_seq`，前端不自动重连。
 - Langfuse 默认关闭且只覆盖部分 Agent 图入口，不得描述成全链路可观测闭环。

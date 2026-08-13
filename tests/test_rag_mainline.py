@@ -192,11 +192,21 @@ async def test_hybrid_search_uses_restored_bm25_candidates():
     )
     store = VectorStore(_Milvus(collection), _Embedding(), enable_rerank=False)
     await store.restore_bm25_index()
+    main_thread = get_ident()
+    bm25_threads = []
+    original_search = store.bm25_retriever.search
+
+    def tracked_search(query, top_k=10):
+        bm25_threads.append(get_ident())
+        return original_search(query, top_k)
+
+    store.bm25_retriever.search = tracked_search
 
     result = await store.search("数据库连接超时", top_k=2)
 
     assert result
     assert any(doc["metadata"].get("source") == "ops.md" for doc in result)
+    assert bm25_threads and all(thread_id != main_thread for thread_id in bm25_threads)
 
 
 @pytest.mark.asyncio

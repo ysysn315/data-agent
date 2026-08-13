@@ -46,7 +46,8 @@ Milvus 的同步 `search` 放入 `asyncio.to_thread`，不会占用事件循环�
 - 上传先按 `source` 删除旧 chunk，再由 `VectorIndexService` 解析、分块、向量化。
 - `VectorStore.insert` 只在线程中执行同步 Milvus `insert/flush` 和 BM25 派生索引更新。
 - `delete_by_source` 同样在线程中完成 Milvus `query/delete/flush` 与 BM25 重建。
-- `search` 的同步 Milvus 查询和 BM25 召回也在线程中执行，事件循环只负责候选融合、过滤和契约编排。
+- `search` 的同步 Milvus 查询和 BM25 召回也在线程中执行；BM25 先在线程中获取
+  retriever 快照，事件循环只负责候选融合、过滤和契约编排，不会同步等待派生索引锁。
 - 首次创建单例时，`restore_bm25_index` 通过 `query_iterator` 分批读取 Milvus，使用
   `deque(maxlen=RAG_BM25_MAX_DOCUMENTS)` 保留扫描尾部，和增量写入的保留策略一致。
 - `list_documents` 复用同一上限，聚合保留 chunk 覆盖到的 source、标题、类型、数量和

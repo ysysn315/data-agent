@@ -50,7 +50,8 @@ query_internal_docs
 Milvus Python SDK 和 BM25 建索引/重建是同步操作，异步入口统一通过
 `asyncio.to_thread` 执行：
 
-- `search`：向量查询和 BM25 召回放入工作线程；Embedding 仍使用异步接口。
+- `search`：向量查询和 BM25 召回放入工作线程，先在线程中获取 retriever 快照；Embedding
+  仍使用异步接口，事件循环不会同步等待 BM25 派生索引锁。
 - `insert`：工作线程执行 `insert/flush`，随后更新 BM25 派生索引。
 - `delete_by_source`：工作线程执行 `query/delete/flush`，随后重建 BM25。
 - `restore_bm25_index`：工作线程完成 iterator 扫描和 BM25 建索引。

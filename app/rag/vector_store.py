@@ -1,7 +1,4 @@
-# 向量存储模块
-# TODO: 任务 12.2 - 实现 VectorStore 类
-# 向量存储模块
-# TODO: 任务 12.2 - 实现 VectorStore 类
+"""Milvus 向量存储与 BM25 派生索引。"""
 
 import asyncio
 import json
@@ -85,8 +82,7 @@ class VectorStore:
             if len(merged_chunks) > self.max_bm25_documents:
                 merged_chunks = merged_chunks[-self.max_bm25_documents :]
                 logger.warning(
-                    "BM25 文档数超过上限，已保留最近 %s 个 chunk；Milvus 中的完整数据不受影响",
-                    self.max_bm25_documents,
+                    f"BM25 文档数超过上限，已保留最近 {self.max_bm25_documents} 个 chunk；Milvus 中的完整数据不受影响"
                 )
             self._rebuild_bm25_sync(merged_chunks)
 
@@ -179,6 +175,11 @@ class VectorStore:
             self.bm25_retriever = BM25Retriever()
             self.bm25_retriever.index(self.all_chunks)
 
+    def _snapshot_bm25_retriever_sync(self):
+        """在线程中获取 BM25 快照，避免事件循环同步等待写锁。"""
+        with self._bm25_lock:
+            return self.bm25_retriever
+
     async def restore_bm25_index(self) -> int:
         """从 Milvus 恢复 BM25 语料，解决服务重启后只剩稠密检索的问题。
 
@@ -192,7 +193,7 @@ class VectorStore:
 
         chunks = await asyncio.to_thread(self._load_bm25_chunks_sync)
         await asyncio.to_thread(self._rebuild_bm25_sync, chunks)
-        logger.info("BM25 索引恢复完成：%s 个 chunk", len(chunks))
+        logger.info(f"BM25 索引恢复完成：{len(chunks)} 个 chunk")
         return len(chunks)
 
     def _list_documents_sync(self) -> List[Dict]:
@@ -314,10 +315,9 @@ class VectorStore:
                         "score": hit.score,
                     }
                 )
-            # ===== 新增：混合检索融合 =====
+            # 混合检索融合：只在线程中读取快照和执行 BM25，避免阻塞事件循环。
             if self.enable_hybrid:
-                with self._bm25_lock:
-                    bm25_retriever = self.bm25_retriever
+                bm25_retriever = await asyncio.to_thread(self._snapshot_bm25_retriever_sync)
                 bm25_docs = (
                     await asyncio.to_thread(bm25_retriever.search, query, candidate_limit)
                     if bm25_retriever is not None
@@ -383,11 +383,11 @@ class VectorStore:
             order = self._safe_parse_order(raw, n=len(docs))
             if order is not None:
                 docs = [docs[i] for i in order]
-                logger.info("[VectorStore.search] rerank 成功，order=%s", order)
+                logger.info(f"[VectorStore.search] rerank 成功，order={order}")
             else:
-                logger.warning("rerank JSON 解析失败 raw=%r", raw)
+                logger.warning(f"rerank JSON 解析失败 raw={raw!r}")
         except Exception as e:
-            logger.warning("rerank 失败，已回退融合排序: %s", e)
+            logger.warning(f"rerank 失败，已回退融合排序: {e}")
         return docs[:limit]
 
     def _rrf_merge(self, vector_docs: List[Dict], bm25_docs: List[Dict], top_k: int, k: int = 60) -> List[Dict]:
