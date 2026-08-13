@@ -31,7 +31,10 @@ async def list_documents(vector_store=Depends(get_vector_store)):
 
 @router.post("/upload", response_model=UploadResponse)
 async def upload_file(
-    file: UploadFile = File(...), title: Optional[str] = Form(None), settings: Settings = Depends(get_settings)
+    file: UploadFile = File(...),
+    title: Optional[str] = Form(None),
+    settings: Settings = Depends(get_settings),
+    vector_store=Depends(get_vector_store),
 ):
     try:
         allowed_extensions = [".txt", ".md", ".pdf", ".docx", ".html", ".htm", ".csv", ".json", ".xlsx", ".xls"]
@@ -57,7 +60,6 @@ async def upload_file(
         strategy = get_strategy_by_filename(safe_filename)
         logger.info(f"文件 {safe_filename} 使用分块策略: {strategy.value}")
 
-        vector_store = await get_vector_store()
         # 同名文件视为重新索引，避免 Milvus 与列表出现重复文档。
         await vector_store.delete_by_source(safe_filename)
         chunker = DocumentChunker(

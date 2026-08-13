@@ -4,8 +4,8 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from loguru import logger
 
+from app.rag.document_utils import document_key, document_source
 from app.rag.query_rewriter import QueryRewriter
-from app.rag.vector_store import VectorStore
 
 
 class RAGService:
@@ -90,7 +90,7 @@ class RAGService:
                 rerank=False,
             )
             for doc in docs:
-                content_key = VectorStore._document_key(doc)
+                content_key = document_key(doc)
                 if content_key not in seen_content:
                     all_docs.append(doc)
                     seen_content.add(content_key)
@@ -143,7 +143,7 @@ class RAGService:
                 "question": question,
             }
         )
-        sources = list({VectorStore._document_source(doc) or "未知来源" for doc in docs})
+        sources = list({document_source(doc) or "未知来源" for doc in docs})
         return {"answer": result, "sources": sources}
 
     async def generate_answer_stream(

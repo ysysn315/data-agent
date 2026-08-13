@@ -270,9 +270,6 @@ async def get_chat_agent():
             from app.agents.tools.internal_docs_tool import create_docs_tool
 
             vector_store = await get_vector_store()
-            vector_store.enable_hybrid = settings.rag_enable_hybrid
-            vector_store.enable_rerank = settings.rag_enable_rerank
-            vector_store.reranker_llm = chat_llm if settings.rag_enable_rerank else None
             rag_service = RAGService(
                 vector_store,
                 chat_llm,
@@ -344,22 +341,32 @@ async def get_vector_store():
             return _vector_store
 
         from app.clients.milvus_client import MilvusClient
+        from app.core.llm import LLMFactory
         from app.rag.embeddings import EmbeddingService
         from app.rag.vector_store import VectorStore
+
+        reranker_llm = None
+        if settings.rag_enable_rerank and settings.llm_api_key:
+            # VectorStore 的检索配置在构造期一次性确定；不在 get_chat_agent 中
+            # 通过修改单例属性改变行为，避免调用顺序造成配置漂移。
+            reranker_llm = LLMFactory.create_llm()
 
         milvus_client = MilvusClient(settings)
         await milvus_client.connect()
         await milvus_client.ensure_collection()
-        _vector_store = VectorStore(
+        vector_store = VectorStore(
             milvus_client,
             EmbeddingService(settings),
+            reranker_llm=reranker_llm,
             dense_top_k=max(settings.rag_top_k, 10),
             enable_hybrid=settings.rag_enable_hybrid,
             enable_rerank=settings.rag_enable_rerank,
             max_bm25_documents=settings.rag_bm25_max_documents,
             restore_batch_size=settings.rag_restore_batch_size,
         )
-        await _vector_store.restore_bm25_index()
+        await vector_store.restore_bm25_index()
+        # 只有恢复完成后才发布单例，避免并发请求走快速路径拿到半初始化对象。
+        _vector_store = vector_store
     return _vector_store
 
 

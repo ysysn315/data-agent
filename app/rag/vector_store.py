@@ -7,12 +7,14 @@ import asyncio
 import json
 import re
 from collections import deque
+from threading import RLock
 from typing import Dict, Iterable, List, Optional
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from loguru import logger
 
 from app.clients.milvus_client import MilvusClient
+from app.rag.document_utils import document_key, document_source
 from app.rag.embeddings import EmbeddingService
 from app.rag.metadata_filters import (
     matches_metadata_filters,
@@ -46,6 +48,7 @@ class VectorStore:
         self.restore_batch_size = max(1, restore_batch_size)
         self.bm25_retriever = None
         self.all_chunks: List[Dict] = []
+        self._bm25_lock = RLock()
         logger.info("向量存储初始化完成")
 
     async def insert(self, chunks: List[Dict]) -> None:
@@ -55,16 +58,21 @@ class VectorStore:
                 return
             texts = [chunk["content"] for chunk in chunks]
             vectors = await self.embedding.embed_texts(texts)
-            data = [vectors, texts, [chunk["metadata"] for chunk in chunks]]
-            self.milvus.collection.insert(data)
-            self.milvus.collection.flush()
+            await asyncio.to_thread(self._insert_sync, vectors, chunks)
             logger.info(f"成功插入 {len(chunks)} 个文档块")
-            if self.enable_hybrid:
-                self._upsert_bm25_chunks(chunks)
 
         except Exception as e:
             logger.error(f"插入文档失败: {str(e)}")
             raise Exception(f"插入文档失败: {str(e)}")
+
+    def _insert_sync(self, vectors: List[List[float]], chunks: List[Dict]) -> None:
+        """在线程中执行同步 Milvus 写入和 BM25 派生索引更新。"""
+        texts = [chunk["content"] for chunk in chunks]
+        data = [vectors, texts, [chunk["metadata"] for chunk in chunks]]
+        self.milvus.collection.insert(data)
+        self.milvus.collection.flush()
+        if self.enable_hybrid:
+            self._upsert_bm25_chunks(chunks)
 
     def _upsert_bm25_chunks(self, chunks: Iterable[Dict]) -> None:
         """把新写入的 chunk 合并进进程内 BM25 索引。
@@ -72,14 +80,15 @@ class VectorStore:
         Milvus 是持久化真相源，BM25 只是本地派生索引；这里仅维护内存副本，
         服务重启时由 ``restore_bm25_index`` 从 Milvus 重建。
         """
-        self.all_chunks.extend(chunks)
-        if len(self.all_chunks) > self.max_bm25_documents:
-            self.all_chunks = self.all_chunks[-self.max_bm25_documents :]
-            logger.warning(
-                "BM25 文档数超过上限，已保留最近 %s 个 chunk；Milvus 中的完整数据不受影响",
-                self.max_bm25_documents,
-            )
-        self._rebuild_bm25_sync(self.all_chunks)
+        with self._bm25_lock:
+            merged_chunks = [*self.all_chunks, *chunks]
+            if len(merged_chunks) > self.max_bm25_documents:
+                merged_chunks = merged_chunks[-self.max_bm25_documents :]
+                logger.warning(
+                    "BM25 文档数超过上限，已保留最近 %s 个 chunk；Milvus 中的完整数据不受影响",
+                    self.max_bm25_documents,
+                )
+            self._rebuild_bm25_sync(merged_chunks)
 
     @staticmethod
     def _normalize_metadata(value) -> Dict:
@@ -93,20 +102,6 @@ class VectorStore:
                 return {}
         return {}
 
-    @staticmethod
-    def _document_key(doc: Dict) -> tuple:
-        """生成跨稠密/BM25 去重键，优先使用稳定的 source+chunk_index。"""
-        metadata = doc.get("metadata") or {}
-        chunk_index = metadata.get("chunk_index")
-        if chunk_index is not None:
-            return (metadata.get("source", ""), chunk_index)
-        return (metadata.get("source", ""), doc.get("content", ""))
-
-    @staticmethod
-    def _document_source(doc: Dict) -> str:
-        """提取文档来源，统一处理缺失 metadata 和空白值。"""
-        return str((doc.get("metadata") or {}).get("source") or "").strip()
-
     @classmethod
     def _row_to_chunk(cls, row: Dict) -> Optional[Dict]:
         """把 Milvus 返回行转换为统一的 chunk 结构。"""
@@ -117,6 +112,16 @@ class VectorStore:
             "content": content,
             "metadata": cls._normalize_metadata(row.get("metadata")),
         }
+
+    def _search_sync(self, query_vector: List[float], candidate_limit: int):
+        """在线程中执行同步 Milvus 向量检索。"""
+        return self.milvus.collection.search(
+            data=[query_vector],
+            anns_field="vector",
+            param={"metric_type": "IP", "params": {"nprobe": 10}},
+            limit=candidate_limit,
+            output_fields=["content", "metadata"],
+        )
 
     def _iter_persisted_chunks(self) -> Iterable[Dict]:
         """逐批读取 Milvus 中已有的文本块，供索引恢复和文档列表复用。"""
@@ -153,21 +158,26 @@ class VectorStore:
 
     def _load_bm25_chunks_sync(self) -> List[Dict]:
         """同步读取 BM25 语料，并与增量写入保持“保留尾部”策略一致。"""
+        return self._load_capped_chunks_sync()
+
+    def _load_capped_chunks_sync(self) -> List[Dict]:
+        """读取受上限约束的 chunk 子集，供 BM25 恢复和文档列表复用。"""
         chunks = deque(maxlen=self.max_bm25_documents)
         for chunk in self._iter_persisted_chunks():
             chunks.append(chunk)
         return list(chunks)
 
     def _rebuild_bm25_sync(self, chunks: List[Dict]) -> None:
-        self.all_chunks = chunks
-        if not chunks:
-            self.bm25_retriever = None
-            return
+        with self._bm25_lock:
+            self.all_chunks = list(chunks)
+            if not self.all_chunks:
+                self.bm25_retriever = None
+                return
 
-        from app.rag.bm25 import BM25Retriever
+            from app.rag.bm25 import BM25Retriever
 
-        self.bm25_retriever = BM25Retriever()
-        self.bm25_retriever.index(chunks)
+            self.bm25_retriever = BM25Retriever()
+            self.bm25_retriever.index(self.all_chunks)
 
     async def restore_bm25_index(self) -> int:
         """从 Milvus 恢复 BM25 语料，解决服务重启后只剩稠密检索的问题。
@@ -188,13 +198,15 @@ class VectorStore:
     def _list_documents_sync(self) -> List[Dict]:
         """同步扫描 Milvus 并聚合真实文档列表，避免在事件循环中阻塞。
 
-        这里不复用 BM25 的 chunk 上限：文档列表必须反映 Milvus 中所有已持久化
-        的 source；聚合后只保留每个 source 的摘要，内存开销按文档数而不是 chunk 数增长。
+        文档列表与 BM25 恢复使用同一个 chunk 上限，避免大库请求把全部文本块
+        一次性读进内存；列表代表本次扫描保留的最近 chunk 所覆盖的 source。
         """
+        chunks = self._load_capped_chunks_sync()
+
         documents: Dict[str, Dict] = {}
-        for chunk in self._iter_persisted_chunks():
+        for chunk in chunks:
             metadata = chunk.get("metadata") or {}
-            source = self._document_source(chunk)
+            source = document_source(chunk)
             if not source:
                 continue
             item = documents.setdefault(
@@ -292,13 +304,7 @@ class VectorStore:
                 candidate_limit = max(candidate_limit * 5, top_k * 10, 30)
 
             query_vector = await self.embedding.embed_text(query)
-            results = self.milvus.collection.search(
-                data=[query_vector],
-                anns_field="vector",
-                param={"metric_type": "IP", "params": {"nprobe": 10}},
-                limit=candidate_limit,
-                output_fields=["content", "metadata"],
-            )
+            results = await asyncio.to_thread(self._search_sync, query_vector, candidate_limit)
             docs = []
             for hit in results[0]:
                 docs.append(
@@ -309,9 +315,16 @@ class VectorStore:
                     }
                 )
             # ===== 新增：混合检索融合 =====
-            if self.enable_hybrid and self.bm25_retriever is not None:
-                bm25_docs = self.bm25_retriever.search(query, top_k=candidate_limit)
-                docs = self._rrf_merge(docs, bm25_docs, top_k=candidate_limit)
+            if self.enable_hybrid:
+                with self._bm25_lock:
+                    bm25_retriever = self.bm25_retriever
+                bm25_docs = (
+                    await asyncio.to_thread(bm25_retriever.search, query, candidate_limit)
+                    if bm25_retriever is not None
+                    else []
+                )
+                if bm25_docs:
+                    docs = self._rrf_merge(docs, bm25_docs, top_k=candidate_limit)
 
             if not docs:
                 logger.info("检索到0个相关文档")
@@ -381,50 +394,42 @@ class VectorStore:
         """简单的 RRF 融合"""
         scores = {}
         for rank, doc in enumerate(bm25_docs):
-            key = self._document_key(doc)
+            key = document_key(doc)
             scores[key] = scores.get(key, {"doc": doc, "score": 0})
             scores[key]["score"] += 1 / (k + rank + 1)
         for rank, doc in enumerate(vector_docs):
-            key = self._document_key(doc)
+            key = document_key(doc)
             scores[key] = scores.get(key, {"doc": doc, "score": 0})
             scores[key]["score"] += 1 / (k + rank + 1)
         return [v["doc"] for v in sorted(scores.values(), key=lambda x: x["score"], reverse=True)[:top_k]]
 
-    async def delete_by_source(self, source: str) -> None:
-        """
-        删除指定来源的所有文档
+    def _delete_by_source_sync(self, source: str) -> int:
+        """在线程中执行同步 Milvus 删除和 BM25 派生索引更新。"""
+        escaped_source = source.replace("\\", "\\\\").replace("'", "\\'")
+        expr = f"metadata['source'] == '{escaped_source}'"
+        results = self.milvus.collection.query(expr=expr, output_fields=["id"])
+        if not results:
+            return 0
 
-        Args:
-            source: 文件名
-        """
-        try:
-            # 先查询出所有匹配的文档 ID
-            escaped_source = source.replace("\\", "\\\\").replace("'", "\\'")
-            expr = f"metadata['source'] == '{escaped_source}'"
+        ids = [result["id"] for result in results]
+        self.milvus.collection.delete(f"id in {ids}")
+        if hasattr(self.milvus.collection, "flush"):
+            self.milvus.collection.flush()
 
-            # 查询匹配的文档
-            results = self.milvus.collection.query(expr=expr, output_fields=["id"])
-
-            if not results:
-                logger.info(f"没有找到来源为 {source} 的文档，跳过删除")
-                return
-
-            # 提取所有 ID
-            ids = [result["id"] for result in results]
-
-            # 按 ID 删除
-            delete_expr = f"id in {ids}"
-            self.milvus.collection.delete(delete_expr)
-            if hasattr(self.milvus.collection, "flush"):
-                self.milvus.collection.flush()
-
-            # 新增：同步删除 all_chunks 并重建 BM25 索引
-            self.all_chunks = [c for c in self.all_chunks if c.get("metadata", {}).get("source") != source]
+        with self._bm25_lock:
+            self.all_chunks = [c for c in self.all_chunks if document_source(c) != source]
             if self.enable_hybrid:
                 self._rebuild_bm25_sync(self.all_chunks)
+        return len(ids)
 
-            logger.info(f"已删除来源为 {source} 的 {len(ids)} 个文档")
-
+    async def delete_by_source(self, source: str) -> None:
+        """删除指定来源的所有文档，不在事件循环中执行同步 Milvus 操作。"""
+        try:
+            deleted_count = await asyncio.to_thread(self._delete_by_source_sync, source)
+            if deleted_count:
+                logger.info(f"已删除来源为 {source} 的 {deleted_count} 个文档")
+            else:
+                logger.info(f"没有找到来源为 {source} 的文档，跳过删除")
         except Exception as e:
             logger.error(f"删除文档失败: {str(e)}")
             raise Exception(f"删除文档失败: {str(e)}")

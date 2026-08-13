@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from threading import get_ident
+
 import httpx
 import pytest
 
@@ -9,6 +11,7 @@ from app.agents.tools.internal_docs_tool import create_docs_tool
 from app.core.dependencies import get_vector_store
 from app.main import app
 from app.rag.context import current_sources, use_metadata_filters
+from app.rag.document_utils import document_source
 from app.rag.vector_store import VectorStore
 from app.services.chat_service import ChatService
 from app.services.rag_service import RAGService
@@ -31,13 +34,36 @@ class _Collection:
         self.rows = rows
         self.dense_hits = dense_hits or []
         self.iterator = None
+        self.inserted = []
+        self.deleted = []
+        self.flush_count = 0
+        self.sync_threads = []
 
     def query_iterator(self, **_kwargs):
         self.iterator = _Iterator([self.rows, []])
         return self.iterator
 
     def search(self, **_kwargs):
+        self.sync_threads.append(get_ident())
         return [self.dense_hits]
+
+    def insert(self, data):
+        self.sync_threads.append(get_ident())
+        self.inserted.append(data)
+
+    def flush(self):
+        self.flush_count += 1
+
+    def query(self, expr="", **_kwargs):
+        self.sync_threads.append(get_ident())
+        source = None
+        if "== '" in expr:
+            source = expr.split("== '", 1)[1].rsplit("'", 1)[0]
+        return [{"id": row["id"]} for row in self.rows if source is None or row["metadata"].get("source") == source]
+
+    def delete(self, expression):
+        self.sync_threads.append(get_ident())
+        self.deleted.append(expression)
 
 
 class _Milvus:
@@ -48,6 +74,9 @@ class _Milvus:
 class _Embedding:
     async def embed_text(self, _text):
         return [1.0]
+
+    async def embed_texts(self, texts):
+        return [[1.0] for _ in texts]
 
 
 class _Hit:
@@ -168,6 +197,26 @@ async def test_hybrid_search_uses_restored_bm25_candidates():
 
     assert result
     assert any(doc["metadata"].get("source") == "ops.md" for doc in result)
+
+
+@pytest.mark.asyncio
+async def test_insert_and_delete_move_sync_milvus_work_off_event_loop():
+    rows = _rows()
+    collection = _Collection(rows)
+    store = VectorStore(_Milvus(collection), _Embedding(), enable_rerank=False)
+    chunks = [{"content": "新增内容", "metadata": {"source": "new.md"}}]
+    main_thread = get_ident()
+
+    await store.insert(chunks)
+    assert collection.inserted[0][1] == ["新增内容"]
+    assert collection.flush_count == 1
+    assert store.all_chunks == chunks
+    assert collection.sync_threads and all(thread_id != main_thread for thread_id in collection.sync_threads)
+
+    await store.delete_by_source("ops.md")
+    assert collection.deleted == ["id in [1, 2]"]
+    assert collection.flush_count == 2
+    assert all(document_source(chunk) != "ops.md" for chunk in store.all_chunks)
 
 
 class _Rewriter:
