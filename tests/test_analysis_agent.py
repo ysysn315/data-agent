@@ -373,6 +373,45 @@ async def test_run_analysis_task_emits_phase_events(monkeypatch):
     assert "## 附：执行的 SQL 清单" in st["result"]["report"]
 
 
+async def test_run_analysis_task_propagates_datasource_graph_scope(monkeypatch):
+    """后台分析和同步 Analysis 使用同一条 datasource/workspace 作用域。"""
+    import fakeredis.aioredis
+
+    from app.agents import analysis_agent as analysis_module
+    from app.core import dependencies as deps
+    from app.graph.scope import current_graph_scope
+    from app.tasks import worker
+
+    class ScopeCheckingAgent:
+        def __init__(self, **kwargs):
+            pass
+
+        async def analyze(self, question):
+            scope = current_graph_scope()
+            assert scope is not None and scope.key == "datasource:19"
+            return {
+                "report": "# report",
+                "step_summaries": [],
+            }
+
+    async def _fake_get_chat_agent():
+        return object()
+
+    monkeypatch.setattr(deps, "get_chat_agent", _fake_get_chat_agent)
+    monkeypatch.setattr(analysis_module, "AnalysisAgent", ScopeCheckingAgent)
+    monkeypatch.setattr(worker.LLMFactory, "create_llm", lambda **kw: object())
+
+    text = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    out = await worker.run_analysis_task(
+        {"job_id": "analysis-scope", "redis": text},
+        question="按数据源分析",
+        datasource_id=19,
+        workspace_id=4,
+    )
+    assert out["report"] == "# report"
+    assert current_graph_scope() is None
+
+
 def test_route_analysis_planner_failure_returns_400():
     from fastapi.testclient import TestClient
 

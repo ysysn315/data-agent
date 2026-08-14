@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-本文描述当前分支代码（2026-08-13）。实现事实以代码、测试和评测原始报告为准；历史需求与差距分析仅用于解释设计过程。
+本文描述当前分支代码（2026-08-14）。实现事实以代码、测试和评测原始报告为准；历史需求与差距分析仅用于解释设计过程。
 
 - 自动化测试：提交前使用 pytest/CI 验证；Docker/Redis 不可用时，外部集成用例会按环境跳过。
 - Text-to-SQL：28 条分层用例；仓库内 3 份可区分的模型报告，最高执行准确率为 **89.29%（25/28）**。
@@ -16,7 +16,7 @@
 - **Skills/MCP 插件体系**：system prompt 只披露技能名称与描述，模型按需读取正文并激活技能，之后才解锁本地门控工具或懒加载 MCP 工具。阶段测量中，提示词注入开销约由 1183 降至 150 tokens/请求。
 - **Text-to-SQL 可靠链路**：支持工作空间接入 SQLite/PostgreSQL/MySQL，自动扫描物理 Schema，LLM 生成业务语义草稿，人工审核后才进入 M-Schema；`sqlglot` 按方言校验单语句、只读、表列和 LIMIT，数据库只读账号/事务再兜底。
 - **RAG 知识库**：支持 TXT/Markdown/PDF/DOCX/HTML/CSV/JSON/Excel；表格会转换为带统计摘要的语义文本，分块后写入 Milvus。主 Chat 与独立实验链路共用 BM25+向量 RRF、查询改写/扩展和可选 BGE/LLM 重排。
-- **轻量知识图谱**：显式调用 LLM 抽取业务三元组，SQLite 持久化，NetworkX 提供实体邻域与关系路径查询，并通过门控技能接入 Agent。它不是 GraphRAG，也不面向大规模图计算。
+- **轻量知识图谱**：图谱按 workspace/datasource 隔离，SQLite 持久化实体/三元组，支持已审核 Schema 同步、别名/属性合并、可选实体 Embedding 召回和 `graph_path_search` 路径工具；NetworkX 负责千级规模邻域/路径查询。它不是 GraphRAG，也不面向大规模图计算。
 - **多步分析与异步任务**：Analysis Agent 按 Planner → Operation → Reflection 运行；ARQ 承载长任务，Redis Hash/Streams 保存状态与事件，SSE 推送进度并支持迟到订阅回放历史事件。
 - **运行安全与降级**：工具调用支持超时、重试、三态熔断和错误回喂；技能脚本可切换到一次性 Docker 容器，以断网、只读挂载、资源限额和超时回收收敛执行风险。
 - **可选平台能力**：SQLAlchemy 2.0 async 持久化、API Key 鉴权与 workspace-lite、推理模型思考/答案分流、Langfuse callbacks 均已实现，但默认配置不等于生产级多租户或全链路可观测平台。
@@ -43,6 +43,7 @@ flowchart TB
     SQL --> BIZDB[("只读 SQLite / PostgreSQL / MySQL")]
     SKILLS --> APPDB[("应用 SQLite / PostgreSQL")]
     GRAPH --> APPDB
+    GRAPH -. "可选实体向量" .-> MILVUS
     KB --> MILVUS[("Milvus")]
 ```
 
@@ -188,7 +189,7 @@ tests/            # 21 个测试文件
 ## 已知边界
 
 - `schema_search(question)` 尚未使用问题做相关表筛选；演示库返回全部 6 张表，平台数据源返回所选 Schema 的全部表，大库仍需表级召回与 token 预算。
-- `datasource_id` 当前只贯通同步/流式 Chat；Analysis Agent、ARQ 后台对话任务与 Text-to-SQL 评测仍使用演示数据源。
+- `datasource_id` 已贯通同步/流式 Chat、同步 Analysis 和 ARQ Chat/Analysis 任务；Text-to-SQL 评测仍固定使用演示数据源。
 - 前端尚无登录/API Key 注入层；启用鉴权后的远程数据源管理需通过 API、统一网关或后续登录页操作。
 - 主 Chat 已接入完整 RAG 检索组装；本地 BGE 重排需要安装 `torch`/`FlagEmbedding`，否则使用配置的 LLM 重排或融合顺序。
 - 顶层 Chat 请求的 `metadata_filters` 已合并到知识库工具过滤条件；非流式 Chat 和 API 流式 SSE 的 `sources` 均来自实际命中的文档。

@@ -165,6 +165,51 @@ async def test_api_create_get_and_errors(fake_server):
         app.dependency_overrides.clear()
 
 
+async def test_api_scoped_task_overwrites_workspace_and_validates_datasource(fake_server, monkeypatch):
+    """异步 Chat/Analysis 任务把服务端 workspace 传给 worker，不信任客户端字段。"""
+    from app.core.dependencies import get_datasource_service, get_task_service
+    from app.core.settings import settings
+    from app.main import app
+
+    class FakeDataSourceService:
+        def __init__(self):
+            self.seen = None
+
+        async def get_source(self, datasource_id, workspace_id):
+            self.seen = (datasource_id, workspace_id)
+            return {"id": datasource_id, "workspace_id": workspace_id}
+
+    text = fakeredis.aioredis.FakeRedis(server=fake_server, decode_responses=True)
+    pool = ArqRedis(connection_pool=fakeredis.aioredis.FakeRedis(server=fake_server).connection_pool)
+    svc = TaskService(redis=text, arq_pool=pool)
+    datasource_service = FakeDataSourceService()
+    monkeypatch.setattr(settings, "auth_enabled", False)
+    app.dependency_overrides[get_task_service] = lambda: svc
+    app.dependency_overrides[get_datasource_service] = lambda: datasource_service
+    try:
+        async with _client(app) as client:
+            response = await client.post(
+                "/api/tasks",
+                json={
+                    "type": "chat",
+                    "params": {"question": "q", "datasource_id": 9, "workspace_id": 999},
+                },
+            )
+            assert response.status_code == 201
+            task = await svc.get_status(response.json()["task_id"])
+            assert task["params"]["workspace_id"] == 0
+            assert task["params"]["datasource_id"] == 9
+            assert datasource_service.seen == (9, 0)
+
+            rejected = await client.post(
+                "/api/tasks",
+                json={"type": "eval", "params": {"datasource_id": 9}},
+            )
+            assert rejected.status_code == 400
+    finally:
+        app.dependency_overrides.clear()
+
+
 # ========== 6. SSE 端点 ==========
 
 
