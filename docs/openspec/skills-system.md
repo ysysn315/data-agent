@@ -58,7 +58,7 @@ app/skills/
     ├── sql-generation/
     ├── data-visualization/     # dependencies.mcps: [chart-mcp]
     ├── sqlite-query/           # dependencies.tools: [execute_sql]，随附 scripts/query.py
-    └── knowledge-graph/        # dependencies.tools: [graph_search]
+    └── knowledge-graph/        # dependencies.tools: [graph_search, graph_path_search]
 ```
 
 ## 4. 依赖模型

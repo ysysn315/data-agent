@@ -5,7 +5,8 @@
 同步模式限制在 **步数 ≤ 2** 的小分析（max_steps 会被夹到 2），适合秒级返回的场景。
 需要更多步骤 / 长耗时的分析，请走异步任务框架，进度用 SSE 订阅：
 
-    POST /api/tasks            {"type": "run_analysis_task", "params": {"question": "..."}}  -> {task_id}
+    POST /api/tasks            {"type": "run_analysis_task",
+                                "params": {"question": "...", "datasource_id": 1}}  -> {task_id}
     GET  /api/tasks/{id}       查询状态，done 后 result.report 即完整报告
     GET  /api/tasks/{id}/events SSE 事件流：started → planning → step i/N → reflecting → reporting → done
 
@@ -19,6 +20,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.agents.analysis_agent import AnalysisAgent
+from app.api.request_scope import resolve_graph_scope
+from app.core.dependencies import get_current_user_optional, get_datasource_service
+from app.datasources.context import use_datasource_graph_scope
+from app.datasources.service import DataSourceService
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 
@@ -28,6 +33,7 @@ SYNC_MAX_STEPS = 2
 
 class AnalysisRequest(BaseModel):
     question: str = Field(description="分析请求，如：分析各州的销售额分布并给出建议")
+    datasource_id: int | None = Field(default=None, ge=1, description="可选的平台数据源")
     max_steps: int = Field(
         default=SYNC_MAX_STEPS,
         ge=2,
@@ -57,10 +63,17 @@ async def get_analysis_agent() -> AnalysisAgent:
 
 
 @router.post("", response_model=AnalysisResponse)
-async def analyze(req: AnalysisRequest, agent: AnalysisAgent = Depends(get_analysis_agent)):
+async def analyze(
+    req: AnalysisRequest,
+    agent: AnalysisAgent = Depends(get_analysis_agent),
+    user: dict | None = Depends(get_current_user_optional),
+    datasource_service: DataSourceService = Depends(get_datasource_service),
+):
     """同步跑一次小规模分析，返回结构化 Markdown 报告。长任务请走 POST /api/tasks。"""
+    scope = await resolve_graph_scope(req.datasource_id, user, datasource_service)
     try:
-        result = await agent.analyze(req.question, max_steps=min(req.max_steps, SYNC_MAX_STEPS))
+        with use_datasource_graph_scope(scope.datasource_id, scope.workspace_id):
+            result = await agent.analyze(req.question, max_steps=min(req.max_steps, SYNC_MAX_STEPS))
     except RuntimeError as e:
         # Planner 重试后仍无法产出合法计划：显式 400，交由调用方重述问题
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

@@ -21,7 +21,15 @@ from typing import Optional
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
-from app.db.models import MCPServerModel, SkillModel, SQLExampleModel, TerminologyModel
+from app.db.models import (
+    GraphEntityAliasModel,
+    GraphEntityModel,
+    GraphTripleModel,
+    MCPServerModel,
+    SkillModel,
+    SQLExampleModel,
+    TerminologyModel,
+)
 from app.mcp.models import MCPServer
 from app.skills.models import Skill, SkillSourceType
 
@@ -426,43 +434,307 @@ class TerminologyRepository:
             return int((await session.execute(stmt)).scalar_one())
 
 
-# ========== 知识图谱三元组仓储（E 轮追加；import 就近声明，不改动文件头部） ==========
-
-from app.db.models import GraphTripleModel  # noqa: E402
+# ========== 知识图谱仓储（平台化扩展） ==========
 
 
-class GraphTripleRepository:
-    """知识图谱三元组存储后端（供 app/graph/store.GraphStore 的持久化层）。
+class GraphEntityRepository:
+    """实体/别名的轻量仓储。
 
-    领域层收发 dict（subject/predicate/object/source），与示例/术语仓储同风格。
-    幂等由 add_many 的 (s,p,o) 判重实现（先查后插，一次提交），而不是逐条
-    捕 IntegrityError —— 后者会让批量插入在第一条冲突处整批回滚。
+    GraphStore 的同步门面通过 ``run_sync`` 调用本仓储；方法自身保持 async，方便
+    API 或后台任务直接复用。实体写入采用先查后插，规模假设仍是千级图谱。
     """
 
     def __init__(self, sessionmaker: async_sessionmaker):
         self._sm = sessionmaker
 
     @staticmethod
-    def _to_dict(row: GraphTripleModel) -> dict:
+    def _to_dict(row: GraphEntityModel) -> dict:
         return {
+            "id": row.id,
+            "scope_key": row.scope_key,
+            "workspace_id": row.workspace_id,
+            "datasource_id": row.datasource_id,
+            "canonical_name": row.canonical_name,
+            "normalized_name": row.normalized_name,
+            "entity_type": row.entity_type,
+            "aliases": list(row.aliases or []),
+            "attributes": dict(row.attributes or {}),
+            "status": row.status,
+            "merged_into_id": row.merged_into_id,
+            "embedding_status": row.embedding_status,
+            "embedding_hash": row.embedding_hash,
+        }
+
+    async def list_scope(self, scope_key: str) -> list[dict]:
+        async with self._sm() as session:
+            stmt = (
+                select(GraphEntityModel)
+                .where(GraphEntityModel.scope_key == scope_key, GraphEntityModel.status == "active")
+                .order_by(GraphEntityModel.id)
+            )
+            rows = (await session.execute(stmt)).scalars().all()
+            return [self._to_dict(row) for row in rows]
+
+    async def get_by_id(self, entity_id: int, scope_key: str | None = None) -> dict | None:
+        async with self._sm() as session:
+            stmt = select(GraphEntityModel).where(GraphEntityModel.id == entity_id)
+            if scope_key is not None:
+                stmt = stmt.where(GraphEntityModel.scope_key == scope_key)
+            row = (await session.execute(stmt)).scalar_one_or_none()
+            return self._to_dict(row) if row else None
+
+    async def get_by_normalized(self, scope_key: str, normalized_name: str) -> dict | None:
+        async with self._sm() as session:
+            stmt = select(GraphEntityModel).where(
+                GraphEntityModel.scope_key == scope_key,
+                GraphEntityModel.normalized_name == normalized_name,
+                GraphEntityModel.status == "active",
+            )
+            row = (await session.execute(stmt)).scalar_one_or_none()
+            return self._to_dict(row) if row else None
+
+    async def get_by_alias(self, scope_key: str, normalized_alias: str) -> dict | None:
+        async with self._sm() as session:
+            stmt = select(GraphEntityAliasModel.entity_id).where(
+                GraphEntityAliasModel.scope_key == scope_key,
+                GraphEntityAliasModel.normalized_alias == normalized_alias,
+            )
+            entity_id = (await session.execute(stmt)).scalar_one_or_none()
+            if entity_id is None:
+                return None
+            row = await session.get(GraphEntityModel, entity_id)
+            return self._to_dict(row) if row and row.status == "active" else None
+
+    async def upsert_many(self, entities: list[dict]) -> list[dict]:
+        if not entities:
+            return []
+        async with self._sm() as session:
+            result = await self._upsert_many_in_session(session, entities)
+            await session.commit()
+            return result
+
+    async def _upsert_many_in_session(self, session, entities: list[dict]) -> list[dict]:
+        """在调用方事务中合并实体/别名，不自行提交。"""
+
+        if not entities:
+            return []
+        from app.graph.entities import merge_attributes, normalize_entity_name
+
+        result: list[dict] = []
+        for item in entities:
+            name = str(item.get("canonical_name") or item.get("name") or "").strip()
+            if not name:
+                continue
+            scope_key = item.get("scope_key") or "workspace:0"
+            normalized = item.get("normalized_name") or normalize_entity_name(name)
+            stmt = select(GraphEntityModel).where(
+                GraphEntityModel.scope_key == scope_key,
+                GraphEntityModel.normalized_name == normalized,
+                GraphEntityModel.status == "active",
+            )
+            row = (await session.execute(stmt)).scalar_one_or_none()
+            source = item.get("source") or "manual"
+            aliases = [str(alias).strip() for alias in item.get("aliases", []) if str(alias).strip()]
+            if row is None:
+                row = GraphEntityModel(
+                    scope_key=scope_key,
+                    workspace_id=int(item.get("workspace_id") or 0),
+                    datasource_id=item.get("datasource_id"),
+                    canonical_name=name,
+                    normalized_name=normalized,
+                    entity_type=item.get("entity_type") or "unknown",
+                    aliases=list(dict.fromkeys(aliases)),
+                    attributes=dict(item.get("attributes") or {}),
+                    embedding_status="pending",
+                )
+                session.add(row)
+                await session.flush()
+            else:
+                merged_aliases = list(dict.fromkeys([*(row.aliases or []), *aliases]))
+                row.aliases = merged_aliases
+                row.attributes = merge_attributes(row.attributes, item.get("attributes"), source)
+                if row.entity_type == "unknown" and item.get("entity_type"):
+                    row.entity_type = item["entity_type"]
+                row.embedding_status = "pending"
+            for alias in aliases:
+                normalized_alias = normalize_entity_name(alias)
+                if not normalized_alias or normalized_alias == row.normalized_name:
+                    continue
+                alias_stmt = select(GraphEntityAliasModel).where(
+                    GraphEntityAliasModel.scope_key == scope_key,
+                    GraphEntityAliasModel.normalized_alias == normalized_alias,
+                )
+                alias_row = (await session.execute(alias_stmt)).scalar_one_or_none()
+                if alias_row is None:
+                    session.add(
+                        GraphEntityAliasModel(
+                            scope_key=scope_key,
+                            entity_id=row.id,
+                            alias=alias,
+                            normalized_alias=normalized_alias,
+                            source=source,
+                            confidence=float(item.get("confidence") if item.get("confidence") is not None else 1.0),
+                        )
+                    )
+            result.append(self._to_dict(row))
+        return result
+
+    async def update_embedding_status(self, entity_id: int, status: str, vector_hash: str = "") -> None:
+        async with self._sm() as session:
+            row = await session.get(GraphEntityModel, entity_id)
+            if row:
+                row.embedding_status = status
+                if vector_hash:
+                    row.embedding_hash = vector_hash
+                await session.commit()
+
+    async def merge_entities(self, scope_key: str, survivor_id: int, duplicate_id: int) -> dict:
+        """显式合并实体并在同一事务内重指关系端点。"""
+
+        from app.graph.entities import merge_attributes
+
+        async with self._sm() as session:
+            survivor = await session.get(GraphEntityModel, survivor_id)
+            duplicate = await session.get(GraphEntityModel, duplicate_id)
+            if not survivor or not duplicate or survivor.scope_key != scope_key or duplicate.scope_key != scope_key:
+                raise ValueError("实体不存在或不属于当前图谱作用域")
+            if survivor.id == duplicate.id:
+                return self._to_dict(survivor)
+
+            survivor.aliases = list(
+                dict.fromkeys([*(survivor.aliases or []), duplicate.canonical_name, *(duplicate.aliases or [])])
+            )
+            survivor.attributes = merge_attributes(survivor.attributes, duplicate.attributes, "manual")
+
+            alias_rows = (
+                (
+                    await session.execute(
+                        select(GraphEntityAliasModel).where(
+                            GraphEntityAliasModel.scope_key == scope_key,
+                            GraphEntityAliasModel.entity_id == duplicate_id,
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            for alias_row in alias_rows:
+                exists = (
+                    await session.execute(
+                        select(GraphEntityAliasModel).where(
+                            GraphEntityAliasModel.scope_key == scope_key,
+                            GraphEntityAliasModel.normalized_alias == alias_row.normalized_alias,
+                            GraphEntityAliasModel.id != alias_row.id,
+                        )
+                    )
+                ).scalar_one_or_none()
+                if exists is None:
+                    alias_row.entity_id = survivor_id
+                else:
+                    await session.delete(alias_row)
+
+            triples = (
+                (
+                    await session.execute(
+                        select(GraphTripleModel)
+                        .where(GraphTripleModel.scope_key == scope_key)
+                        .order_by(GraphTripleModel.id)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            seen: set[tuple[str, str, str]] = set()
+            updates: list[tuple[GraphTripleModel, str, str]] = []
+            duplicates: list[GraphTripleModel] = []
+            for triple in triples:
+                new_subject = (
+                    survivor.canonical_name
+                    if triple.subject_entity_id == duplicate_id or triple.subject == duplicate.canonical_name
+                    else triple.subject
+                )
+                new_object = (
+                    survivor.canonical_name
+                    if triple.object_entity_id == duplicate_id or triple.object == duplicate.canonical_name
+                    else triple.object
+                )
+                key = (new_subject, triple.predicate, new_object)
+                if key in seen:
+                    duplicates.append(triple)
+                else:
+                    seen.add(key)
+                    updates.append((triple, new_subject, new_object))
+
+            # 先删掉合并后会冲突的边并 flush，再更新保留边，避免 SQLite/PG 的
+            # ``scope + subject + predicate + object`` 唯一约束被临时撞上。
+            for triple in duplicates:
+                await session.delete(triple)
+            if duplicates:
+                await session.flush()
+            for triple, subject, object_ in updates:
+                if triple.subject_entity_id == duplicate_id or triple.subject == duplicate.canonical_name:
+                    triple.subject_entity_id = survivor_id
+                if triple.object_entity_id == duplicate_id or triple.object == duplicate.canonical_name:
+                    triple.object_entity_id = survivor_id
+                triple.subject = subject
+                triple.object = object_
+
+            duplicate.status = "merged"
+            duplicate.merged_into_id = survivor_id
+            duplicate.embedding_status = "stale"
+            survivor.embedding_status = "pending"
+            await session.commit()
+            return self._to_dict(survivor)
+
+
+class GraphTripleRepository:
+    """作用域三元组仓储，保留旧的无参数调用语义（默认 workspace:0）。"""
+
+    def __init__(self, sessionmaker: async_sessionmaker):
+        self._sm = sessionmaker
+
+    @staticmethod
+    def _to_dict(row: GraphTripleModel) -> dict:
+        data = {
             "subject": row.subject,
             "predicate": row.predicate,
             "object": row.object,
             "source": row.source,
         }
+        if row.scope_key != "workspace:0":
+            data.update(
+                scope_key=row.scope_key,
+                workspace_id=row.workspace_id,
+                datasource_id=row.datasource_id,
+            )
+        # 默认值不扩展旧接口返回；非默认来源/置信度会显式带出，方便新链路
+        # 做 provenance 展示，同时保持已有调用方的四字段结果兼容。
+        if row.source_type != row.source:
+            data["source_type"] = row.source_type
+        if row.confidence != 1.0:
+            data["confidence"] = row.confidence
+        if row.source_ref:
+            data["source_ref"] = row.source_ref
+        if row.provenance:
+            data["provenance"] = dict(row.provenance)
+        return data
 
-    async def list_all(self) -> list[dict]:
+    async def list_all(self, scope_key: str | None = None) -> list[dict]:
         async with self._sm() as session:
-            stmt = select(GraphTripleModel).order_by(GraphTripleModel.id)
-            rows = (await session.execute(stmt)).scalars().all()
+            stmt = select(GraphTripleModel)
+            if scope_key is not None:
+                stmt = stmt.where(GraphTripleModel.scope_key == scope_key)
+            rows = (await session.execute(stmt.order_by(GraphTripleModel.id))).scalars().all()
             return [self._to_dict(r) for r in rows]
 
-    async def add_many(self, triples: list[dict]) -> int:
-        """批量入库，返回实际新增条数；库内已有或批内重复的 (s,p,o) 都只留一条。"""
+    async def add_many(self, triples: list[dict], scope_key: str = "workspace:0") -> int:
+        """批量入库，幂等范围为 ``scope_key + (s,p,o)``。"""
         if not triples:
             return 0
         async with self._sm() as session:
-            stmt = select(GraphTripleModel.subject, GraphTripleModel.predicate, GraphTripleModel.object)
+            stmt = select(GraphTripleModel.subject, GraphTripleModel.predicate, GraphTripleModel.object).where(
+                GraphTripleModel.scope_key == scope_key
+            )
             existing = {tuple(row) for row in (await session.execute(stmt)).all()}
             added = 0
             for t in triples:
@@ -474,7 +746,19 @@ class GraphTripleRepository:
                         subject=t["subject"],
                         predicate=t["predicate"],
                         object=t["object"],
+                        scope_key=t.get("scope_key") or scope_key,
+                        workspace_id=int(t.get("workspace_id") or 0),
+                        datasource_id=t.get("datasource_id"),
+                        subject_entity_id=t.get("subject_entity_id"),
+                        object_entity_id=t.get("object_entity_id"),
                         source=t.get("source") or "manual",
+                        source_type=t.get("source_type") or t.get("source") or "manual",
+                        confidence=min(
+                            1.0,
+                            max(0.0, float(t.get("confidence") if t.get("confidence") is not None else 1.0)),
+                        ),
+                        source_ref=t.get("source_ref"),
+                        provenance=dict(t.get("provenance") or {}),
                     )
                 )
                 existing.add(key)
@@ -482,9 +766,66 @@ class GraphTripleRepository:
             await session.commit()
             return added
 
-    async def count(self) -> int:
+    async def add_many_with_entities(
+        self,
+        entity_rows: list[dict],
+        triples: list[dict],
+        scope_key: str = "workspace:0",
+    ) -> int:
+        """在同一事务中合并端点实体并写入关系，避免留下孤儿实体。"""
+
+        from app.graph.entities import normalize_entity_name
+
+        if not entity_rows and not triples:
+            return 0
+        async with self._sm() as session:
+            entity_repo = GraphEntityRepository(self._sm)
+            entities = await entity_repo._upsert_many_in_session(session, entity_rows)
+            entity_by_name = {entity["normalized_name"]: entity for entity in entities}
+            existing_stmt = select(GraphTripleModel.subject, GraphTripleModel.predicate, GraphTripleModel.object).where(
+                GraphTripleModel.scope_key == scope_key
+            )
+            existing = {tuple(row) for row in (await session.execute(existing_stmt)).all()}
+            added = 0
+            for raw in triples:
+                t = dict(raw)
+                key = (t["subject"], t["predicate"], t["object"])
+                if key in existing:
+                    continue
+                t.setdefault("scope_key", scope_key)
+                t.setdefault("workspace_id", 0)
+                t["subject_entity_id"] = entity_by_name.get(normalize_entity_name(t["subject"]), {}).get("id")
+                t["object_entity_id"] = entity_by_name.get(normalize_entity_name(t["object"]), {}).get("id")
+                session.add(
+                    GraphTripleModel(
+                        subject=t["subject"],
+                        predicate=t["predicate"],
+                        object=t["object"],
+                        scope_key=t.get("scope_key") or scope_key,
+                        workspace_id=int(t.get("workspace_id") or 0),
+                        datasource_id=t.get("datasource_id"),
+                        subject_entity_id=t.get("subject_entity_id"),
+                        object_entity_id=t.get("object_entity_id"),
+                        source=t.get("source") or "manual",
+                        source_type=t.get("source_type") or t.get("source") or "manual",
+                        confidence=min(
+                            1.0,
+                            max(0.0, float(t.get("confidence") if t.get("confidence") is not None else 1.0)),
+                        ),
+                        source_ref=t.get("source_ref"),
+                        provenance=dict(t.get("provenance") or {}),
+                    )
+                )
+                existing.add(key)
+                added += 1
+            await session.commit()
+            return added
+
+    async def count(self, scope_key: str | None = None) -> int:
         async with self._sm() as session:
             stmt = select(func.count()).select_from(GraphTripleModel)
+            if scope_key is not None:
+                stmt = stmt.where(GraphTripleModel.scope_key == scope_key)
             return int((await session.execute(stmt)).scalar_one())
 
 

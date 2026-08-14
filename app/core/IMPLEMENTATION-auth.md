@@ -86,7 +86,8 @@ get_admin_user             ──(管理员守卫：role!=admin→403)
 | 级别 | 端点 |
 |---|---|
 | login | sql-examples / terminology 写口；skills 增删改、远程安装；数据源目录、AI 草稿与审核 |
-| admin | skills 启停；MCP 全部写口 + 连接测试；数据源接入、同步和删除 |
+| admin | skills 启停；MCP 全部写口 + 连接测试；数据源接入、同步和删除；图谱写入、抽取、Schema 同步与实体合并 |
+| login | 图谱邻居、路径和统计查询 |
 | 开放 | 普通 Skills/MCP/知识管理读口；数据源连接摘要与 Schema 例外，必须登录 |
 
 `tests/test_auth.py` 既对清单做矩阵化行为断言（逐口 no-key→401 / member 对 admin 口→403 /

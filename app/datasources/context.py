@@ -11,6 +11,8 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Iterator
 
+from app.graph.scope import GraphScope, use_graph_scope
+
 
 @dataclass(frozen=True)
 class DataSourceSelection:
@@ -36,3 +38,11 @@ def use_datasource(datasource_id: int | None, workspace_id: int) -> Iterator[Non
         yield
     finally:
         _selection.reset(token)
+
+
+@contextmanager
+def use_datasource_graph_scope(datasource_id: int | None, workspace_id: int) -> Iterator[None]:
+    """同时设置数据源和图谱作用域，保证 Agent 链路使用同一租户上下文。"""
+
+    with use_datasource(datasource_id, workspace_id), use_graph_scope(GraphScope.from_ids(workspace_id, datasource_id)):
+        yield

@@ -18,6 +18,8 @@ from loguru import logger
 
 from app.core.llm import LLMFactory
 from app.core.settings import settings
+from app.datasources.context import use_datasource_graph_scope
+from app.datasources.service import normalize_workspace_id
 from app.skills.middleware import READ_SKILL_TOOL_NAME
 from app.tasks.events import TaskEvent
 from app.tasks.service import TaskService, build_redis_settings
@@ -55,7 +57,13 @@ def _final_text(msg) -> str:
     return "".join(p.get("text", "") for p in content if isinstance(p, dict) and p.get("type") == "text")
 
 
-async def run_chat_task(ctx, question: str, session_id: Optional[str] = None) -> dict:
+async def run_chat_task(
+    ctx,
+    question: str,
+    session_id: Optional[str] = None,
+    datasource_id: Optional[int] = None,
+    workspace_id: Optional[int] = None,
+) -> dict:
     """后台跑一轮 ChatAgent 对话，逐步产出进度事件：已激活技能 / 每次工具调用 / 完成。"""
     task_id = ctx["job_id"]
     svc = _svc(ctx)
@@ -68,17 +76,20 @@ async def run_chat_task(ctx, question: str, session_id: Optional[str] = None) ->
         agent = await get_chat_agent()
         answer = ""
         # stream_mode="updates"：每个节点产出的 state 增量，从中截获工具调用与最终回答
-        async for update in agent.graph.astream(
-            {"messages": [HumanMessage(content=question)]},
-            stream_mode="updates",
+        with (
+            use_datasource_graph_scope(datasource_id, normalize_workspace_id(workspace_id)),
         ):
-            for delta in (update or {}).values():
-                for msg in (delta or {}).get("messages", []) if isinstance(delta, dict) else []:
-                    for event in _message_progress_events(msg):
-                        await svc.publish_event(task_id, event)
-                    text = _final_text(msg)
-                    if text:
-                        answer = text
+            async for update in agent.graph.astream(
+                {"messages": [HumanMessage(content=question)]},
+                stream_mode="updates",
+            ):
+                for delta in (update or {}).values():
+                    for msg in (delta or {}).get("messages", []) if isinstance(delta, dict) else []:
+                        for event in _message_progress_events(msg):
+                            await svc.publish_event(task_id, event)
+                        text = _final_text(msg)
+                        if text:
+                            answer = text
 
         await svc.publish_event(
             task_id, TaskEvent(type="done", message="对话完成", progress=1.0, payload={"answer": answer})
@@ -166,7 +177,12 @@ async def run_eval_task(ctx, limit: Optional[int] = None, model: Optional[str] =
 # ========== 任务 3：后台跑 P-O-R 分析工作流，产出 Markdown 报告 ==========
 
 
-async def run_analysis_task(ctx, question: str) -> dict:
+async def run_analysis_task(
+    ctx,
+    question: str,
+    datasource_id: Optional[int] = None,
+    workspace_id: Optional[int] = None,
+) -> dict:
     """后台跑 AnalysisAgent（Plan-Operation-Reflection），阶段事件透传给 SSE：
     started → planning → step 1/N … → reflecting →（补充则再 step/reflecting）→ reporting → done。
 
@@ -189,7 +205,8 @@ async def run_analysis_task(ctx, question: str) -> dict:
             await svc.publish_event(task_id, event)
 
         agent = AnalysisAgent(llm=llm, chat_agent=chat_agent, on_event=_on_event)
-        result = await agent.analyze(question)  # done 事件已由 agent 通过 on_event 上报
+        with use_datasource_graph_scope(datasource_id, normalize_workspace_id(workspace_id)):
+            result = await agent.analyze(question)  # done 事件已由 agent 通过 on_event 上报
 
         await svc.mark_done(task_id, {"report": result["report"], "steps": result["step_summaries"]})
         return {"report": result["report"]}
