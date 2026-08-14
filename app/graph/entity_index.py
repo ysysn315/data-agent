@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
+from collections import OrderedDict
 from typing import Sequence
 
 from loguru import logger
@@ -22,7 +23,8 @@ class GraphEntityIndex:
         self.settings = settings
         self._embedding_service = embed_service
         self._embed_fn = embed_fn
-        self._vectors: dict[tuple[str, int, str], list[float]] = {}
+        self._vectors: OrderedDict[tuple[str, int, str], list[float]] = OrderedDict()
+        self._vector_cache_size = max(1, int(getattr(settings, "graph_entity_vector_cache_size", 10000)))
         self._collection = None
         self._milvus_ready = False
         # GraphService 既可能从 FastAPI 主循环也可能从 run_sync 后台循环访问；
@@ -87,13 +89,26 @@ class GraphEntityIndex:
                 self._milvus_ready = False
                 return False
 
-    async def upsert(self, entities: Sequence[dict], scope: GraphScope) -> int:
+    def _cache_vector(self, key: tuple[str, int, str], vector: list[float]) -> None:
+        self._vectors[key] = vector
+        self._vectors.move_to_end(key)
+        while len(self._vectors) > self._vector_cache_size:
+            self._vectors.popitem(last=False)
+
+    async def _upsert_with_status(self, entities: Sequence[dict], scope: GraphScope) -> dict[int, str]:
+        """生成并写入实体向量，返回成功实体及其内容 hash。
+
+        返回 hash 供 GraphService 回写 ``embedding_status=synced``；失败实体
+        保持 pending，下一次显式写入或重建时可重试。
+        """
         if not entities:
-            return 0
+            return {}
         vectors: list[list[float]] = []
         rows: list[dict] = []
+        indexed: dict[int, str] = {}
         for entity in entities:
             text = entity_index_text(entity)
+            vector_hash = embedding_hash(text)
             try:
                 vector = await self._embed(text)
             except Exception as exc:  # noqa: BLE001
@@ -103,9 +118,10 @@ class GraphEntityIndex:
                 continue
             vectors.append(vector)
             rows.append(entity)
-            self._vectors[(scope.key, int(entity["id"]), embedding_hash(text))] = vector
+            indexed[int(entity["id"])] = vector_hash
+            self._cache_vector((scope.key, int(entity["id"]), vector_hash), vector)
         if not rows:
-            return 0
+            return {}
         if await self._ensure_milvus(len(vectors[0])):
             try:
                 ids = [int(row["id"]) for row in rows]
@@ -120,13 +136,25 @@ class GraphEntityIndex:
                             "workspace_id": scope.workspace_id,
                             "datasource_id": scope.datasource_id,
                             "canonical_name": row.get("canonical_name", ""),
+                            "entity_type": row.get("entity_type", "unknown"),
+                            "embedding_hash": indexed[int(row["id"])],
                         }
                         for row in rows
                     ],
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.warning(f"实体向量写入 Milvus 失败，保留进程内索引: {exc}")
-        return len(rows)
+        return indexed
+
+    async def upsert(self, entities: Sequence[dict], scope: GraphScope) -> int:
+        """兼容旧调用方：返回成功写入的实体数。"""
+
+        return len(await self._upsert_with_status(entities, scope))
+
+    async def upsert_with_status(self, entities: Sequence[dict], scope: GraphScope) -> dict[int, str]:
+        """返回成功实体及 hash，供持久化层回写 Embedding 状态。"""
+
+        return await self._upsert_with_status(entities, scope)
 
     def _upsert_milvus_sync(self, ids, vectors, contents, metadata) -> None:
         self._collection.delete(f"entity_id in {ids}")
@@ -193,7 +221,9 @@ class GraphEntityIndex:
                     return []
                 if not vector:
                     continue
-                self._vectors[key] = vector
+                self._cache_vector(key, vector)
+            else:
+                self._vectors.move_to_end(key)
             score = cosine_similarity(query_vector, vector)
             scored.append(EntityCandidate(entity=entity, score=score, method="embedding"))
         scored.sort(key=lambda item: (-item.score, item.entity.get("canonical_name", "")))

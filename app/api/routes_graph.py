@@ -13,9 +13,9 @@ import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
+from app.api.request_scope import resolve_graph_scope
 from app.core.dependencies import get_admin_user, get_current_user, get_datasource_service, get_graph_service
-from app.datasources.models import DataSourceNotFoundError
-from app.datasources.service import DataSourceService, normalize_workspace_id
+from app.datasources.service import DataSourceService
 from app.graph.scope import GraphScope, use_graph_scope
 from app.graph.service import GraphService
 
@@ -32,6 +32,8 @@ class TripleIn(BaseModel):
     predicate: str = Field(..., min_length=1, description="谓词（短动词短语，如 属于、计算自）")
     object: str = Field(..., min_length=1, description="宾语（实体/指标名）")
     source: str = Field("manual", description="来源标记（默认 manual）")
+    source_type: str | None = Field(None, description="来源分类；缺省沿用 source")
+    confidence: float = Field(1.0, ge=0.0, le=1.0, description="事实置信度（0~1）")
 
 
 class TriplesCreate(BaseModel):
@@ -56,13 +58,7 @@ async def _resolve_scope(
     user: dict,
     datasource_service: DataSourceService,
 ) -> GraphScope:
-    workspace_id = normalize_workspace_id(user.get("workspace_id"))
-    if datasource_id is not None:
-        try:
-            await datasource_service.get_source(datasource_id, workspace_id)
-        except DataSourceNotFoundError as exc:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    return GraphScope.from_ids(workspace_id, datasource_id)
+    return await resolve_graph_scope(datasource_id, user, datasource_service)
 
 
 # ========== 写入 ==========

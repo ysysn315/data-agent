@@ -18,10 +18,12 @@ milvus_graph_service.py）：Neo4j Cypher 子图查询 + Milvus 实体向量召�
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Callable, Optional, Sequence
 
 import networkx as nx
 
+from app.graph.entities import ResolutionStatus
 from app.graph.extractor import Triple, extract_triples
 from app.graph.resolver import EntityResolver
 from app.graph.scope import GraphScope, current_graph_scope
@@ -30,6 +32,10 @@ from app.graph.store import GraphStore
 
 class GraphService:
     """图谱门面：路由与 graph_search 工具都只依赖本类，不直接碰 store/extractor。"""
+
+    MAX_PATH_HOPS = 8
+    MAX_PATH_NODES = 64
+    MAX_PATH_EDGES = 64
 
     def __init__(
         self,
@@ -62,7 +68,7 @@ class GraphService:
 
             self._entity_resolver = EntityResolver(
                 self._store.entity_repo,
-                self._store._run,
+                self._store.run,
                 embed_fn=self._embed_fn,
                 index=entity_index,
                 top_k=getattr(settings, "graph_entity_top_k", 5),
@@ -82,7 +88,7 @@ class GraphService:
             "added": added,
             "skipped": len(triples) - added,
             "total": self._store.count(scope),
-            "scope": {"key": scope.key, "workspace_id": scope.workspace_id, "datasource_id": scope.datasource_id},
+            "scope": _scope_dict(scope),
         }
 
     def extract_and_add(self, text: str) -> dict:
@@ -102,11 +108,16 @@ class GraphService:
 
             if not getattr(settings, "graph_entity_embedding_enabled", False) or not self._store.entity_repo:
                 return
-            index = self._resolver()._index
+            index = self._resolver().index
             if index is None:
                 return
-            entities = self._store._run(self._store.entity_repo.list_scope(scope.key))
-            self._store._run(index.upsert(entities, scope))
+            entities = self._store.run(self._store.entity_repo.list_scope(scope.key))
+            upsert = getattr(index, "upsert_with_status", index.upsert)
+            indexed = self._store.run(upsert(entities, scope))
+            if not isinstance(indexed, dict):
+                return
+            for entity_id, vector_hash in indexed.items():
+                self._store.run(self._store.entity_repo.update_embedding_status(entity_id, "synced", vector_hash))
         except Exception:
             # GraphEntityIndex 自身已对单实体/ Milvus 失败做降级；这里再兜底一次，
             # 确保外部 Embedding 服务故障不会让关系写入接口失败。
@@ -121,6 +132,11 @@ class GraphService:
         scope = self._scope()
         entities: list[dict] = []
         triples: list[dict] = []
+        scope_fields = {
+            "scope_key": scope.key,
+            "workspace_id": scope.workspace_id,
+            "datasource_id": scope.datasource_id,
+        }
         for table in catalog.get("tables", []) if isinstance(catalog, dict) else []:
             schema = str(table.get("schema_name") or "").strip()
             table_name = str(table.get("table_name") or "").strip()
@@ -131,9 +147,7 @@ class GraphService:
             entities.append(
                 {
                     "canonical_name": qualified_table,
-                    "scope_key": scope.key,
-                    "workspace_id": scope.workspace_id,
-                    "datasource_id": scope.datasource_id,
+                    **scope_fields,
                     "entity_type": "table",
                     "aliases": [table_name],
                     "attributes": {
@@ -157,9 +171,7 @@ class GraphService:
                 entities.append(
                     {
                         "canonical_name": qualified_column,
-                        "scope_key": scope.key,
-                        "workspace_id": scope.workspace_id,
-                        "datasource_id": scope.datasource_id,
+                        **scope_fields,
                         "entity_type": "column",
                         "aliases": aliases,
                         "attributes": {
@@ -178,6 +190,8 @@ class GraphService:
                         "predicate": "属于",
                         "object": qualified_table,
                         "source": "schema_reviewed" if column_approved and table_approved else "physical_schema",
+                        "source_type": "schema_reviewed" if column_approved and table_approved else "physical_schema",
+                        "confidence": 1.0,
                         "source_ref": f"datasource:{scope.datasource_id}",
                     }
                 )
@@ -193,11 +207,13 @@ class GraphService:
                             "predicate": "引用",
                             "object": f"{target}.{target_column}",
                             "source": "physical_schema",
+                            "source_type": "physical_schema",
+                            "confidence": 1.0,
                             "source_ref": f"datasource:{scope.datasource_id}",
                         }
                     )
         if self._store.entity_repo and entities:
-            self._store._run(self._store.entity_repo.upsert_many(entities))
+            self._store.run(self._store.entity_repo.upsert_many(entities))
             self._maybe_index_entities(scope)
         added = self._store.add_triples(triples, scope=scope) if triples else 0
         return {"scope": scope.key, "entities": len(entities), "triples_added": added}
@@ -237,6 +253,8 @@ class GraphService:
         target: str,
         scope: GraphScope | None = None,
         max_hops: int | None = None,
+        max_nodes: int | None = None,
+        max_edges: int | None = None,
     ) -> dict:
         """两实体间最短路（无向可达）；chain 为可读谓词链，每跳标注真实方向。
 
@@ -266,7 +284,10 @@ class GraphService:
         except nx.NetworkXNoPath:
             return result
 
-        if max_hops is not None and len(nodes) - 1 > max(1, int(max_hops)):
+        hop_limit = self.MAX_PATH_HOPS if max_hops is None else min(max(1, int(max_hops)), self.MAX_PATH_HOPS)
+        node_limit = self.MAX_PATH_NODES if max_nodes is None else min(max(2, int(max_nodes)), self.MAX_PATH_NODES)
+        edge_limit = self.MAX_PATH_EDGES if max_edges is None else min(max(1, int(max_edges)), self.MAX_PATH_EDGES)
+        if len(nodes) - 1 > hop_limit or len(nodes) > node_limit or len(nodes) - 1 > edge_limit:
             return result
 
         edges: list[dict] = []
@@ -281,6 +302,8 @@ class GraphService:
                         "predicate": predicate,
                         "object": v,
                         "source": data.get("source", ""),
+                        "source_type": data.get("source_type") or data.get("source", ""),
+                        "confidence": data.get("confidence", 1.0),
                         "source_ref": data.get("source_ref"),
                         "provenance": data.get("provenance") or {},
                     }
@@ -295,6 +318,8 @@ class GraphService:
                         "predicate": predicate,
                         "object": u,
                         "source": data.get("source", ""),
+                        "source_type": data.get("source_type") or data.get("source", ""),
+                        "confidence": data.get("confidence", 1.0),
                         "source_ref": data.get("source_ref"),
                         "provenance": data.get("provenance") or {},
                     }
@@ -309,10 +334,10 @@ class GraphService:
 
         scope = self._scope()
         resolver = self._resolver()
-        source_result, target_result = await _gather_resolutions(
+        source_result, target_result = await asyncio.gather(
             resolver.resolve(source, scope), resolver.resolve(target, scope)
         )
-        if source_result.status == "ambiguous" or target_result.status == "ambiguous":
+        if source_result.status == ResolutionStatus.AMBIGUOUS or target_result.status == ResolutionStatus.AMBIGUOUS:
             return {
                 "status": "ambiguous",
                 "found": False,
@@ -342,8 +367,6 @@ class GraphService:
         # find_path 是同步的 SQLite/NetworkX 读取；路径工具运行在异步
         # Agent 链路中时放到线程，避免再次在运行中的 event loop 内嵌套
         # run_until_complete。
-        import asyncio
-
         result = await asyncio.to_thread(
             self.find_path,
             source_result.entity["canonical_name"],
@@ -401,6 +424,10 @@ def _candidate_dicts(candidates) -> list[dict]:
     ]
 
 
+def _scope_dict(scope: GraphScope) -> dict:
+    return {"key": scope.key, "workspace_id": scope.workspace_id, "datasource_id": scope.datasource_id}
+
+
 def _resolution_dict(result) -> dict:
     return {
         "input": result.input_name,
@@ -408,11 +435,3 @@ def _resolution_dict(result) -> dict:
         "method": result.method,
         "score": result.score,
     }
-
-
-async def _gather_resolutions(source_awaitable, target_awaitable):
-    # 使用 asyncio.gather 让两个端点的 Embedding 请求并行，精确/别名命中时仍然
-    # 只是轻量的后台 DB 查询。
-    import asyncio
-
-    return await asyncio.gather(source_awaitable, target_awaitable)

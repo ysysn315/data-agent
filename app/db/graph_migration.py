@@ -26,6 +26,15 @@ def upgrade_graph_schema(connection) -> None:
 
     columns = {column["name"] for column in inspector.get_columns("graph_triples")}
     if "scope_key" in columns:
+        # 已经完成作用域迁移的旧部署仍可能缺少后续的来源分类和置信度列。
+        # 这里做同样幂等的窄迁移，不引入 Alembic 依赖。
+        if "source_type" not in columns:
+            connection.exec_driver_sql(
+                "ALTER TABLE graph_triples ADD COLUMN source_type VARCHAR(64) NOT NULL DEFAULT 'manual'"
+            )
+            connection.exec_driver_sql("UPDATE graph_triples SET source_type = source")
+        if "confidence" not in columns:
+            connection.exec_driver_sql("ALTER TABLE graph_triples ADD COLUMN confidence FLOAT NOT NULL DEFAULT 1.0")
         return
 
     dialect = connection.dialect.name
@@ -43,6 +52,8 @@ def upgrade_graph_schema(connection) -> None:
                 subject_entity_id INTEGER,
                 object_entity_id INTEGER,
                 source VARCHAR(64) NOT NULL DEFAULT 'manual',
+                source_type VARCHAR(64) NOT NULL DEFAULT 'manual',
+                confidence FLOAT NOT NULL DEFAULT 1.0,
                 source_ref VARCHAR(512),
                 provenance JSON NOT NULL DEFAULT '{}',
                 created_at DATETIME NOT NULL
@@ -52,8 +63,8 @@ def upgrade_graph_schema(connection) -> None:
         connection.exec_driver_sql(
             """
             INSERT INTO graph_triples_v2
-                (id, subject, predicate, object, source, created_at)
-            SELECT id, subject, predicate, object, source, created_at
+                (id, subject, predicate, object, source, source_type, confidence, created_at)
+            SELECT id, subject, predicate, object, source, source, 1.0, created_at
             FROM graph_triples
             """
         )
@@ -78,9 +89,8 @@ def upgrade_graph_schema(connection) -> None:
         )
         return
 
-    # PostgreSQL and other production databases: preserve rows and remove the old
-    # global constraint before adding the scoped one. Existing deployments should
-    # eventually move this block to versioned Alembic migrations.
+    # PostgreSQL 及其他生产数据库：保留已有行，先补作用域列，再移除旧的全局
+    # 唯一约束并创建带作用域的新约束。正式部署后可把这段窄迁移替换为 Alembic。
     connection.exec_driver_sql(
         "ALTER TABLE graph_triples ADD COLUMN scope_key VARCHAR(128) NOT NULL DEFAULT 'workspace:0'"
     )
@@ -88,6 +98,9 @@ def upgrade_graph_schema(connection) -> None:
     connection.exec_driver_sql("ALTER TABLE graph_triples ADD COLUMN datasource_id INTEGER")
     connection.exec_driver_sql("ALTER TABLE graph_triples ADD COLUMN subject_entity_id INTEGER")
     connection.exec_driver_sql("ALTER TABLE graph_triples ADD COLUMN object_entity_id INTEGER")
+    connection.exec_driver_sql("ALTER TABLE graph_triples ADD COLUMN source_type VARCHAR(64) NOT NULL DEFAULT 'manual'")
+    connection.exec_driver_sql("UPDATE graph_triples SET source_type = source")
+    connection.exec_driver_sql("ALTER TABLE graph_triples ADD COLUMN confidence FLOAT NOT NULL DEFAULT 1.0")
     connection.exec_driver_sql("ALTER TABLE graph_triples ADD COLUMN source_ref VARCHAR(512)")
     connection.exec_driver_sql("ALTER TABLE graph_triples ADD COLUMN provenance JSON NOT NULL DEFAULT '{}'::json")
     with suppress(Exception):

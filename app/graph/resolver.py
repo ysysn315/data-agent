@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import asyncio
-import threading
+from collections import OrderedDict
 from typing import Callable
 
 from app.graph.entities import (
     EmbedFn,
     EntityCandidate,
     EntityResolution,
+    ResolutionStatus,
     cosine_similarity,
     embedding_hash,
     entity_index_text,
@@ -38,76 +39,72 @@ class EntityResolver:
         self._top_k = max(1, min(int(top_k), 20))
         self._min_score = float(min_score)
         self._merge_margin = float(merge_margin)
-        self._vectors: dict[tuple[str, int, str], list[float]] = {}
+        self._vectors: OrderedDict[tuple[str, int, str], list[float]] = OrderedDict()
+        self._vector_cache_size = 10000
 
-    def _run_db(self, factory: Callable):
-        """兼容同步 runner 和正在运行的异步事件循环。
+    async def _run_db(self, factory: Callable):
+        """把同步 DB 桥移出当前事件循环，避免 ``thread.join`` 阻塞请求。
 
-        生产环境的 ``run_sync`` 本身提交到后台循环；离线测试注入的 runner 常用
-        ``loop.run_until_complete``，不能在 ``asyncio.run`` 内嵌套。此处只在已有
-        event loop 时把同步 DB 桥放到短生命周期线程，避免两种 runner 互相污染。
+        ``run_sync`` 在生产环境本身会等待后台数据库循环；测试注入的
+        ``loop.run_until_complete`` 也可以在工作线程安全执行。统一交给
+        ``asyncio.to_thread`` 后，解析期间事件循环仍能处理其他请求。
         """
 
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            return self._run(factory())
+        return await asyncio.to_thread(lambda: self._run(factory()))
 
-        result: list = []
-        error: list[BaseException] = []
+    @property
+    def index(self):
+        """实体向量索引只读入口，避免服务层依赖私有成员。"""
 
-        def invoke():
-            try:
-                result.append(self._run(factory()))
-            except BaseException as exc:  # noqa: BLE001 - 透传原始 DB 异常
-                error.append(exc)
-
-        thread = threading.Thread(target=invoke, daemon=True)
-        thread.start()
-        thread.join()
-        if error:
-            raise error[0]
-        return result[0] if result else None
+        return self._index
 
     async def resolve(self, name: str, scope: GraphScope, entity_type: str | None = None) -> EntityResolution:
         raw = str(name or "").strip()
         normalized = normalize_entity_name(raw)
         if not normalized or self._repo is None:
-            return EntityResolution(status="missing", input_name=raw)
+            return EntityResolution(status=ResolutionStatus.MISSING, input_name=raw)
 
-        exact = self._run_db(lambda: self._repo.get_by_normalized(scope.key, normalized))
+        exact = await self._run_db(lambda: self._repo.get_by_normalized(scope.key, normalized))
         if exact and self._compatible(exact, entity_type):
-            return EntityResolution(status="resolved", input_name=raw, entity=exact, method="exact", score=1.0)
+            return EntityResolution(
+                status=ResolutionStatus.RESOLVED, input_name=raw, entity=exact, method="exact", score=1.0
+            )
 
-        alias = self._run_db(lambda: self._repo.get_by_alias(scope.key, normalized))
+        alias = await self._run_db(lambda: self._repo.get_by_alias(scope.key, normalized))
         if alias and self._compatible(alias, entity_type):
-            return EntityResolution(status="resolved", input_name=raw, entity=alias, method="alias", score=1.0)
+            return EntityResolution(
+                status=ResolutionStatus.RESOLVED, input_name=raw, entity=alias, method="alias", score=1.0
+            )
 
-        entities = self._run_db(lambda: self._repo.list_scope(scope.key))
+        entities = await self._run_db(lambda: self._repo.list_scope(scope.key))
         entities = [entity for entity in entities if self._compatible(entity, entity_type)]
         lexical = lexical_candidates(raw, entities, self._top_k)
         if lexical and lexical[0].score >= 1.0:
             return EntityResolution(
-                status="resolved", input_name=raw, entity=lexical[0].entity, method="lexical", score=lexical[0].score
+                status=ResolutionStatus.RESOLVED,
+                input_name=raw,
+                entity=lexical[0].entity,
+                method="lexical",
+                score=lexical[0].score,
             )
 
         vector_candidates = await self._vector_candidates(raw, scope, entities)
         candidates = vector_candidates or lexical
         if not candidates:
-            return EntityResolution(status="missing", input_name=raw)
+            return EntityResolution(status=ResolutionStatus.MISSING, input_name=raw)
 
         best = candidates[0]
         second = candidates[1].score if len(candidates) > 1 else 0.0
         if best.score >= self._min_score and (len(candidates) == 1 or best.score - second >= self._merge_margin):
             return EntityResolution(
-                status="resolved",
+                status=ResolutionStatus.RESOLVED,
                 input_name=raw,
                 entity=best.entity,
                 method=best.method,
                 score=best.score,
                 candidates=tuple(candidates),
             )
-        return EntityResolution(status="ambiguous", input_name=raw, candidates=tuple(candidates))
+        return EntityResolution(status=ResolutionStatus.AMBIGUOUS, input_name=raw, candidates=tuple(candidates))
 
     def _compatible(self, entity: dict, entity_type: str | None) -> bool:
         return not entity_type or entity.get("entity_type") in (None, "unknown", entity_type)
@@ -134,6 +131,11 @@ class EntityResolver:
                     return []
                 if vector:
                     self._vectors[key] = vector
+                    self._vectors.move_to_end(key)
+                    while len(self._vectors) > self._vector_cache_size:
+                        self._vectors.popitem(last=False)
+            else:
+                self._vectors.move_to_end(key)
             if not vector:
                 continue
             score = cosine_similarity(query_vector, vector)

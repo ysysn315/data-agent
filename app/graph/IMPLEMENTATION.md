@@ -47,7 +47,8 @@ embedding_status, embedding_hash, created_at, updated_at
 ### 关系
 
 `graph_triples` 保留旧接口使用的 `subject/predicate/object/source`，并补充作用域、实体端点
-ID、`source_ref` 和 `provenance`。幂等范围为 `scope_key + (subject, predicate, object)`；实体
+ID、`source_type/source_ref/provenance/confidence`。`source` 继续兼容旧调用方，新的来源分类和
+置信度用于溯源；默认值不会扩展旧接口返回。幂等范围为 `scope_key + (subject, predicate, object)`；实体
 ID 作为合并和后续索引的稳定引用。旧版没有 `scope_key` 的表由
 `app/db/graph_migration.py` 在 `init_db` 前迁移，原数据归入 `workspace:0`，不删除旧事实。
 
@@ -56,9 +57,9 @@ ID 作为合并和后续索引的稳定引用。旧版没有 `scope_key` 的表�
 ```text
 手工三元组 / LLM 抽取 / 已审核 Schema
         → normalize_entity_name
-        → GraphEntityRepository.upsert_many（别名、属性合并）
-        → GraphTripleRepository.add_many（作用域内幂等）
-        → NetworkX 镜像写后失效
+        → GraphEntityRepository 实体合并（别名、属性）
+        → GraphTripleRepository.add_many_with_entities（实体与关系同事务、作用域内幂等）
+        → 按 scope_key 缓存的 NetworkX 镜像写后失效
 ```
 
 首次启动且 `workspace:0` 为空时仍灌入 17 条演示种子；其他 workspace/datasource 不自动复制种子。
@@ -99,8 +100,8 @@ ID 作为合并和后续索引的稳定引用。旧版没有 `scope_key` 的表�
 ```
 
 候选接近时返回 `ambiguous` 和候选列表，工具提示 Agent 先向用户确认；实体缺失返回
-`missing`，实体已找到但路径超过上限/不可达返回 `unreachable`。路径默认 3 跳、API 与工具
-最多 5 跳，谓词按字典序取稳定结果。
+`missing`，实体已找到但路径超过上限/不可达返回 `unreachable`。路径默认 3 跳、工具最多 5 跳，
+服务端同时限制 8 跳、64 个节点和 64 条边；当前只返回一条确定性最短路，因此没有额外的路径数参数。
 
 ## ⑥ Entity Embedding 与消歧
 
@@ -110,8 +111,9 @@ Milvus 可在重启后恢复向量；进程内向量缓存是小图谱和 Milvus
 `GRAPH_ENTITY_EMBEDDING_ENABLED=false` 时默认完全不发起实体向量请求。
 
 `app/graph/resolver.py` 只在作用域内取候选，并遵守类型兼容、最小分数和领先 margin；任何
-Embedding 异常都降级为词法匹配，不阻塞精确路径。别名、属性和向量状态写入 SQLite，因而
-关系写成功不依赖外部向量服务。
+Embedding 异常都降级为词法匹配，不阻塞精确路径。实体向量成功写入进程内/Milvus 索引后，
+服务回写 `embedding_status=synced` 和 `embedding_hash`；失败实体继续保持 `pending`，因而
+关系写成功不依赖外部向量服务。进程内缓存采用 LRU 上限，避免实体持续增长导致无界占用。
 
 管理员可通过 `POST /api/graph/entities/merge` 提交 survivor/duplicate。仓储在一个事务内合并
 属性和别名、重指关系、先删后改去重冲突边，再把 duplicate 标记为 `merged` 并保留
@@ -129,13 +131,14 @@ Embedding 异常都降级为词法匹配，不阻塞精确路径。别名、属�
 | `app/graph/service.py` | 抽取、目录同步、邻居/路径/合并门面 |
 | `app/agents/tools/graph_tool.py` | `graph_search` / `graph_path_search` 文本工具 |
 | `app/api/routes_graph.py` | 鉴权、数据源归属校验、作用域上下文和 API |
+| `app/api/request_scope.py` / `app/datasources/context.py` | 统一数据源归属校验与 Agent 作用域上下文 |
 | `app/db/graph_migration.py` | 旧 `graph_triples` 表兼容迁移 |
 
 ## ⑧ 测试与可讲边界
 
 `tests/test_knowledge_graph.py` 覆盖抽取容错、幂等/重启、作用域隔离、实体属性合并与显式
-合并、Embedding 回退、路径工具、API 和 Skill 门控；全量回归仍需使用
-`PYTHONPATH=. .venv/bin/pytest -q`。
+合并、Embedding 回退、路径工具、API 和 Skill 门控；在仓库根目录使用
+`.venv/bin/python -m pytest -q` 执行全量回归（Docker/Redis 不可用时外部用例按环境跳过）。
 
 面试时应主动说明：NetworkX 节点当前使用可读规范名，实体 ID 主要用于持久化合并和向量主键；
 图谱规模假设是千级，Milvus/Embedding 是可选增强，当前没有跨文档 GraphRAG 和 PPR。

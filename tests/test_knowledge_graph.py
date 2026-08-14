@@ -22,6 +22,7 @@ from app.agents.tools.graph_tool import create_graph_path_tool, create_graph_sea
 from app.db.engine import create_engine_and_sessionmaker, init_db
 from app.db.repositories import GraphTripleRepository
 from app.graph.extractor import Triple, extract_triples
+from app.graph.resolver import EntityResolver
 from app.graph.scope import GraphScope, use_graph_scope
 from app.graph.service import GraphService
 from app.graph.store import SEED_TRIPLES, GraphStore
@@ -184,6 +185,57 @@ def test_legacy_graph_table_migrates_to_demo_scope(graph_env, tmp_path):
         run(engine.dispose())
 
 
+def test_scoped_graph_table_adds_provenance_columns(graph_env, tmp_path):
+    """已完成作用域迁移的旧部署也能幂等补齐来源分类/置信度。"""
+    _, run = graph_env
+    url = f"sqlite+aiosqlite:///{tmp_path / 'scoped-legacy.db'}"
+    engine, _sessionmaker = create_engine_and_sessionmaker(url)
+    try:
+
+        async def create_scoped_table():
+            async with engine.begin() as conn:
+                await conn.exec_driver_sql(
+                    """
+                    CREATE TABLE graph_triples (
+                        id INTEGER PRIMARY KEY,
+                        subject VARCHAR(256) NOT NULL,
+                        predicate VARCHAR(256) NOT NULL,
+                        object VARCHAR(256) NOT NULL,
+                        scope_key VARCHAR(128) NOT NULL,
+                        workspace_id INTEGER NOT NULL,
+                        datasource_id INTEGER,
+                        subject_entity_id INTEGER,
+                        object_entity_id INTEGER,
+                        source VARCHAR(64) NOT NULL,
+                        source_ref VARCHAR(512),
+                        provenance JSON NOT NULL,
+                        created_at DATETIME NOT NULL
+                    )
+                    """
+                )
+                await conn.exec_driver_sql(
+                    "INSERT INTO graph_triples "
+                    "(id, subject, predicate, object, scope_key, workspace_id, source, provenance, created_at) "
+                    "VALUES (1, '旧指标', '计算自', '旧字段', 'workspace:0', 0, 'seed', '{}', '2026-01-01 00:00:00')"
+                )
+
+        async def read_columns_and_row():
+            async with engine.begin() as conn:
+                columns = {row[1] for row in (await conn.exec_driver_sql("PRAGMA table_info(graph_triples)")).all()}
+                row = (
+                    await conn.exec_driver_sql("SELECT source_type, confidence FROM graph_triples WHERE id = 1")
+                ).one()
+                return columns, row
+
+        run(create_scoped_table())
+        run(init_db(engine))
+        columns, row = run(read_columns_and_row())
+        assert {"source_type", "confidence"} <= columns
+        assert row == ("seed", 1.0)
+    finally:
+        run(engine.dispose())
+
+
 def test_store_graph_mirror_invalidation(graph_env):
     make_repo, run = graph_env
     store = GraphStore(make_repo(), runner=run, seed=False)
@@ -200,6 +252,50 @@ def test_store_graph_mirror_invalidation(graph_env):
 
     store.add_triples([Triple("B", "q", "C")])  # 幂等写入（0 新增）→ 不重建
     assert store.graph is g2
+
+
+def test_store_graph_cache_isolated_per_scope(graph_env):
+    make_repo, run = graph_env
+    store = GraphStore(make_repo(), runner=run, seed=False)
+    scope_a = GraphScope.from_ids(101)
+    scope_b = GraphScope.from_ids(202)
+
+    store.add_triples([Triple("A", "属于", "甲")], scope=scope_a)
+    graph_a = store.graph_for(scope_a)
+    store.add_triples([Triple("B", "属于", "乙")], scope=scope_b)
+    graph_b = store.graph_for(scope_b)
+
+    assert graph_a is not graph_b
+    assert set(graph_a.nodes) == {"A", "甲"}
+    assert set(graph_b.nodes) == {"B", "乙"}
+    # B 作用域写入不会让 A 作用域的镜像被替换或串租户。
+    assert store.graph_for(scope_a) is graph_a
+    store.add_triples([Triple("C", "属于", "丙")], scope=scope_b)
+    assert store.graph_for(scope_a) is graph_a
+    assert store.graph_for(scope_b) is not graph_b
+
+
+def test_triple_provenance_fields_are_persisted(graph_env):
+    make_repo, run = graph_env
+    store = GraphStore(make_repo(), runner=run, seed=False)
+    store.add_triples(
+        [
+            {
+                "subject": "指标",
+                "predicate": "计算自",
+                "object": "字段",
+                "source": "llm",
+                "source_type": "reviewed",
+                "confidence": 0.65,
+            }
+        ]
+    )
+    row = store.list_triples()[0]
+    assert row["source_type"] == "reviewed"
+    assert row["confidence"] == 0.65
+    edge = store.graph["指标"]["字段"]["计算自"]
+    assert edge["source_type"] == "reviewed"
+    assert edge["confidence"] == 0.65
 
 
 # ========== 种子：首启灌种 + 幂等 + 与术语库对齐 ==========
@@ -549,3 +645,24 @@ def test_embedding_close_candidates_return_ambiguous(graph_env):
     result = asyncio.run(service.find_path_resolved("不确定收入", "金额", max_hops=2))
     assert result["status"] == "ambiguous"
     assert len(result["candidates"]["from"]) >= 2
+
+
+def test_embedding_index_success_updates_entity_status(graph_env, monkeypatch):
+    make_repo, run = graph_env
+    store = GraphStore(make_repo(), runner=run, seed=False)
+
+    class FakeIndex:
+        async def upsert(self, entities, scope):
+            return {int(entity["id"]): f"hash-{entity['id']}" for entity in entities}
+
+    from app.core.settings import settings
+
+    monkeypatch.setattr(settings, "graph_entity_embedding_enabled", True)
+    resolver = EntityResolver(store.entity_repo, store.run, index=FakeIndex())
+    service = GraphService(store, entity_resolver=resolver)
+    service.add_triples([Triple("指标", "计算自", "字段")])
+
+    entities = run(store.entity_repo.list_scope("workspace:0"))
+    assert entities
+    assert {entity["embedding_status"] for entity in entities} == {"synced"}
+    assert all(entity["embedding_hash"].startswith("hash-") for entity in entities)

@@ -7,6 +7,7 @@ import math
 import re
 import unicodedata
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Any, Awaitable, Callable, Iterable, Sequence
 
 _SEPARATOR_RE = re.compile(r"[\s\-_—–·./\\]+")
@@ -82,9 +83,17 @@ class EntityCandidate:
     method: str
 
 
+class ResolutionStatus(StrEnum):
+    """实体解析结果，避免在主链路散落不可约束的裸字符串。"""
+
+    MISSING = "missing"
+    RESOLVED = "resolved"
+    AMBIGUOUS = "ambiguous"
+
+
 @dataclass(frozen=True)
 class EntityResolution:
-    status: str
+    status: ResolutionStatus
     input_name: str
     entity: dict | None = None
     candidates: tuple[EntityCandidate, ...] = ()

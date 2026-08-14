@@ -14,9 +14,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from app.api.request_scope import resolve_graph_scope
 from app.core.dependencies import get_current_user_optional, get_datasource_service, get_task_service
-from app.core.settings import settings
-from app.datasources.models import DataSourceNotFoundError
 from app.datasources.service import DataSourceService, normalize_workspace_id
 from app.tasks.service import TaskService
 
@@ -59,12 +58,9 @@ async def create_task(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="datasource_id 必须是整数",
             ) from exc
-        if settings.auth_enabled and user is None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="选择数据源时需要有效的 API Key")
-        try:
-            await datasource_service.get_source(datasource_id, workspace_id)
-        except DataSourceNotFoundError as exc:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        scope = await resolve_graph_scope(datasource_id, user, datasource_service)
+        workspace_id = scope.workspace_id
+        params["workspace_id"] = workspace_id
         params["datasource_id"] = datasource_id
     try:
         task_id = await task_service.enqueue(req.type, params)

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, Float, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -128,6 +128,9 @@ class GraphTripleModel(Base):
     object_entity_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     # 来源标记：seed（首启种子）/ manual（API 手动补录）/ llm（LLM 抽取）/ schema_reviewed
     source: Mapped[str] = mapped_column(String(64), nullable=False, default="manual")
+    # source 保留兼容旧接口；source_type 是可扩展的来源分类，confidence 是事实置信度。
+    source_type: Mapped[str] = mapped_column(String(64), nullable=False, default="manual")
+    confidence: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
     source_ref: Mapped[str | None] = mapped_column(String(512), nullable=True)
     provenance: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)

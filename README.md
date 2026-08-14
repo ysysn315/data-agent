@@ -158,7 +158,7 @@ evals/
 ├── text2sql/     # 28 条执行准确率评测与原始报告
 └── rag/          # 检索/生成数据集、指标和历史 baseline
 frontend/         # Vue 3 前端
-tests/            # 21 个测试文件
+tests/            # 22 个测试文件
 ```
 
 ## 文档索引
