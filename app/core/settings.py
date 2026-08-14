@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     graph_entity_collection: str = "graph_entities"
     graph_entity_milvus_enabled: bool = False
     graph_entity_embedding_dim: int = 1024
+    graph_entity_vector_cache_size: int = 10000
 
     # RAG 配置
     doc_chunk_max_size: int = 800

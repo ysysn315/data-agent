@@ -70,6 +70,22 @@ TOOL_POLICIES: Dict[str, ToolExecutionPolicy] = {
         failure_threshold=2,
         recovery_timeout_seconds=30.0,
     ),
+    # 图谱路径可能触发外置 Embedding；单独设置超时和熔断，避免沿用默认策略
+    # 把网络故障拖入整条 Agent 链路。邻居查询也显式登记，统一存量工具口径。
+    "graph_search": replace(
+        DEFAULT_POLICY,
+        retry_attempts=0,
+        timeout_seconds=8.0,
+        failure_threshold=2,
+        recovery_timeout_seconds=30.0,
+    ),
+    "graph_path_search": replace(
+        DEFAULT_POLICY,
+        retry_attempts=0,
+        timeout_seconds=12.0,
+        failure_threshold=2,
+        recovery_timeout_seconds=30.0,
+    ),
     "get_current_datetime": replace(
         DEFAULT_POLICY,
         retry_attempts=0,
@@ -91,6 +107,12 @@ TOOL_FALLBACK_MESSAGES: Dict[str, str] = {
     "query_log": ("Log retrieval is temporarily unavailable. Try another tool or continue with the current evidence."),
     "query_prometheus_alerts": (
         "Alert retrieval is temporarily unavailable. Try another tool or continue with the current evidence."
+    ),
+    "graph_search": (
+        "Graph lookup is temporarily unavailable. Continue without graph evidence and state the limitation."
+    ),
+    "graph_path_search": (
+        "Graph path lookup is temporarily unavailable. Continue without path evidence and state the limitation."
     ),
     "default": "The requested tool is temporarily unavailable. Continue with the current context.",
 }

@@ -18,9 +18,8 @@ from loguru import logger
 
 from app.core.llm import LLMFactory
 from app.core.settings import settings
-from app.datasources.context import use_datasource
+from app.datasources.context import use_datasource_graph_scope
 from app.datasources.service import normalize_workspace_id
-from app.graph.scope import GraphScope, use_graph_scope
 from app.skills.middleware import READ_SKILL_TOOL_NAME
 from app.tasks.events import TaskEvent
 from app.tasks.service import TaskService, build_redis_settings
@@ -78,8 +77,7 @@ async def run_chat_task(
         answer = ""
         # stream_mode="updates"：每个节点产出的 state 增量，从中截获工具调用与最终回答
         with (
-            use_datasource(datasource_id, normalize_workspace_id(workspace_id)),
-            use_graph_scope(GraphScope.from_ids(normalize_workspace_id(workspace_id), datasource_id)),
+            use_datasource_graph_scope(datasource_id, normalize_workspace_id(workspace_id)),
         ):
             async for update in agent.graph.astream(
                 {"messages": [HumanMessage(content=question)]},
@@ -207,10 +205,7 @@ async def run_analysis_task(
             await svc.publish_event(task_id, event)
 
         agent = AnalysisAgent(llm=llm, chat_agent=chat_agent, on_event=_on_event)
-        with (
-            use_datasource(datasource_id, normalize_workspace_id(workspace_id)),
-            use_graph_scope(GraphScope.from_ids(normalize_workspace_id(workspace_id), datasource_id)),
-        ):
+        with use_datasource_graph_scope(datasource_id, normalize_workspace_id(workspace_id)):
             result = await agent.analyze(question)  # done 事件已由 agent 通过 on_event 上报
 
         await svc.mark_done(task_id, {"report": result["report"], "steps": result["step_summaries"]})

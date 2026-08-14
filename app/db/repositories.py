@@ -508,68 +508,76 @@ class GraphEntityRepository:
     async def upsert_many(self, entities: list[dict]) -> list[dict]:
         if not entities:
             return []
-        from app.graph.entities import merge_attributes, normalize_entity_name
-
         async with self._sm() as session:
-            result: list[dict] = []
-            for item in entities:
-                name = str(item.get("canonical_name") or item.get("name") or "").strip()
-                if not name:
-                    continue
-                scope_key = item.get("scope_key") or "workspace:0"
-                normalized = item.get("normalized_name") or normalize_entity_name(name)
-                stmt = select(GraphEntityModel).where(
-                    GraphEntityModel.scope_key == scope_key,
-                    GraphEntityModel.normalized_name == normalized,
-                    GraphEntityModel.status == "active",
-                )
-                row = (await session.execute(stmt)).scalar_one_or_none()
-                source = item.get("source") or "manual"
-                aliases = [str(alias).strip() for alias in item.get("aliases", []) if str(alias).strip()]
-                if row is None:
-                    row = GraphEntityModel(
-                        scope_key=scope_key,
-                        workspace_id=int(item.get("workspace_id") or 0),
-                        datasource_id=item.get("datasource_id"),
-                        canonical_name=name,
-                        normalized_name=normalized,
-                        entity_type=item.get("entity_type") or "unknown",
-                        aliases=list(dict.fromkeys(aliases)),
-                        attributes=dict(item.get("attributes") or {}),
-                        embedding_status="pending",
-                    )
-                    session.add(row)
-                    await session.flush()
-                else:
-                    merged_aliases = list(dict.fromkeys([*(row.aliases or []), *aliases]))
-                    row.aliases = merged_aliases
-                    row.attributes = merge_attributes(row.attributes, item.get("attributes"), source)
-                    if row.entity_type == "unknown" and item.get("entity_type"):
-                        row.entity_type = item["entity_type"]
-                    row.embedding_status = "pending"
-                for alias in aliases:
-                    normalized_alias = normalize_entity_name(alias)
-                    if not normalized_alias or normalized_alias == row.normalized_name:
-                        continue
-                    alias_stmt = select(GraphEntityAliasModel).where(
-                        GraphEntityAliasModel.scope_key == scope_key,
-                        GraphEntityAliasModel.normalized_alias == normalized_alias,
-                    )
-                    alias_row = (await session.execute(alias_stmt)).scalar_one_or_none()
-                    if alias_row is None:
-                        session.add(
-                            GraphEntityAliasModel(
-                                scope_key=scope_key,
-                                entity_id=row.id,
-                                alias=alias,
-                                normalized_alias=normalized_alias,
-                                source=source,
-                                confidence=float(item.get("confidence") or 1.0),
-                            )
-                        )
-                result.append(self._to_dict(row))
+            result = await self._upsert_many_in_session(session, entities)
             await session.commit()
             return result
+
+    async def _upsert_many_in_session(self, session, entities: list[dict]) -> list[dict]:
+        """在调用方事务中合并实体/别名，不自行提交。"""
+
+        if not entities:
+            return []
+        from app.graph.entities import merge_attributes, normalize_entity_name
+
+        result: list[dict] = []
+        for item in entities:
+            name = str(item.get("canonical_name") or item.get("name") or "").strip()
+            if not name:
+                continue
+            scope_key = item.get("scope_key") or "workspace:0"
+            normalized = item.get("normalized_name") or normalize_entity_name(name)
+            stmt = select(GraphEntityModel).where(
+                GraphEntityModel.scope_key == scope_key,
+                GraphEntityModel.normalized_name == normalized,
+                GraphEntityModel.status == "active",
+            )
+            row = (await session.execute(stmt)).scalar_one_or_none()
+            source = item.get("source") or "manual"
+            aliases = [str(alias).strip() for alias in item.get("aliases", []) if str(alias).strip()]
+            if row is None:
+                row = GraphEntityModel(
+                    scope_key=scope_key,
+                    workspace_id=int(item.get("workspace_id") or 0),
+                    datasource_id=item.get("datasource_id"),
+                    canonical_name=name,
+                    normalized_name=normalized,
+                    entity_type=item.get("entity_type") or "unknown",
+                    aliases=list(dict.fromkeys(aliases)),
+                    attributes=dict(item.get("attributes") or {}),
+                    embedding_status="pending",
+                )
+                session.add(row)
+                await session.flush()
+            else:
+                merged_aliases = list(dict.fromkeys([*(row.aliases or []), *aliases]))
+                row.aliases = merged_aliases
+                row.attributes = merge_attributes(row.attributes, item.get("attributes"), source)
+                if row.entity_type == "unknown" and item.get("entity_type"):
+                    row.entity_type = item["entity_type"]
+                row.embedding_status = "pending"
+            for alias in aliases:
+                normalized_alias = normalize_entity_name(alias)
+                if not normalized_alias or normalized_alias == row.normalized_name:
+                    continue
+                alias_stmt = select(GraphEntityAliasModel).where(
+                    GraphEntityAliasModel.scope_key == scope_key,
+                    GraphEntityAliasModel.normalized_alias == normalized_alias,
+                )
+                alias_row = (await session.execute(alias_stmt)).scalar_one_or_none()
+                if alias_row is None:
+                    session.add(
+                        GraphEntityAliasModel(
+                            scope_key=scope_key,
+                            entity_id=row.id,
+                            alias=alias,
+                            normalized_alias=normalized_alias,
+                            source=source,
+                            confidence=float(item.get("confidence") if item.get("confidence") is not None else 1.0),
+                        )
+                    )
+            result.append(self._to_dict(row))
+        return result
 
     async def update_embedding_status(self, entity_id: int, status: str, vector_hash: str = "") -> None:
         async with self._sm() as session:
@@ -699,6 +707,12 @@ class GraphTripleRepository:
                 workspace_id=row.workspace_id,
                 datasource_id=row.datasource_id,
             )
+        # 默认值不扩展旧接口返回；非默认来源/置信度会显式带出，方便新链路
+        # 做 provenance 展示，同时保持已有调用方的四字段结果兼容。
+        if row.source_type != row.source:
+            data["source_type"] = row.source_type
+        if row.confidence != 1.0:
+            data["confidence"] = row.confidence
         if row.source_ref:
             data["source_ref"] = row.source_ref
         if row.provenance:
@@ -738,6 +752,66 @@ class GraphTripleRepository:
                         subject_entity_id=t.get("subject_entity_id"),
                         object_entity_id=t.get("object_entity_id"),
                         source=t.get("source") or "manual",
+                        source_type=t.get("source_type") or t.get("source") or "manual",
+                        confidence=min(
+                            1.0,
+                            max(0.0, float(t.get("confidence") if t.get("confidence") is not None else 1.0)),
+                        ),
+                        source_ref=t.get("source_ref"),
+                        provenance=dict(t.get("provenance") or {}),
+                    )
+                )
+                existing.add(key)
+                added += 1
+            await session.commit()
+            return added
+
+    async def add_many_with_entities(
+        self,
+        entity_rows: list[dict],
+        triples: list[dict],
+        scope_key: str = "workspace:0",
+    ) -> int:
+        """在同一事务中合并端点实体并写入关系，避免留下孤儿实体。"""
+
+        from app.graph.entities import normalize_entity_name
+
+        if not entity_rows and not triples:
+            return 0
+        async with self._sm() as session:
+            entity_repo = GraphEntityRepository(self._sm)
+            entities = await entity_repo._upsert_many_in_session(session, entity_rows)
+            entity_by_name = {entity["normalized_name"]: entity for entity in entities}
+            existing_stmt = select(GraphTripleModel.subject, GraphTripleModel.predicate, GraphTripleModel.object).where(
+                GraphTripleModel.scope_key == scope_key
+            )
+            existing = {tuple(row) for row in (await session.execute(existing_stmt)).all()}
+            added = 0
+            for raw in triples:
+                t = dict(raw)
+                key = (t["subject"], t["predicate"], t["object"])
+                if key in existing:
+                    continue
+                t.setdefault("scope_key", scope_key)
+                t.setdefault("workspace_id", 0)
+                t["subject_entity_id"] = entity_by_name.get(normalize_entity_name(t["subject"]), {}).get("id")
+                t["object_entity_id"] = entity_by_name.get(normalize_entity_name(t["object"]), {}).get("id")
+                session.add(
+                    GraphTripleModel(
+                        subject=t["subject"],
+                        predicate=t["predicate"],
+                        object=t["object"],
+                        scope_key=t.get("scope_key") or scope_key,
+                        workspace_id=int(t.get("workspace_id") or 0),
+                        datasource_id=t.get("datasource_id"),
+                        subject_entity_id=t.get("subject_entity_id"),
+                        object_entity_id=t.get("object_entity_id"),
+                        source=t.get("source") or "manual",
+                        source_type=t.get("source_type") or t.get("source") or "manual",
+                        confidence=min(
+                            1.0,
+                            max(0.0, float(t.get("confidence") if t.get("confidence") is not None else 1.0)),
+                        ),
                         source_ref=t.get("source_ref"),
                         provenance=dict(t.get("provenance") or {}),
                     )

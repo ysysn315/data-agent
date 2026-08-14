@@ -20,12 +20,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.agents.analysis_agent import AnalysisAgent
+from app.api.request_scope import resolve_graph_scope
 from app.core.dependencies import get_current_user_optional, get_datasource_service
-from app.core.settings import settings
-from app.datasources.context import use_datasource
-from app.datasources.models import DataSourceNotFoundError
-from app.datasources.service import DataSourceService, normalize_workspace_id
-from app.graph.scope import GraphScope, use_graph_scope
+from app.datasources.context import use_datasource_graph_scope
+from app.datasources.service import DataSourceService
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 
@@ -72,19 +70,9 @@ async def analyze(
     datasource_service: DataSourceService = Depends(get_datasource_service),
 ):
     """同步跑一次小规模分析，返回结构化 Markdown 报告。长任务请走 POST /api/tasks。"""
-    workspace_id = normalize_workspace_id(user.get("workspace_id") if user else None)
-    if req.datasource_id is not None:
-        if settings.auth_enabled and user is None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="选择数据源时需要有效的 API Key")
-        try:
-            await datasource_service.get_source(req.datasource_id, workspace_id)
-        except DataSourceNotFoundError as exc:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    scope = await resolve_graph_scope(req.datasource_id, user, datasource_service)
     try:
-        with (
-            use_datasource(req.datasource_id, workspace_id),
-            use_graph_scope(GraphScope.from_ids(workspace_id, req.datasource_id)),
-        ):
+        with use_datasource_graph_scope(scope.datasource_id, scope.workspace_id):
             result = await agent.analyze(req.question, max_steps=min(req.max_steps, SYNC_MAX_STEPS))
     except RuntimeError as e:
         # Planner 重试后仍无法产出合法计划：显式 400，交由调用方重述问题
