@@ -13,11 +13,13 @@
 from __future__ import annotations
 
 import asyncio
+import time
 
 import pytest
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage
 
+from app.agents.tool_runtime import TOOL_POLICIES
 from app.agents.tools.graph_tool import create_graph_path_tool, create_graph_search_tool
 from app.db.engine import create_engine_and_sessionmaker, init_db
 from app.db.repositories import GraphTripleRepository
@@ -666,3 +668,45 @@ def test_embedding_index_success_updates_entity_status(graph_env, monkeypatch):
     assert entities
     assert {entity["embedding_status"] for entity in entities} == {"synced"}
     assert all(entity["embedding_hash"].startswith("hash-") for entity in entities)
+
+
+def test_graph_tools_have_external_call_policy():
+    assert TOOL_POLICIES["graph_search"].timeout_seconds == 8.0
+    assert TOOL_POLICIES["graph_path_search"].timeout_seconds == 12.0
+    assert TOOL_POLICIES["graph_path_search"].failure_threshold == 2
+
+
+def test_resolver_db_bridge_does_not_block_event_loop():
+    class EmptyRepo:
+        async def get_by_normalized(self, _scope_key, _normalized_name):
+            return None
+
+        async def get_by_alias(self, _scope_key, _normalized_alias):
+            return None
+
+        async def list_scope(self, _scope_key):
+            return []
+
+    def blocking_runner(coro):
+        # 模拟慢数据库桥；修复前的 thread.join 会把当前事件循环一起卡住。
+        time.sleep(0.05)
+        return asyncio.run(coro)
+
+    resolver = EntityResolver(EmptyRepo(), blocking_runner)
+
+    async def exercise():
+        marker = asyncio.Event()
+
+        async def mark():
+            await asyncio.sleep(0)
+            marker.set()
+
+        resolve_task = asyncio.create_task(resolver.resolve("不存在", GraphScope.from_ids(1)))
+        marker_task = asyncio.create_task(mark())
+        await asyncio.wait_for(marker.wait(), timeout=0.02)
+        result = await resolve_task
+        await marker_task
+        return result
+
+    result = asyncio.run(exercise())
+    assert result.status.value == "missing"
