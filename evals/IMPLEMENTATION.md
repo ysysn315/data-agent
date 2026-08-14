@@ -14,8 +14,8 @@
 
 ### 1. RAG 评估（`evals/rag/`）
 
-针对独立 RAG 实验链路（分块 → 混合检索 → 重排 → 生成）。注意：主 Chat 当前只接
-Milvus 稠密召回与元数据后过滤，完整实验链路尚未接回主 Chat：
+针对 RAG 链路（分块 → 混合检索 → 重排 → 生成）。主 Chat 与评测脚本共用
+`VectorStore`/`RAGService` 组件；知识库单例首次初始化时恢复 BM25，并由 Agent 工具触发查询改写、扩展、RRF、过滤与重排。
 
 - **检索指标**：Hit@k、Recall@k、MRR、Precision@k、NDCG@k、MAP（`metrics.py`）。
 - **生成指标**：关键词召回 keyword_recall、来源命中 source_hit，以及严格版
@@ -25,8 +25,8 @@ Milvus 稠密召回与元数据后过滤，完整实验链路尚未接回主 Cha
 - **基线**：`baselines/retrieval_baseline.json`、`generation_baseline.json`——
   改检索参数（top_k / hybrid / rerank）后与基线对比，看是涨还是跌。
 
-运行需要 Milvus、Embedding、可选重排模型和测试语料。迁移后脚本仍引用已调整的配置字段，
-部分语料目录也未随仓库提交；以下是入口而不是“开箱即得 baseline”的保证，执行前先按
+运行需要 Milvus、Embedding、LLM、可选重排模型和测试语料。脚本已对齐当前
+`LLMFactory`/Settings；部分语料目录也未随仓库提交，以下是入口而不是“开箱即得 baseline”的保证，执行前先按
 `evals/rag/README.md` 的检查清单修正配置：
 
 ```bash

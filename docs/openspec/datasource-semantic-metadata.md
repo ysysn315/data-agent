@@ -86,4 +86,4 @@ GET    /api/datasources/{id}/m-schema            预览实际注入 Agent 的 M-
 
 ## 7. 当前范围
 
-本轮交付后端 API、持久化、SQLite/PostgreSQL/MySQL 连接器、请求级数据源选择、M-Schema/Text-to-SQL 接入、测试与操作文档。前端提供基础数据源选择和语义审核入口；更复杂的字段批量审批、权限角色细分和大规模 Schema embedding 召回留作后续增强。
+本轮交付后端 API、持久化、SQLite/PostgreSQL/MySQL 连接器、请求级数据源选择、M-Schema/Text-to-SQL 接入、测试与操作文档。前端提供基础数据源选择和语义审核入口。请求级数据源选择当前只接入同步/流式 Chat，Analysis Agent、ARQ 后台对话任务和评测仍走演示库；鉴权模式的前端登录/API Key 注入、复杂字段批量审批、权限角色细分和大规模 Schema 召回留作后续增强。

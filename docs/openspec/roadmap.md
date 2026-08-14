@@ -4,7 +4,7 @@
 > 宁可少而深，不做只能演示不能追问的功能。
 > 参考项目功能全景对照见 REQUIREMENTS.md §10。
 >
-> 状态口径：本页顶部能力盘点按 2026-08-09 当前代码维护；P0/P1 与 D/E/F 轮次保留为开发历史。
+> 状态口径：本页顶部能力盘点按当前分支代码维护；P0/P1 与 D/E/F 轮次保留为开发历史。
 
 ## 0. 现状（已完成 ✅）
 
@@ -15,10 +15,11 @@
 | Skills v2：目录模型/渐进披露/激活门控/远程安装 | Yuxi | ✅ |
 | MCP：注册表/工具加载/技能联动 | Yuxi | ✅ |
 | 工具熔断/重试/降级（ToolRuntimeMiddleware） | my-agent 保留 | ✅ |
-| RAG 知识库与实验链路 | my-agent 保留 | ⚠️ 主 Chat 已接稠密召回；混合检索/改写/重排仍在独立实验链路 |
+| RAG 知识库与实验链路 | my-agent 保留 | ✅ 主 Chat 共享 VectorStore，首次初始化恢复 BM25，统一改写/扩展、RRF、元数据过滤与可选重排；评测仍独立运行 |
 | 数据源接入 + 自动 Schema 扫描 + AI 语义草稿/人工审核 | SQLBot 思路 + 自研闭环 | ✅ SQLite/PG/MySQL；真实远端 smoke 待环境 |
+| Schema 相关表召回 | SQLBot | ⏳ `question` 已预留但未参与筛选；当前全量返回所选 Schema |
 | 只读 SQL 执行（execute_sql，按方言 AST + 数据库只读） | SQLBot 思路 | ✅ |
-| pytest 测试体系（20 个文件） | — | ✅ 233 passed，5 skipped（外部集成） |
+| pytest 测试体系（21 个文件） | — | ✅ pytest/CI 验证；Docker/Redis 不可用时外部集成用例按环境跳过 |
 | Text-to-SQL 执行准确率评估（28 例）+ 模型对比 | my-agent 思路扩展 | ✅ 3 份可区分报告，最高 89.29%（25/28） |
 | Langfuse 调用链追踪（默认关闭） | Yuxi | ✅ |
 | 持久化层（应用状态、图谱、用户与数据源语义目录） | Yuxi | ✅（D 轮起，持续扩展）|
@@ -51,7 +52,7 @@
 5. **README + 启动脚本**（0.5 天）
    docker-compose 起 Redis（Milvus 可选），`uvicorn` 一条命令起后端。
 
-## 2. P1 —— 差异化亮点（已完成，保留历史计划）
+## 2. P1 —— 差异化亮点（大部分已完成，保留历史计划）
 
 **优先级按"面试可讲深度 ÷ 实现成本"排序。**
 
@@ -70,9 +71,9 @@
    业务术语映射（GMV=成交总额），命中即注入 prompt。实现小、故事完整。
 5. **Chat 前端（复用 my-agent-original/frontend，2 天）** ⭐⭐⭐
    Vue3 对话界面 + skills 面板（列表/启停/详情）。demo 观感所需的最小集。
-6. **schema embedding 检索（抄 SQLBot，1-2 天，表多时才有意义）** ⭐⭐
-   表结构向量化 → 按问题召回 top-N 注入。9 张表的 demo 可以先讲"预留"，
-   接口已在 schema-retrieval 技能占位。
+6. **schema embedding 检索（⏳ 未完成；抄 SQLBot，表多时才有意义）** ⭐⭐
+   目标是表结构向量化 → 按问题召回 top-N，并补充外键相邻表后注入。当前演示库 6 张表、
+   平台数据源为任意表规模；`question` 只在接口中预留，当前仍全量返回所选 Schema。
 
 ## 3. P2+ 推进计划（4 轮子代理，轮间等待合并）
 

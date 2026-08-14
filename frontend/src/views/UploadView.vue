@@ -62,11 +62,11 @@
       </div>
       
       <div v-else class="document-list">
-        <div v-for="doc in documents" :key="doc.id" class="document-item">
+        <div v-for="doc in documents" :key="doc.source" class="document-item">
           <span class="doc-icon"><svg viewBox="0 0 20 20" fill="none" width="18" height="18"><path d="M5 2.5h6.5L16 7v10.5H5V2.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M11.5 2.5V7H16" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></span>
           <div class="doc-info">
-            <p class="doc-name">{{ doc.name }}</p>
-            <p class="doc-meta">{{ doc.chunks || 0 }} 个文档块</p>
+            <p class="doc-name">{{ doc.title || doc.source }}</p>
+            <p class="doc-meta">{{ doc.source }} · {{ doc.chunk_count || 0 }} 个文档块<span v-if="doc.sheet_names?.length"> · {{ doc.sheet_names.join('、') }}</span></p>
           </div>
         </div>
       </div>
@@ -152,9 +152,16 @@ const uploadFile = async (file) => {
 }
 
 const refreshDocuments = async () => {
-  // 这里可以添加获取文档列表的 API
-  // 目前先显示模拟数据
-  documents.value = []
+  loadingDocs.value = true
+  try {
+    const response = await fetch('/api/documents')
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    documents.value = await response.json()
+  } catch (error) {
+    documents.value = []
+  } finally {
+    loadingDocs.value = false
+  }
 }
 
 onMounted(() => {

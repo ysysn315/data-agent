@@ -2,10 +2,10 @@ import json
 from pathlib import Path
 from typing import Any, Dict
 
-from langchain_community.chat_models import ChatTongyi
 from loguru import logger
 
 from app.clients.milvus_client import MilvusClient
+from app.core.llm import LLMFactory
 from app.core.settings import get_settings
 from app.rag.embeddings import EmbeddingService
 from app.rag.query_rewriter import QueryRewriter
@@ -32,12 +32,7 @@ def _build_eval_rerankers(settings, reranker_model: str = "qwen-turbo"):
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[evals] BGE reranker unavailable, falling back to LLM rerank: {e}")
 
-    reranker_llm = ChatTongyi(
-        dashscope_api_key=settings.dashscope_api_key,
-        model_name=reranker_model,
-        streaming=False,
-        temperature=0.0,
-    )
+    reranker_llm = LLMFactory.create_llm(model=reranker_model, temperature=0.0, streaming=False)
     return reranker, reranker_llm
 
 
@@ -60,12 +55,7 @@ async def build_rag(enable_hybrid: bool, enable_rerank: bool, dense_top_k: int =
         enable_hybrid=enable_hybrid,
     )
 
-    llm = ChatTongyi(
-        dashscope_api_key=settings.dashscope_api_key,
-        model_name=settings.chat_model,
-        streaming=False,
-        temperature=0.0,
-    )
+    llm = LLMFactory.create_llm(model=settings.llm_model, temperature=0.0, streaming=False)
 
     rag_service = RAGService(vector_store, llm)
     return rag_service, vector_store
@@ -102,19 +92,9 @@ async def build_rag_for_main_model_eval(
         enable_hybrid=enable_hybrid,
     )
 
-    generation_llm = ChatTongyi(
-        dashscope_api_key=settings.dashscope_api_key,
-        model_name=generation_model,
-        streaming=False,
-        temperature=0.0,
-    )
+    generation_llm = LLMFactory.create_llm(model=generation_model, temperature=0.0, streaming=False)
 
-    rewrite_llm = ChatTongyi(
-        dashscope_api_key=settings.dashscope_api_key,
-        model_name=rewrite_model,
-        streaming=False,
-        temperature=0.0,
-    )
+    rewrite_llm = LLMFactory.create_llm(model=rewrite_model, temperature=0.0, streaming=False)
 
     rag_service = RAGService(vector_store, generation_llm)
     # Override the default query rewriter so generation-model experiments

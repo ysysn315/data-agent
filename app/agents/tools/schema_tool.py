@@ -1,5 +1,5 @@
-# Schema 检索工具 —— schema-retrieval 技能声明的门控工具（激活后可见）
-# 返回演示库的 M-Schema 表结构，供 sql-generation 对齐字段生成 SQL。
+# Schema 目录工具 —— schema-retrieval 技能声明的门控工具（激活后可见）
+# 返回请求所选平台数据源或兼容演示库的 M-Schema，供 sql-generation 对齐字段。
 from pathlib import Path
 
 from langchain_core.tools import tool
@@ -27,8 +27,8 @@ def create_schema_search_tool(db_path: str, datasource_runtime=None):
         生成 SQL 前必须先调用本工具确认真实存在的表名与字段名，不要凭空臆测。
 
         参数:
-            question: 用户的自然语言问题（当前 demo 全量返回，未据此过滤；
-                      二期会用它做 embedding 召回相关表）
+            question: 用户的自然语言问题。当前对所选平台 Schema 或演示库均全量返回，
+                      尚未据此过滤；后续用于 embedding/关键词召回相关表。
         """
         try:
             selection = current_selection()
@@ -48,7 +48,7 @@ def create_schema_search_tool(db_path: str, datasource_runtime=None):
             return f"读取表结构失败: {e}"
 
         if not m_schema.strip():
-            return "数据库中没有可用的表（演示数据集可能未导入）"
+            return "当前数据源中没有可用的表结构"
 
         return m_schema
 

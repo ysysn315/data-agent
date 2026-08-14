@@ -1,7 +1,8 @@
-# 对话请求/响应模型
-# TODO: 任务 5.1 - 使用 Pydantic 定义 ChatRequest 和 ChatResponse
-# ChatRequest: Id (str), Question (str)
-# ChatResponse: answer (str), sources (list, 可选)
+"""对话请求/响应模型。
+
+ChatRequest 可选绑定平台 datasource_id；未提供时保持演示库兼容路径。
+"""
+
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field

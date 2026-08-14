@@ -90,7 +90,7 @@ async def chat_stream(
                 datasource_id=request.datasource_id,
                 workspace_id=workspace_id,
             ):
-                yield f"data: {json.dumps({'type': 'content', 'data': chunk}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
         except Exception as e:
             logger.error(f"流式对话失败: {str(e)}")

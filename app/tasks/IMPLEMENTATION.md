@@ -107,6 +107,11 @@ worker 进程轮询队列取到 job，把 `ctx["job_id"]`（即 task_id）和 `c
 RabbitMQ 或独立 result backend，运维更重。代价是 arq 的编排/路由/监控生态不如 celery 成熟，
 但本项目用不到。
 
+**数据源边界。** 当前 `run_chat_task`/`run_analysis_task` 的入队参数和 worker 都没有携带
+`workspace_id + datasource_id`，所以后台 Agent 使用演示数据源；平台数据源选择目前只贯通
+同步/流式 Chat。后续接入时必须在入队前校验工作空间归属，并把选择写入 worker 请求级上下文，
+不能让模型自行传数据源 ID。
+
 **为什么 Streams 不是 pub/sub。** 见"实现原理"：进度事件要求迟到订阅仍可回放，pub/sub
 "发了就没"做不到。Streams 还为未来的断点续读保留了 seq 游标，但当前 API/前端没有贯通重连游标；
 取消信号那种"一次性、丢了也无所谓"的场景才适合 pub/sub（Yuxi 正是这么分的）。

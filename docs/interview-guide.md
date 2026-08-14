@@ -2,14 +2,14 @@
 
 > 目标：围绕当前简历的 5 条主线讲清“问题、链路、设计原因、失败边界、证据”。本文只使用当前代码与可核验报告；旧 README/旧报告中的 92.86%、4 模型、113 tests 等数字已废弃。
 
-## 0. 事实卡（2026-08-09）
+## 0. 事实卡（2026-08-13）
 
 | 主题 | 当前可核验事实 | 不要说 |
 |---|---|---|
-| 测试 | `233 passed, 5 skipped`；20 个测试文件 | 所有外部集成都已真机跑通 |
+| 测试 | 提交前用 pytest/CI 验证；21 个测试文件，Docker/Redis 不可用时外部集成用例按环境跳过 | 所有外部集成都已真机跑通 |
 | Skills | 5 个内置技能；阶段测量约 1183→150 tokens/请求 | 当前 5 个技能仍精确等于早期测量口径 |
 | Text-to-SQL | 支持 SQLite/PG/MySQL 接入、AI 语义草稿与人工审核；28 条演示集最高 89.29%（25/28） | 已有行列级权限或真实 PG/MySQL 集成环境全覆盖 |
-| RAG | 主 Chat 为 Milvus 稠密召回；完整混合检索在实验链路 | 主 Chat 已贯通 BM25/BGE/查询改写 |
+| RAG | 主 Chat 已贯通 BM25 恢复、查询改写/扩展、RRF 与可选重排；独立实验可切换模型 | 本地 BGE 需额外依赖；BM25 是有上限的进程内派生索引 |
 | 图谱 | SQLite+NetworkX 轻量图谱；显式 LLM 抽取 | GraphRAG、Neo4j、大规模图推理 |
 | 沙箱 | 默认 subprocess，可切 Docker 一次性容器 | 所有 Agent/工具默认运行在 Docker |
 | 异步事件 | Streams 保存历史事件；SSE 可从头回放 | HTTP/前端已经支持断点续传 |
@@ -27,7 +27,7 @@
 
 1. **问数主链路**：管理员接入数据源并自动扫描 Schema，AI 只生成语义草稿，用户审核后才进入正式 M-Schema；问题再结合术语和 SQL 示例生成 SQL，由 sqlglot 按方言校验后通过只读连接执行。
 2. **能力扩展**：Skills 只向模型披露名称和描述，模型读取正文后才激活并解锁工具；外部 MCP 工具也只在相关技能激活后加载。
-3. **知识增强**：文档和表格进入 Milvus 知识库；图谱保存指标口径与实体关系。主 Chat 与完整 RAG 实验链路的接线边界明确分开。
+3. **知识增强**：文档和表格进入 Milvus 知识库；知识库单例首次初始化恢复 BM25，主 Chat 统一执行查询改写/扩展、RRF 和重排；图谱保存指标口径与实体关系。
 4. **复杂任务**：Analysis Agent 进行规划、逐步执行和反思；长任务通过 ARQ、Redis Streams 和 SSE 异步推送进度。
 5. **效果与可靠性**：工具层有超时、重试、熔断和降级；SQL 有双重只读；评测以结果集等价性衡量 28 条 SQL，用原始报告支撑 89.29% 最高准确率。
 
@@ -71,8 +71,8 @@ system prompt 披露技能名称/描述
 ```text
 中文问题
   → 请求级绑定当前工作空间数据源
-  → 自动扫描且已审核的 M-Schema
-  → 术语与 SQL 示例
+  → schema_search 读取自动扫描且已审核的 M-Schema（当前全量返回所选 Schema）
+  → 演示库可补充全局术语与 SQL 示例；平台数据源暂时禁用这两份未隔离数据
   → 分层规则生成 SQL
   → sqlglot 按 SQLite/PostgreSQL/MySQL 方言做 AST 校验/自动 LIMIT
   → 数据库只读连接执行
@@ -87,7 +87,7 @@ system prompt 披露技能名称/描述
 - 非限定列只在能唯一确定归属时校验；多表、CTE、子查询宁可交给数据库报错，避免误报驱动模型反复改错。
 - 校验错误作为中文 ToolMessage 回给模型，使 Agent 能继续自纠；真正异常才中断。
 
-**边界**：SQLite 已有端到端测试，远程连接配置、加密和错误路径有自动化覆盖，但没有真实 PostgreSQL/MySQL 环境 smoke 证据；当前仍全量注入一个 schema，术语/历史 SQL 也尚未按数据源建模（平台请求会禁用全局兼容库），并且没有行列级权限、定时同步、凭证轮换和审批历史，不能包装成成熟企业 BI 平台。
+**边界**：SQLite 已有端到端测试，远程连接配置、加密和错误路径有自动化覆盖，但没有真实 PostgreSQL/MySQL 环境 smoke 证据；`schema_search(question)` 仍未按问题筛表，而是全量注入所选 Schema，术语/历史 SQL 也尚未按数据源建模（平台请求会禁用全局兼容库）。`datasource_id` 当前只贯通同步/流式 Chat，Analysis/ARQ/评测仍走演示库；此外还没有行列级权限、定时同步、凭证轮换和审批历史，不能包装成成熟企业 BI 平台。
 
 **高频追问**：
 
@@ -128,11 +128,11 @@ system prompt 披露技能名称/描述
 - Markdown 按 H1/H2/H3 组织章节路径，其他格式走递归分块。
 - 图谱使用 SQLite 保证三元组持久化和幂等，NetworkX 提供轻量邻域/路径查询；LLM 抽取由显式 API 触发，避免上传即产生模型成本。
 
-**边界**：主 Chat 新建的 VectorStore 没有恢复 BM25 语料，也没有注入查询改写器和 reranker；DOCX 只读普通段落，Markdown 超长章节不会二次按长度切分，图谱也没有实体向量链接或 PPR。
+**边界**：主 Chat 已统一接线，但 BM25 和文档列表都只处理最多 `RAG_BM25_MAX_DOCUMENTS` 个 chunk，重启后仍需从 Milvus 重建；Milvus 的恢复、检索、写入和列表扫描已放入工作线程，不占用事件循环；本地 BGE reranker 是可选依赖，未安装时回退配置的 LLM/融合排序。DOCX 只读普通段落，Markdown 超长章节不会二次按长度切分，图谱也没有实体向量链接或 PPR。
 
 **高频追问**：
 
-1. 为什么完整 RAG 代码没直接接主 Chat？——组件和实验先独立验证，主链路接线仍需补 BM25 索引恢复、reranker 配置与响应来源契约。
+1. 主 Chat 如何保证重启后仍能混合检索？——Milvus 保存 content/metadata，知识库单例首次初始化时由共享 VectorStore 在工作线程中分批恢复 BM25；BM25 是派生索引，超过上限时与增量写入一样保留扫描尾部的受控规模，稠密召回仍覆盖完整库。
 2. 为什么还要图谱？——向量检索适合语义相关，图谱适合明确回答“实体之间是什么关系、指标由什么构成”。
 3. 为什么不用 Neo4j？——当前是千级演示关系，SQLite+NetworkX 更轻；规模、并发和复杂图算法需求出现后再换。
 
@@ -206,7 +206,7 @@ Chat Agent 初始化需要 SkillService，两者曾复用同一把不可重入�
 | Skills 渐进披露、门控与 MCP 懒加载 | `app/skills/middleware.py`、`app/mcp/service.py`、中间件测试 | token 数是阶段测量 |
 | Docker 一次性脚本沙箱 | `app/skills/sandbox.py`、沙箱测试 | 默认 subprocess；本轮真容器测试跳过 |
 | M-Schema + sqlglot + 只读执行 | `app/text2sql/`、`app/agents/tools/sql_guard.py` | SQLite 演示级、列校验保守 |
-| RAG 混合检索实验链路 | `app/rag/`、`evals/rag/run_embedding_compare.py` | 未接回主 Chat |
+| RAG 主线与实验链路 | `app/rag/`、`app/core/dependencies.py`、`evals/rag/` | 主 Chat 已统一组装；实验可独立切换配置 |
 | 轻量知识图谱 | `app/graph/`、`tests/test_knowledge_graph.py` | 非 GraphRAG/Neo4j |
 | P-O-R + ARQ/Streams/SSE | `app/agents/analysis_agent.py`、`app/tasks/` | 历史回放，不是断点续传 |
 | 89.29%（25/28） | `execution_qwen3.7-plus.json` | 3 份可区分报告、数据集较小 |

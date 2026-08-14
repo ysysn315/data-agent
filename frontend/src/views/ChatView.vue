@@ -109,7 +109,7 @@
 </template>
 
 <script setup>
-import { ref, nextTick, onMounted } from 'vue'
+import { computed, ref, nextTick, onMounted } from 'vue'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 
@@ -123,11 +123,18 @@ marked.setOptions({
   }
 })
 
-const suggestions = [
+const demoSuggestions = [
   '各州（customer_state）的销售额 Top5',
   '2018 年各月的 GMV 趋势',
   '复购率是多少？',
   '各支付方式的订单量占比',
+]
+
+const datasourceSuggestions = [
+  '这个数据源包含哪些主要业务表？',
+  '概括当前数据源可以分析的业务主题',
+  '选择一个核心指标并分析其分布情况',
+  '找出值得进一步分析的数据异常或趋势',
 ]
 
 const messages = ref([])
@@ -137,6 +144,7 @@ const isLoading = ref(false)
 const messagesContainer = ref(null)
 const datasources = ref([])
 const selectedDatasource = ref(localStorage.getItem('data-agent:selected-datasource') || '')
+const suggestions = computed(() => selectedDatasource.value ? datasourceSuggestions : demoSuggestions)
 
 // 单页会话 ID，对应后端 ChatRequest.Id
 const sessionId = 'session-' + Date.now()
@@ -158,7 +166,7 @@ const scrollToBottom = () => {
 }
 
 // 解析后端 SSE：每条形如 `data: {"type": "...", "data": "..."}`。
-// 后端定义了三种 type：content（增量文本）/ done（结束）/ error（异常）。
+// 后端定义了四种 type：content（增量文本）/ sources（来源）/ done（结束）/ error（异常）。
 // 逐块读取时需要跨 read 缓冲不完整的行，避免把 JSON 截断。
 const streamChat = async (question, assistantMessage) => {
   const response = await fetch('/api/chat_stream', {
@@ -192,6 +200,8 @@ const streamChat = async (question, assistantMessage) => {
         if (payload.type === 'content') {
           assistantMessage.content += payload.data
           scrollToBottom()
+        } else if (payload.type === 'sources') {
+          assistantMessage.sources = payload.data || []
         } else if (payload.type === 'error') {
           assistantMessage.content += `\n\n❌ ${payload.data}`
         }

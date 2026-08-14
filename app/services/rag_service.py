@@ -4,11 +4,12 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from loguru import logger
 
+from app.rag.document_utils import document_key, document_source
 from app.rag.query_rewriter import QueryRewriter
 
 
 class RAGService:
-    def __init__(self, vector_store, llm):
+    def __init__(self, vector_store, llm, query_rewriter: Optional[QueryRewriter] = None):
         self.vector_store = vector_store
         self.llm = llm
         self.prompt = ChatPromptTemplate.from_template(
@@ -28,7 +29,7 @@ class RAGService:
 回答：
 """.strip()
         )
-        self.query_rewriter = QueryRewriter(llm) if llm else None
+        self.query_rewriter = query_rewriter or (QueryRewriter(llm) if llm else None)
         logger.info("RAG 服务初始化完成")
 
     async def retrieve(
@@ -86,13 +87,17 @@ class RAGService:
                 q,
                 top_k=top_k,
                 metadata_filters=metadata_filters,
+                rerank=False,
             )
             for doc in docs:
-                content_key = doc.get("content", "")[:100]
+                content_key = document_key(doc)
                 if content_key not in seen_content:
                     all_docs.append(doc)
                     seen_content.add(content_key)
-        return all_docs[:top_k]
+        if not all_docs:
+            return []
+        # 多查询先合并候选，再统一重排；避免每个改写查询各自截断后顺序互相覆盖。
+        return await self.vector_store.rerank_documents(query, all_docs, top_k=top_k)
 
     def format_docs(self, docs: List[Dict]) -> str:
         if not docs:
@@ -138,7 +143,7 @@ class RAGService:
                 "question": question,
             }
         )
-        sources = list(set(doc.get("metadata", {}).get("source", "未知来源") for doc in docs))
+        sources = list({document_source(doc) or "未知来源" for doc in docs})
         return {"answer": result, "sources": sources}
 
     async def generate_answer_stream(

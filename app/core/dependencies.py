@@ -93,7 +93,9 @@ _term_store = None
 _datasource_service = None
 _datasource_runtime = None
 _datasource_connectors = None
+_vector_store = None
 _init_lock = asyncio.Lock()
+_vector_store_lock = asyncio.Lock()
 
 
 def _get_datasource_connectors():
@@ -248,9 +250,12 @@ async def get_chat_agent():
         from app.agents.tools.sql_context_tool import create_sql_context_tool
         from app.agents.tools.sql_tool import create_execute_sql_tool
         from app.core.llm import LLMFactory
+        from app.rag.query_rewriter import QueryRewriter
+        from app.services.rag_service import RAGService
         from app.skills.middleware import SkillsMiddleware
         from app.skills.tools import create_skill_tools
 
+        chat_llm = LLMFactory.create_llm()
         base_tools = [get_current_datetime]
         base_tools.extend(create_skill_tools(skill_service))
 
@@ -263,15 +268,18 @@ async def get_chat_agent():
             # 知识库检索依赖 Milvus。连不上就显式失败：
             # 未部署 Milvus 时请设置 ENABLE_KB_TOOL=false
             from app.agents.tools.internal_docs_tool import create_docs_tool
-            from app.clients.milvus_client import MilvusClient
-            from app.rag.embeddings import EmbeddingService
-            from app.rag.vector_store import VectorStore
 
-            milvus_client = MilvusClient(settings)
-            await milvus_client.connect()
-            await milvus_client.ensure_collection()
-            vector_store = VectorStore(milvus_client, EmbeddingService(settings))
-            base_tools.append(create_docs_tool(vector_store))
+            vector_store = await get_vector_store()
+            rag_service = RAGService(
+                vector_store,
+                chat_llm,
+                query_rewriter=(
+                    QueryRewriter(chat_llm)
+                    if settings.rag_enable_query_rewrite
+                    else QueryRewriter(chat_llm, enable_rewrite=False, enable_expansion=False)
+                ),
+            )
+            base_tools.append(create_docs_tool(rag_service))
 
         # 技能声明的门控工具：构建期注册，read_skill 激活后才对模型可见
         gated_tools = [
@@ -282,7 +290,7 @@ async def get_chat_agent():
         ]
 
         _chat_agent = ChatAgent(
-            llm=LLMFactory.create_llm(),
+            llm=chat_llm,
             tools=base_tools,
             middleware=[
                 SkillsMiddleware(
@@ -303,7 +311,8 @@ def reset_singletons() -> None:
     NullPool 无常驻连接，不随单例重置销毁（如需换库调 app.db.reset_engine）。
     """
     global _skill_service, _mcp_service, _chat_agent, _example_store, _term_store
-    global _task_service, _graph_service, _datasource_service, _datasource_runtime, _datasource_connectors
+    global _task_service, _graph_service, _datasource_service, _datasource_runtime
+    global _datasource_connectors, _vector_store
     _skill_service = None
     _mcp_service = None
     _chat_agent = None
@@ -312,8 +321,53 @@ def reset_singletons() -> None:
     _datasource_service = None
     _datasource_runtime = None
     _datasource_connectors = None
+    _vector_store = None
     _task_service = None
     _graph_service = None
+
+
+async def get_vector_store():
+    """Milvus + Embedding 单例，供上传、文档列表和主 Chat 共用。
+
+    Milvus 是持久化真相源；BM25 是派生内存索引，首次按需初始化时从 Collection 恢复，
+    后续上传/删除复用同一实例，避免服务重启或不同请求分别创建 VectorStore 后
+    主 Chat 退化成纯稠密召回。
+    """
+    global _vector_store
+    if _vector_store is not None:
+        return _vector_store
+    async with _vector_store_lock:
+        if _vector_store is not None:
+            return _vector_store
+
+        from app.clients.milvus_client import MilvusClient
+        from app.core.llm import LLMFactory
+        from app.rag.embeddings import EmbeddingService
+        from app.rag.vector_store import VectorStore
+
+        reranker_llm = None
+        if settings.rag_enable_rerank and settings.llm_api_key:
+            # VectorStore 的检索配置在构造期一次性确定；不在 get_chat_agent 中
+            # 通过修改单例属性改变行为，避免调用顺序造成配置漂移。
+            reranker_llm = LLMFactory.create_llm()
+
+        milvus_client = MilvusClient(settings)
+        await milvus_client.connect()
+        await milvus_client.ensure_collection()
+        vector_store = VectorStore(
+            milvus_client,
+            EmbeddingService(settings),
+            reranker_llm=reranker_llm,
+            dense_top_k=max(settings.rag_top_k, 10),
+            enable_hybrid=settings.rag_enable_hybrid,
+            enable_rerank=settings.rag_enable_rerank,
+            max_bm25_documents=settings.rag_bm25_max_documents,
+            restore_batch_size=settings.rag_restore_batch_size,
+        )
+        await vector_store.restore_bm25_index()
+        # 只有恢复完成后才发布单例，避免并发请求走快速路径拿到半初始化对象。
+        _vector_store = vector_store
+    return _vector_store
 
 
 # ========== 异步任务（arq + Redis Streams），D 轮追加 ==========

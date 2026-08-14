@@ -3,10 +3,10 @@ from pathlib import Path
 from statistics import mean
 from typing import Dict, Iterable, List, Tuple
 
-from langchain_community.chat_models import ChatTongyi
 from loguru import logger
 
 from app.clients.milvus_client import MilvusClient
+from app.core.llm import LLMFactory
 from app.core.settings import Settings, get_settings
 from app.rag.bm25 import BM25Retriever
 from app.rag.chunking import DocumentChunker, get_strategy_by_filename
@@ -124,12 +124,7 @@ def build_eval_rerankers(settings: Settings):
     except Exception as e:  # noqa: BLE001
         logger.warning(f"[embedding-compare] BGE reranker unavailable, fallback to LLM rerank: {e}")
 
-    reranker_llm = ChatTongyi(
-        dashscope_api_key=settings.dashscope_api_key,
-        model_name=FIXED_RERANK_MODEL,
-        streaming=False,
-        temperature=0.0,
-    )
+    reranker_llm = LLMFactory.create_llm(model=FIXED_RERANK_MODEL, temperature=0.0, streaming=False)
     return reranker, reranker_llm
 
 
@@ -160,18 +155,8 @@ async def build_eval_stack(
         vector_store.bm25_retriever = BM25Retriever()
         vector_store.bm25_retriever.index(vector_store.all_chunks)
 
-    generation_llm = ChatTongyi(
-        dashscope_api_key=settings.dashscope_api_key,
-        model_name=FIXED_MAIN_MODEL,
-        streaming=False,
-        temperature=0.0,
-    )
-    rewrite_llm = ChatTongyi(
-        dashscope_api_key=settings.dashscope_api_key,
-        model_name=FIXED_REWRITE_MODEL,
-        streaming=False,
-        temperature=0.0,
-    )
+    generation_llm = LLMFactory.create_llm(model=FIXED_MAIN_MODEL, temperature=0.0, streaming=False)
+    rewrite_llm = LLMFactory.create_llm(model=FIXED_REWRITE_MODEL, temperature=0.0, streaming=False)
 
     rag_service = RAGService(vector_store, generation_llm)
     rag_service.query_rewriter = QueryRewriter(rewrite_llm)
@@ -362,7 +347,7 @@ async def run_one_experiment(
 ) -> Dict:
     settings = clone_settings(
         base_settings,
-        chat_model=FIXED_MAIN_MODEL,
+        llm_model=FIXED_MAIN_MODEL,
         embedding_provider=experiment["embedding_provider"],
         embedding_model=experiment["embedding_model"],
         milvus_collection=experiment["collection"],
