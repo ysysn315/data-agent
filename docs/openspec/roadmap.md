@@ -19,7 +19,7 @@
 | 数据源接入 + 自动 Schema 扫描 + AI 语义草稿/人工审核 | SQLBot 思路 + 自研闭环 | ✅ SQLite/PG/MySQL；真实远端 smoke 待环境 |
 | Schema 相关表召回 | SQLBot | ⏳ `question` 已预留但未参与筛选；当前全量返回所选 Schema |
 | 只读 SQL 执行（execute_sql，按方言 AST + 数据库只读） | SQLBot 思路 | ✅ |
-| pytest 测试体系（22 个文件） | — | ✅ pytest/CI 验证；Docker/Redis 不可用时外部集成用例按环境跳过 |
+| pytest 测试体系（21 个 test_*.py 文件，含 conftest 共 22 个 Python 文件） | — | ✅ pytest/CI 验证；Docker/Redis 不可用时外部集成用例按环境跳过 |
 | Text-to-SQL 执行准确率评估（28 例）+ 模型对比 | my-agent 思路扩展 | ✅ 3 份可区分报告，最高 89.29%（25/28） |
 | Langfuse 调用链追踪（默认关闭） | Yuxi | ✅ |
 | 持久化层（应用状态、图谱、用户与数据源语义目录） | Yuxi | ✅（D 轮起，持续扩展）|

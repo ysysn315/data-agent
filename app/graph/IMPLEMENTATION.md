@@ -139,6 +139,8 @@ Embedding 异常都降级为词法匹配，不阻塞精确路径。实体向量�
 `tests/test_knowledge_graph.py` 覆盖抽取容错、幂等/重启、作用域隔离、实体属性合并与显式
 合并、Embedding 回退、路径工具、API 和 Skill 门控；在仓库根目录使用
 `.venv/bin/python -m pytest -q` 执行全量回归（Docker/Redis 不可用时外部用例按环境跳过）。
+作用域缓存当前以顺序隔离/写后失效回归覆盖，没有额外编写多线程交错压测；并发安全依赖
+按 `scope_key` 分桶和版本校验，后续若扩大图规模再补压力测试。
 
 面试时应主动说明：NetworkX 节点当前使用可读规范名，实体 ID 主要用于持久化合并和向量主键；
 图谱规模假设是千级，Milvus/Embedding 是可选增强，当前没有跨文档 GraphRAG 和 PPR。
