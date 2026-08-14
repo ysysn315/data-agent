@@ -18,10 +18,11 @@ import pytest
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage
 
-from app.agents.tools.graph_tool import create_graph_search_tool
+from app.agents.tools.graph_tool import create_graph_path_tool, create_graph_search_tool
 from app.db.engine import create_engine_and_sessionmaker, init_db
 from app.db.repositories import GraphTripleRepository
 from app.graph.extractor import Triple, extract_triples
+from app.graph.scope import GraphScope, use_graph_scope
 from app.graph.service import GraphService
 from app.graph.store import SEED_TRIPLES, GraphStore
 
@@ -148,6 +149,41 @@ def test_store_restart_persistence(graph_env):
     assert store2.graph.has_edge("GMV", "订单项价格")
 
 
+def test_legacy_graph_table_migrates_to_demo_scope(graph_env, tmp_path):
+    """旧版全局 graph_triples 数据保留，并归入 workspace:0。"""
+    _, run = graph_env
+    url = f"sqlite+aiosqlite:///{tmp_path / 'legacy.db'}"
+    engine, sessionmaker = create_engine_and_sessionmaker(url)
+    try:
+
+        async def create_legacy_table():
+            async with engine.begin() as conn:
+                await conn.exec_driver_sql(
+                    """
+                    CREATE TABLE graph_triples (
+                        id INTEGER PRIMARY KEY,
+                        subject VARCHAR(256) NOT NULL,
+                        predicate VARCHAR(256) NOT NULL,
+                        object VARCHAR(256) NOT NULL,
+                        source VARCHAR(64) NOT NULL,
+                        created_at DATETIME NOT NULL
+                    )
+                    """
+                )
+                await conn.exec_driver_sql(
+                    "INSERT INTO graph_triples (id, subject, predicate, object, source, created_at) "
+                    "VALUES (1, '旧指标', '计算自', '旧字段', 'manual', '2026-01-01 00:00:00')"
+                )
+
+        run(create_legacy_table())
+        run(init_db(engine))
+        repo = GraphTripleRepository(sessionmaker)
+        rows = run(repo.list_all("workspace:0"))
+        assert rows == [{"subject": "旧指标", "predicate": "计算自", "object": "旧字段", "source": "manual"}]
+    finally:
+        run(engine.dispose())
+
+
 def test_store_graph_mirror_invalidation(graph_env):
     make_repo, run = graph_env
     store = GraphStore(make_repo(), runner=run, seed=False)
@@ -241,7 +277,9 @@ def test_find_path_predicate_chain(small_graph):
     assert res2["found"] is True
     assert res2["path"] == ["复购率", "客户唯一标识", "客户", "订单"]
     assert res2["chain"].endswith("客户 <-[属于]- 订单")
-    assert res2["edges"][-1] == {"subject": "订单", "predicate": "属于", "object": "客户"}
+    assert res2["edges"][-1]["subject"] == "订单"
+    assert res2["edges"][-1]["predicate"] == "属于"
+    assert res2["edges"][-1]["object"] == "客户"
 
     # 无路可达（孤岛）与端点缺失
     store.add_triples([Triple("孤岛A", "关联", "孤岛B")])
@@ -368,10 +406,146 @@ def test_api_graph_full_flow(client):
 async def test_knowledge_graph_skill_declares_graph_search(skill_service):
     skill = await skill_service.get_skill("knowledge-graph")
     assert skill is not None
-    assert "graph_search" in skill.get_tools()
+    assert {"graph_search", "graph_path_search"} <= set(skill.get_tools())
     assert "口径溯源" in skill.parsed.body  # 正文写了何时用图谱
 
     expanded = await skill_service.expand_dependencies(["knowledge-graph"])
-    assert "graph_search" in expanded.tools
+    assert {"graph_search", "graph_path_search"} <= set(expanded.tools)
     # 激活 knowledge-graph 后，graph_search 应在其直接声明的工具集中（门控解锁依据）
-    assert "graph_search" in expanded.tools_of({"knowledge-graph"})
+    assert {"graph_search", "graph_path_search"} <= expanded.tools_of({"knowledge-graph"})
+
+
+def test_graph_scope_isolation_and_embedding_resolution(graph_env):
+    make_repo, run = graph_env
+    store = GraphStore(make_repo(), runner=run, seed=False)
+    service = GraphService(
+        store,
+        embed_fn=lambda text: [1.0, 0.0] if any(token in text for token in ("GMV", "成交额")) else [0.0, 1.0],
+    )
+
+    with use_graph_scope(GraphScope.from_ids(11)):
+        store.add_triples([{"subject": "GMV", "predicate": "计算自", "object": "订单项价格"}])
+    with use_graph_scope(GraphScope.from_ids(22)):
+        store.add_triples([{"subject": "GMV", "predicate": "计算自", "object": "另一张表"}])
+
+    with use_graph_scope(GraphScope.from_ids(11)):
+        assert service.stats()["triple_count"] == 1
+        result = asyncio.run(service.find_path_resolved("成交额", "订单项价格", max_hops=2))
+        assert result["found"] is True
+        assert result["resolution"]["from"]["method"] == "embedding"
+    with use_graph_scope(GraphScope.from_ids(22)):
+        assert service.query_entity("订单项价格") is None
+
+
+def test_graph_entity_attribute_merge_and_explicit_merge(graph_env):
+    make_repo, run = graph_env
+    store = GraphStore(make_repo(), runner=run, seed=False)
+    scope = GraphScope.from_ids(7)
+    with use_graph_scope(scope):
+        store.add_triples(
+            [
+                {
+                    "subject": "GMV",
+                    "subject_aliases": ["成交额"],
+                    "subject_attributes": {"comment": "成交总额"},
+                    "predicate": "计算自",
+                    "object": "订单项价格",
+                },
+                {
+                    "subject": "成交总额",
+                    "subject_aliases": ["旧口径"],
+                    "subject_attributes": {"comment": "订单金额总和"},
+                    "predicate": "别名关系",
+                    "object": "GMV",
+                },
+                {
+                    "subject": "成交总额",
+                    "predicate": "计算自",
+                    "object": "订单项价格",
+                },
+            ]
+        )
+        entities = run(store.entity_repo.list_scope(scope.key))
+        gmv = next(entity for entity in entities if entity["canonical_name"] == "GMV")
+        duplicate = next(entity for entity in entities if entity["canonical_name"] == "成交总额")
+        merged = store.merge_entities(gmv["id"], duplicate["id"], scope=scope)
+        assert merged["canonical_name"] == "GMV"
+        refreshed = run(store.entity_repo.get_by_id(gmv["id"], scope.key))
+        assert refreshed["status"] == "active"
+        assert "成交总额" in refreshed["aliases"]
+        assert "旧口径" in refreshed["aliases"]
+        assert run(store.entity_repo.get_by_alias(scope.key, "旧口径"))["id"] == gmv["id"]
+        duplicate_row = run(store.entity_repo.get_by_id(duplicate["id"], scope.key))
+        assert duplicate_row["status"] == "merged"
+
+
+def test_sync_catalog_creates_reviewed_schema_entities(graph_env):
+    make_repo, run = graph_env
+    store = GraphStore(make_repo(), runner=run, seed=False)
+    service = GraphService(store)
+    scope = GraphScope.from_ids(3, 8)
+    catalog = {
+        "tables": [
+            {
+                "schema_name": "public",
+                "table_name": "orders",
+                "review_status": "approved",
+                "reviewed_comment": "订单主表",
+                "physical_comment": "physical",
+                "columns": [
+                    {
+                        "column_name": "id",
+                        "data_type": "INTEGER",
+                        "review_status": "approved",
+                        "reviewed_comment": "订单编号",
+                        "reviewed_synonyms": ["订单号"],
+                        "primary_key": True,
+                    },
+                    {
+                        "column_name": "customer_id",
+                        "data_type": "INTEGER",
+                        "review_status": "pending",
+                        "ai_comment": "不应进入图谱",
+                        "references": {"table": "customers", "column": "id"},
+                    },
+                ],
+            }
+        ]
+    }
+    with use_graph_scope(scope):
+        result = service.sync_catalog(catalog)
+    assert result == {"scope": "datasource:8", "entities": 3, "triples_added": 3}
+    entities = run(store.entity_repo.list_scope(scope.key))
+    order_table = next(item for item in entities if item["canonical_name"] == "public.orders")
+    order_id = next(item for item in entities if item["canonical_name"] == "public.orders.id")
+    customer_id = next(item for item in entities if item["canonical_name"] == "public.orders.customer_id")
+    assert order_table["attributes"]["comment"] == "订单主表"
+    assert "订单号" in order_id["aliases"]
+    assert "不应进入图谱" not in str(customer_id["attributes"])
+    with use_graph_scope(scope):
+        path = service.find_path("public.orders.customer_id", "public.customers.id")
+    assert path["found"] is True
+
+
+def test_graph_path_tool_direct_call(graph_env):
+    make_repo, run = graph_env
+    service = GraphService(GraphStore(make_repo(), runner=run, seed=True))
+    tool = create_graph_path_tool(service)
+    result = asyncio.run(tool.ainvoke({"from_entity": "GMV", "to_entity": "客户", "max_hops": 5}))
+    assert "路径" in result
+    assert "GMV" in result and "客户" in result
+
+
+def test_embedding_close_candidates_return_ambiguous(graph_env):
+    make_repo, run = graph_env
+    store = GraphStore(make_repo(), runner=run, seed=False)
+    store.add_triples(
+        [
+            {"subject": "收入指标", "predicate": "计算自", "object": "金额"},
+            {"subject": "收入口径", "predicate": "计算自", "object": "金额"},
+        ]
+    )
+    service = GraphService(store, embed_fn=lambda _: [1.0, 0.0])
+    result = asyncio.run(service.find_path_resolved("不确定收入", "金额", max_hops=2))
+    assert result["status"] == "ambiguous"
+    assert len(result["candidates"]["from"]) >= 2

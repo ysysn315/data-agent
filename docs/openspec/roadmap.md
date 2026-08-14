@@ -27,7 +27,8 @@
 | 技能语义匹配（embedding + jieba 回退） | 自研增量 | ✅（D 轮）|
 | Analysis Agent（P-O-R 工作流 + Markdown 报告） | my-agent | ✅（E 轮）|
 | 技能脚本容器沙箱（Docker 一次性容器） | Yuxi | ✅ 可切换；默认 subprocess，真机记录见实现文档 |
-| 知识图谱（三元组抽取 + graph_search 技能） | Yuxi | ✅（E 轮）|
+| 知识图谱基础（三元组抽取 + graph_search 技能） | Yuxi | ✅（E 轮）|
+| 知识图谱平台化（workspace/datasource 作用域、实体消歧、路径工具、Schema 同步、可选 Embedding） | 自研 | 🚧 当前分支待 PR |
 | 用户体系 + API Key 鉴权 + workspace-lite（默认关闭） | Yuxi/SQLBot | ✅（F 轮，非全资源租户隔离）|
 | 前端 v2：任务中心 / 图谱 / 知识管理 / 数据源语义审核 | — | ✅ |
 

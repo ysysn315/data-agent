@@ -43,3 +43,45 @@ def create_graph_search_tool(graph_service: GraphService):
         return "\n".join(lines)
 
     return graph_search
+
+
+def create_graph_path_tool(graph_service: GraphService):
+    """创建 Agent 直接调用的作用域路径查询工具。
+
+    工具不接受 workspace/datasource 参数，GraphService 从请求级 GraphScope 读取；
+    Embedding 解析失败时仍会回到精确名称、别名和子串候选。
+    """
+
+    @tool
+    async def graph_path_search(from_entity: str, to_entity: str, max_hops: int = 3) -> str:
+        """查询两个业务实体之间的关系路径。
+
+        适用于“GMV 和客户有什么关系”“这个指标沿哪些表字段计算”等问题。
+        如果实体名称存在歧义，返回候选列表；不要在候选不明确时自行猜测。
+        """
+
+        source = (from_entity or "").strip()
+        target = (to_entity or "").strip()
+        if not source or not target:
+            return "起点和终点实体都不能为空。"
+        result = await graph_service.find_path_resolved(source, target, max_hops=max(1, min(int(max_hops), 5)))
+        if result.get("status") == "ambiguous":
+            candidates = result.get("candidates", {})
+            return (
+                f"实体解析存在歧义：起点候选={candidates.get('from', [])}，"
+                f"终点候选={candidates.get('to', [])}。请先向用户确认。"
+            )
+        if result.get("status") == "missing":
+            return f"图谱中不存在实体：{'、'.join(result.get('missing', []))}。"
+        if not result.get("found"):
+            return (
+                f"实体已解析，但 {source} 与 {target} 在 {result.get('scope', '')} 内没有不超过 {max_hops} 跳的路径。"
+            )
+        lines = [
+            f"路径（{result['hops']} 跳，作用域 {result.get('scope', '')}）：{result['chain']}",
+        ]
+        resolution = result.get("resolution") or {}
+        lines.append(f"实体解析：起点={resolution.get('from')}；终点={resolution.get('to')}")
+        return "\n".join(lines)
+
+    return graph_path_search

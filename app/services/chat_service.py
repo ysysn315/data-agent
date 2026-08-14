@@ -8,6 +8,7 @@ from loguru import logger
 from app.agents.chat_agent import ChatAgent
 from app.datasources.context import use_datasource
 from app.datasources.service import normalize_workspace_id
+from app.graph.scope import GraphScope, use_graph_scope
 from app.rag.context import current_sources, use_metadata_filters
 from app.services.session_store import SessionStore
 
@@ -30,6 +31,7 @@ class ChatService:
 
         with (
             use_datasource(datasource_id, normalize_workspace_id(workspace_id)),
+            use_graph_scope(GraphScope.from_ids(normalize_workspace_id(workspace_id), datasource_id)),
             use_metadata_filters(metadata_filters),
         ):
             answer = await self.agent.chat(question, history=history, summary=summary)
@@ -54,6 +56,7 @@ class ChatService:
         sources: list[str] = []
         with (
             use_datasource(datasource_id, normalize_workspace_id(workspace_id)),
+            use_graph_scope(GraphScope.from_ids(normalize_workspace_id(workspace_id), datasource_id)),
             use_metadata_filters(metadata_filters),
         ):
             async for chunk in self.agent.chat_stream(question, history=history, summary=summary):

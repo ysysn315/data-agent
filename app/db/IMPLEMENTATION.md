@@ -15,7 +15,8 @@ Skills/MCP/术语/示例，后续追加图谱、用户/工作空间和数据源�
 | `mcp_servers` | `app/mcp/models.MCPServer` | `save_dir/mcp_servers.json` | 字段与 MCPServer 全字段一一对应 |
 | `sql_examples` | dict | `save_dir/sql_examples.json` | question→SQL few-shot 示例库 |
 | `terminology` | dict | `save_dir/terminology.json` | 业务术语库（term 唯一键） |
-| `graph_triples` | 图谱三元组 | 内存图 | NetworkX 的持久化事实源 |
+| `graph_triples` | 作用域图谱三元组 | 内存图 | NetworkX 的持久化事实源；旧表由 `graph_migration.py` 归入 `workspace:0` |
+| `graph_entities` / `graph_entity_aliases` | 图谱实体、别名与合并状态 | 无 | 作用域内实体主表、属性合并和消歧索引 |
 | `workspaces` / `users` | 工作空间与 API Key 用户 | 无 | workspace-lite 与鉴权 |
 | `data_sources` | 用户数据源 | 固定 `SQLITE_DB_PATH` | 非敏感配置、加密凭证、同步状态 |
 | `data_source_tables` / `data_source_columns` | 物理结构与语义 | 演示注释字典 | 物理/AI/人工三层元数据 |
@@ -35,7 +36,7 @@ postgresql+asyncpg://user:pwd@localhost:5432/data_agent
 其余代码零改动 —— 模型用的都是 SQLite/PG 通用的列类型（`JSON`/`DateTime`/`String`/`Text`），
 仓储用的是纯 Core/ORM 语句，没有 SQLite 方言依赖。SQLite 首次启动会自动建 `./data` 目录与库文件。
 
-建表：`app.db.ensure_initialized()` 幂等执行 `Base.metadata.create_all`。
+建表：`app.db.ensure_initialized()` 先执行图谱旧表兼容迁移，再幂等执行 `Base.metadata.create_all`。
 入口有两处：`main.py` 的 startup 事件；以及 `dependencies.py` 里每个 DB 组件首次构建前
 （保证测试等不走 startup 的路径也已建表）。
 
@@ -122,9 +123,10 @@ CRUD/检索逻辑一行没动，所以老的 JSON 路径（测试用）行为完
   开发与 CI 都不用起数据库容器。代码用的是双通用列类型 + 纯 ORM 语句，`database_url` 一行切 PG，
   迁移成本已经前置消化。PG 的并发/MVCC 优势在当前写入量级（管理端偶发 CRUD）用不上。
 
-- **为什么当前还没上 alembic**：起步阶段 schema 还在快速变动，`create_all` 幂等建表足够；此刻维护
-  迁移脚本的成本大于收益。现在数据源目录已包含用户审核资产，部署到持久环境前必须引入 Alembic；
-  `create_all` 只会创建新表，不会替已有表加列，不能作为线上升级机制。
+- **为什么当前还没全面上 alembic**：起步阶段 schema 还在快速变动，`create_all` 幂等建表足够；图谱
+  旧表这次例外增加了一个窄迁移 `graph_migration.py`，只负责把历史 `graph_triples` 归入
+  `workspace:0`。数据源目录已包含用户审核资产，部署到持久环境前仍必须引入 Alembic；`create_all`
+  只会创建新表，不会替已有表加列，不能作为完整线上升级机制。
 
 - **为什么内置技能不入库**：内置技能是随代码发布的资产（`app/skills/buildin/` 下的目录），
   版本即代码版本，天然由 Git 管理。让它们入库反而要处理「代码更新了、库里是旧版」的同步问题。
