@@ -118,16 +118,77 @@ def test_sql_context_tool_empty(tmp_path):
     assert "未命中" in out
 
 
-def test_platform_datasource_does_not_receive_global_sql_context(tmp_path):
-    ex = ExampleStore(tmp_path / "e.json")
+def test_platform_datasource_scope_isolation(tmp_path):
+    """平台数据源：只收自己的数据源级知识，不串演示库全局知识（此前是整体禁用）。"""
+    ex = ExampleStore(tmp_path / "e.json")  # 种子=演示作用域
     tm = TermStore(tmp_path / "t.json")
+    # 给数据源 12 配一条专属示例与术语
+    ex.add("各州的客户数量分布", "SELECT state, COUNT(*) FROM usr GROUP BY state", verified=True, datasource_id=12)
+    tm.add("活跃用户", ["活客"], "近 30 天有下单的用户", datasource_id=12)
     tool = create_sql_context_tool(ex, tm)
 
     with use_datasource(12, 34):
-        out = tool.invoke({"question": "各州的复购率是多少"})
+        out = tool.invoke({"question": "各州的活跃用户客户数量分布"})
 
-    assert "未配置数据源级术语" in out
+    # 命中数据源级知识
+    assert "FROM usr" in out
+    assert "活跃用户" in out
+    # 不串入演示库知识（演示库种子示例用 customers 表、术语是 GMV/复购率/客单价）
     assert "customer_state" not in out
+    assert "复购率" not in out
+
+    # 数据源 13 什么都没配 → 未命中提示（而非旧的"未配置"禁用文案）
+    with use_datasource(13, 34):
+        out13 = tool.invoke({"question": "各州的客户数量分布"})
+    assert "未命中" in out13
+    assert "customer_state" not in out13
+
+    # 演示库路径不受影响：仍命中全局种子
+    out_demo = tool.invoke({"question": "各州的客户数量分布"})
+    assert "customer_state" in out_demo
+
+
+def test_candidate_examples_not_injected_until_verified(tmp_path):
+    """候选（verified=False）不进 few-shot；转正（覆盖为 True）后生效。"""
+    ex = ExampleStore(tmp_path / "e.json", seed=False)
+    ex.add("各州的客户数量", "SELECT WRONG FROM t", verified=False)
+    assert ex.search("各州的客户数量") == []  # verified_only 默认 True
+    assert ex.search("各州的客户数量", verified_only=False) != []  # 管理端可见
+
+    ex.add("各州的客户数量", "SELECT state FROM t GROUP BY state", verified=True)  # 转正覆盖
+    hits = ex.search("各州的客户数量")
+    assert len(hits) == 1 and "state" in hits[0]["sql"]
+    assert hits[0]["verified"] is True
+
+
+def test_example_scope_dedup_by_datasource(tmp_path):
+    """去重键是 (question, datasource_id)：平台示例不覆盖演示库同题示例。"""
+    ex = ExampleStore(tmp_path / "e.json", seed=False)
+    ex.add("各州的客户数量", "SELECT a FROM demo_t")
+    ex.add("各州的客户数量", "SELECT b FROM ds_t", datasource_id=7)
+    assert len(ex.list()) == 2
+
+    # 演示作用域检索拿到自己的版本，数据源 7 检索拿到自己的版本
+    assert "demo_t" in ex.search("各州的客户数量")[0]["sql"]
+    assert "ds_t" in ex.search("各州的客户数量", datasource_id=7)[0]["sql"]
+
+    # 同作用域同题覆盖（转正即此机制），id 复用不失效
+    first_id = [r for r in ex.list() if r.get("datasource_id") == 7][0]["id"]
+    ex.add("各州的客户数量", "SELECT c FROM ds_t2", datasource_id=7)
+    assert len(ex.list()) == 2
+    assert [r for r in ex.list() if r.get("datasource_id") == 7][0]["id"] == first_id
+
+
+def test_term_match_scoped_by_datasource(tmp_path):
+    """术语按作用域命中：平台数据源看不到演示全局术语。"""
+    tm = TermStore(tmp_path / "t.json")
+    tm.add("GMV", ["成交额"], "演示口径")  # 演示作用域（种子已有 GMV，这里覆盖定义便于断言）
+    tm.add("动销率", ["动销"], "数据源口径", datasource_id=5)
+
+    assert any(t["term"] == "动销率" for t in tm.match("动销怎么样", datasource_id=5))
+    assert tm.match("动销怎么样") == []  # 演示路径看不到数据源 5 的术语
+    assert tm.match("成交额趋势", datasource_id=5) == []  # 数据源 5 看不到演示 GMV
+    assert any(t["term"] == "GMV" for t in tm.match("成交额趋势"))  # 演示路径正常
 
 
 # ========== SKILL.md 依赖展开 ==========
@@ -180,6 +241,23 @@ def test_api_sql_examples_crud(client):
     # 删除
     assert client.delete(f"/api/sql-examples/{new_id}").status_code == 204
     assert client.delete(f"/api/sql-examples/{new_id}").status_code == 404
+
+
+def test_api_sql_example_datasource_ownership(client):
+    """datasource_id 有值时校验归属：不存在的数据源 404，不带 datasource_id 正常入演示作用域。"""
+    resp = client.post(
+        "/api/sql-examples",
+        json={"question": "平台问题", "sql": "SELECT 1", "verified": True, "datasource_id": 999},
+    )
+    assert resp.status_code == 404
+
+    resp = client.post(
+        "/api/sql-examples",
+        json={"question": "演示问题", "sql": "SELECT 2", "verified": True, "source": "chat"},
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["datasource_id"] is None and body["source"] == "chat"
 
 
 def test_api_terminology_crud(client):

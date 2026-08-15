@@ -119,13 +119,22 @@ class TermStore:
 
     @staticmethod
     def _normalize(item: dict) -> dict:
-        """统一词条结构，缺省字段补齐。"""
+        """统一词条结构，缺省字段补齐（旧数据无作用域字段 → 演示作用域）。"""
         return {
             "term": (item.get("term") or "").strip(),
             "synonyms": [s.strip() for s in (item.get("synonyms") or []) if s and s.strip()],
             "definition": (item.get("definition") or "").strip(),
             "sql_hint": (item.get("sql_hint") or "").strip() or None,
+            "datasource_id": item.get("datasource_id"),
+            "workspace_id": int(item.get("workspace_id") or 0),
         }
+
+    @staticmethod
+    def _in_scope(rec: dict, datasource_id: Optional[int]) -> bool:
+        """作用域匹配：平台数据源按 datasource_id；演示库取 datasource_id 为 NULL 的词条。"""
+        if datasource_id is not None:
+            return rec.get("datasource_id") == datasource_id
+        return rec.get("datasource_id") is None
 
     # ========== 增删查 ==========
 
@@ -135,8 +144,14 @@ class TermStore:
         synonyms: Optional[list[str]] = None,
         definition: str = "",
         sql_hint: Optional[str] = None,
+        datasource_id: Optional[int] = None,
     ) -> dict:
-        """新增/更新一个术语（term 作为唯一键，已存在则覆盖）。"""
+        """新增/更新一个术语（term 全局唯一，已存在则覆盖，可同时改作用域）。
+
+        术语表主键是 term 本身（DB 同款），同一 term 不能在两个作用域并存——
+        把术语挪到平台数据源就是一次带 datasource_id 的覆盖写入。术语量级
+        极小（个位数到十几条），这个限制换不来复合主键重建表的成本。
+        """
         if not term or not term.strip():
             raise ValueError("term 不能为空")
 
@@ -146,6 +161,7 @@ class TermStore:
                 "synonyms": synonyms or [],
                 "definition": definition,
                 "sql_hint": sql_hint,
+                "datasource_id": datasource_id,
             }
         )
 
@@ -170,11 +186,12 @@ class TermStore:
         self._save()
         return True
 
-    def match(self, question: str) -> list[dict]:
-        """返回问题中命中的术语（term 或某个同义词是问题子串）。
+    def match(self, question: str, datasource_id: Optional[int] = None) -> list[dict]:
+        """返回问题在指定作用域内命中的术语（term 或某个同义词是问题子串）。
 
         大小写不敏感（英文术语如 GMV 常被小写输入）。命中即返回该词条，供
-        sql_context_search 注入 prompt。
+        sql_context_search 注入 prompt；跨作用域词条不串入（平台数据源只看
+        自己的口径，演示库只看全局词条）。
         """
         if not question or not question.strip():
             return []
@@ -182,6 +199,8 @@ class TermStore:
         q = question.lower()
         hits: list[dict] = []
         for rec in self._terms:
+            if not self._in_scope(rec, datasource_id):
+                continue
             candidates = [rec["term"], *rec["synonyms"]]
             if any(c and c.lower() in q for c in candidates):
                 hits.append(dict(rec))

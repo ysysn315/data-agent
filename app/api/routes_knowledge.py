@@ -10,12 +10,14 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from app.core.dependencies import get_current_user, get_example_store, get_term_store
+from app.core.dependencies import get_current_user, get_datasource_service, get_example_store, get_term_store
+from app.datasources.models import DataSourceNotFoundError
+from app.datasources.service import normalize_workspace_id
 from app.text2sql.examples import ExampleStore
 from app.text2sql.terminology import TermStore
 
@@ -29,11 +31,13 @@ router = APIRouter(tags=["knowledge"])
 
 
 class SQLExampleCreate(BaseModel):
-    """新增 SQL 示例（反馈接口）"""
+    """新增 SQL 示例（反馈接口）。datasource_id 有值即数据源级示例（平台数据源场景）。"""
 
     question: str = Field(..., description="自然语言问题")
     sql: str = Field(..., description="对应的 SQL")
-    verified: bool = Field(True, description="是否人工确认结果正确")
+    verified: bool = Field(True, description="是否人工确认结果正确（False=候选，不进 few-shot）")
+    datasource_id: Optional[int] = Field(None, description="归属数据源；None=演示库全局作用域")
+    source: Literal["manual", "chat"] = Field("manual", description="来源（eval 仅允许 CLI 写入）")
 
 
 class SQLExampleResponse(BaseModel):
@@ -41,6 +45,8 @@ class SQLExampleResponse(BaseModel):
     question: str
     sql: str
     verified: bool
+    datasource_id: Optional[int] = None
+    source: str = "manual"
 
 
 class TermCreate(BaseModel):
@@ -50,6 +56,7 @@ class TermCreate(BaseModel):
     synonyms: list[str] = Field(default_factory=list, description="同义词列表")
     definition: str = Field("", description="口径定义")
     sql_hint: Optional[str] = Field(None, description="SQL 计算口径提示")
+    datasource_id: Optional[int] = Field(None, description="归属数据源；None=演示库全局作用域")
 
 
 class TermResponse(BaseModel):
@@ -57,6 +64,7 @@ class TermResponse(BaseModel):
     synonyms: list[str]
     definition: str
     sql_hint: Optional[str] = None
+    datasource_id: Optional[int] = None
 
 
 # ========== SQL 示例库 ==========
@@ -74,10 +82,32 @@ async def list_sql_examples(store: ExampleStore = Depends(get_example_store)):
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(get_current_user)],
 )
-async def create_sql_example(req: SQLExampleCreate, store: ExampleStore = Depends(get_example_store)):
-    """新增一条 SQL 示例（答对的问答入库；同问题则更新）"""
+async def create_sql_example(
+    req: SQLExampleCreate,
+    store: ExampleStore = Depends(get_example_store),
+    user: dict = Depends(get_current_user),
+    datasource_service=Depends(get_datasource_service),
+):
+    """新增一条 SQL 示例（答对的问答入库；同作用域同问题则更新）
+
+    datasource_id 有值时校验数据源归属（跨工作空间 404），防把示例挂到别人的数据源下。
+    """
+    workspace_id = normalize_workspace_id(user.get("workspace_id") if user else None)
+    if req.datasource_id is not None:
+        try:
+            await datasource_service.get_source(req.datasource_id, workspace_id)
+        except DataSourceNotFoundError as exc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
     try:
-        return store.add(req.question, req.sql, req.verified)
+        return store.add(
+            req.question,
+            req.sql,
+            req.verified,
+            datasource_id=req.datasource_id,
+            workspace_id=workspace_id,
+            source=req.source,
+        )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -108,10 +138,22 @@ async def list_terms(store: TermStore = Depends(get_term_store)):
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(get_current_user)],
 )
-async def create_term(req: TermCreate, store: TermStore = Depends(get_term_store)):
-    """新增/更新业务术语（term 为唯一键）"""
+async def create_term(
+    req: TermCreate,
+    store: TermStore = Depends(get_term_store),
+    user: dict = Depends(get_current_user),
+    datasource_service=Depends(get_datasource_service),
+):
+    """新增/更新业务术语（term 全局唯一，可同时改归属数据源）"""
+    workspace_id = normalize_workspace_id(user.get("workspace_id") if user else None)
+    if req.datasource_id is not None:
+        try:
+            await datasource_service.get_source(req.datasource_id, workspace_id)
+        except DataSourceNotFoundError as exc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
     try:
-        return store.add(req.term, req.synonyms, req.definition, req.sql_hint)
+        return store.add(req.term, req.synonyms, req.definition, req.sql_hint, datasource_id=req.datasource_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
