@@ -79,6 +79,8 @@ class SQLExampleModel(Base):
     """sql_examples 表：question→SQL 示例库（few-shot 运营闭环）。
 
     example_id 直接用领域层生成的 12 位 hex 作主键（与内存版 dict 的 "id" 一致）。
+    verified=False 即候选示例（对话沉淀待确认 / 评测失败导入），人工转正后进 few-shot。
+    datasource_id NULL=演示库全局作用域；workspace_id 0=内置种子/无鉴权 demo。
     """
 
     __tablename__ = "sql_examples"
@@ -87,11 +89,18 @@ class SQLExampleModel(Base):
     question: Mapped[str] = mapped_column(Text, nullable=False)
     sql: Mapped[str] = mapped_column(Text, nullable=False)
     verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    datasource_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    workspace_id: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    source: Mapped[str] = mapped_column(String(32), nullable=False, default="manual")
+    meta: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
 
 
 class TerminologyModel(Base):
-    """terminology 表：业务术语库（term 为唯一键，同义词/口径存 JSON）。"""
+    """terminology 表：业务术语库（term 为主键，同义词/口径存 JSON）。
+
+    作用域列语义同 sql_examples：datasource_id NULL=演示全局；workspace_id 0=种子/demo。
+    """
 
     __tablename__ = "terminology"
 
@@ -99,6 +108,8 @@ class TerminologyModel(Base):
     synonyms: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     definition: Mapped[str] = mapped_column(Text, nullable=False, default="")
     sql_hint: Mapped[str | None] = mapped_column(Text, nullable=True)
+    datasource_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    workspace_id: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
 
 

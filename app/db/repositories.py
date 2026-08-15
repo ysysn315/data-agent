@@ -322,6 +322,10 @@ class SQLExampleRepository:
             "question": row.question,
             "sql": row.sql,
             "verified": bool(row.verified),
+            "datasource_id": row.datasource_id,
+            "workspace_id": row.workspace_id or 0,
+            "source": row.source or "manual",
+            "meta": dict(row.meta or {}),
         }
 
     async def list_all(self) -> list[dict]:
@@ -339,6 +343,10 @@ class SQLExampleRepository:
             row.question = rec["question"]
             row.sql = rec["sql"]
             row.verified = bool(rec.get("verified", True))
+            row.datasource_id = rec.get("datasource_id")
+            row.workspace_id = int(rec.get("workspace_id") or 0)
+            row.source = rec.get("source") or "manual"
+            row.meta = dict(rec.get("meta") or {})
             await session.commit()
 
     async def delete(self, example_id: str) -> bool:
@@ -360,6 +368,10 @@ class SQLExampleRepository:
                         question=rec["question"],
                         sql=rec["sql"],
                         verified=bool(rec.get("verified", True)),
+                        datasource_id=rec.get("datasource_id"),
+                        workspace_id=int(rec.get("workspace_id") or 0),
+                        source=rec.get("source") or "manual",
+                        meta=dict(rec.get("meta") or {}),
                     )
                 )
             await session.commit()
@@ -386,6 +398,8 @@ class TerminologyRepository:
             "synonyms": list(row.synonyms or []),
             "definition": row.definition,
             "sql_hint": row.sql_hint,
+            "datasource_id": row.datasource_id,
+            "workspace_id": row.workspace_id or 0,
         }
 
     async def list_all(self) -> list[dict]:
@@ -403,6 +417,8 @@ class TerminologyRepository:
             row.synonyms = list(rec.get("synonyms") or [])
             row.definition = rec.get("definition") or ""
             row.sql_hint = rec.get("sql_hint")
+            row.datasource_id = rec.get("datasource_id")
+            row.workspace_id = int(rec.get("workspace_id") or 0)
             await session.commit()
 
     async def delete(self, term: str) -> bool:
@@ -424,6 +440,8 @@ class TerminologyRepository:
                         synonyms=list(rec.get("synonyms") or []),
                         definition=rec.get("definition") or "",
                         sql_hint=rec.get("sql_hint"),
+                        datasource_id=rec.get("datasource_id"),
+                        workspace_id=int(rec.get("workspace_id") or 0),
                     )
                 )
             await session.commit()
