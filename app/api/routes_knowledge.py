@@ -97,7 +97,6 @@ async def list_sql_examples(store: ExampleStore = Depends(get_example_store)):
     "/sql-examples",
     response_model=SQLExampleResponse,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(get_current_user)],
 )
 async def create_sql_example(
     req: SQLExampleCreate,
@@ -149,7 +148,6 @@ async def list_terms(store: TermStore = Depends(get_term_store)):
     "/terminology",
     response_model=TermResponse,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(get_current_user)],
 )
 async def create_term(
     req: TermCreate,

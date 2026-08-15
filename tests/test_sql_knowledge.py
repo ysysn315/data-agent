@@ -162,7 +162,7 @@ def test_candidate_examples_not_injected_until_verified(tmp_path):
 
 
 def test_example_scope_dedup_by_datasource(tmp_path):
-    """去重键是 (question, datasource_id)：平台示例不覆盖演示库同题示例。"""
+    """去重键含作用域（datasource_id / workspace_id）：平台示例不覆盖演示库同题示例。"""
     ex = ExampleStore(tmp_path / "e.json", seed=False)
     ex.add("各州的客户数量", "SELECT a FROM demo_t")
     ex.add("各州的客户数量", "SELECT b FROM ds_t", datasource_id=7)
@@ -177,6 +177,24 @@ def test_example_scope_dedup_by_datasource(tmp_path):
     ex.add("各州的客户数量", "SELECT c FROM ds_t2", datasource_id=7)
     assert len(ex.list()) == 2
     assert [r for r in ex.list() if r.get("datasource_id") == 7][0]["id"] == first_id
+
+
+def test_example_dedup_includes_workspace(tmp_path):
+    """鉴权开启后两个 workspace 的演示作用域（datasource NULL）同题各自独立，不互相覆盖。"""
+    ex = ExampleStore(tmp_path / "e.json", seed=False)
+    ex.add("各州的客户数量", "SELECT a FROM ws1_t", workspace_id=1)
+    ex.add("各州的客户数量", "SELECT b FROM ws2_t", workspace_id=2)
+    assert len(ex.list()) == 2
+
+    # 各 workspace 检索只看到自己的示例（workspace=0 看不到它们）
+    assert "ws1_t" in ex.search("各州的客户数量", workspace_id=1)[0]["sql"]
+    assert "ws2_t" in ex.search("各州的客户数量", workspace_id=2)[0]["sql"]
+    assert ex.search("各州的客户数量") == []
+
+    # 同 workspace 同题覆盖，另一 workspace 不受影响
+    ex.add("各州的客户数量", "SELECT a2 FROM ws1_t2", workspace_id=1)
+    assert len(ex.list()) == 2
+    assert "ws2_t" in ex.search("各州的客户数量", workspace_id=2)[0]["sql"]
 
 
 def test_term_match_scoped_by_datasource(tmp_path):
