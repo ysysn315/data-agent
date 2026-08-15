@@ -19,21 +19,40 @@
 
 ### 1.2 反馈闭环怎么用
 
-闭环的关键是**答对的问答要能回流入库**：
+闭环的关键是**答对的问答要能回流入库**（feat/sql-knowledge-loop 起已完整落地，
+三条回流路径 + 人工确认闸）：
 
-1. 用户提问 → Agent 生成并执行 SQL → 人工/评估确认结果正确。
-2. 调 `POST /api/sql-examples`（body: `{question, sql, verified:true}`）把这条存档。
-3. 下次遇到相似问题，`sql_context_search` 会把它作为 few-shot 召回 → 生成更稳。
+1. **对话一键沉淀**：用户提问 → Agent 生成并执行 SQL → 前端出现「沉淀为示例」
+   按钮 → 用户确认后 `POST /api/sql-examples`（`verified:true, source:'chat'`）。
+   信号来自 `app/text2sql/feedback.py` 的 ContextVar 记录器：`execute_sql` 成功路径
+   `record_sql_execution()`，`ChatService` 流末以 `sql_result` SSE 事件下发
+   （多轮自纠取最后一次成功）。
+2. **评测失败导入**：`python -m evals.text2sql.export_failures [--dry-run]` 把报告里
+   失败 case 的 `question + golden_sql` 导入为候选（`verified:false, source:'eval'`）；
+   `pred_sql/error` 只进 meta，知识管理页审核时并排展示"模型当时怎么错的"。
+3. **人工转正闸**：候选（verified=False）**不进 few-shot**——`ExampleStore.search`
+   默认 `verified_only=True`。知识管理页候选分组里「转正」= 同作用域覆盖写入
+   `verified:true`，此后参与注入。评测报告对比（`evals.text2sql.compare_reports.py`）
+   可量化转正前后的执行准确率变化。
 
 示例越攒越多，命中率越高，这就是「越问越准」。术语库同理：把公司黑话与口径
 （`POST /api/terminology`）一次维护好，之后所有相关问题都按同一口径算。
+
+### 1.2.1 作用域（平台数据源解禁）
+
+示例/术语带作用域列（`datasource_id` / `workspace_id`，见 `app/db/knowledge_migration.py`
+幂等窄迁移）：`datasource_id=NULL` 是演示库全局作用域（`workspace_id=0` 为内置种子）；
+平台数据源请求只检索 `datasource_id=本数据源` 的知识，跨作用域不串。`sql_context_search`
+此前在选了平台数据源时整体禁用（怕全局知识串入租户），作用域化后改为分域检索。
+去重键：示例按 `(question, datasource_id)`（平台示例不顶掉演示库同题示例）；
+术语主键仍是 term，同 term 不能双作用域并存，挪作用域 = 一次带 `datasource_id` 的覆盖。
 
 ### 1.3 API 一览（`app/api/routes_knowledge.py`，挂 `/api`）
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET/POST/DELETE | `/api/sql-examples[/{id}]` | 列出 / 反馈入库 / 删除示例 |
-| GET/POST/DELETE | `/api/terminology[/{term}]` | 列出 / 新增更新 / 删除术语 |
+| GET/POST/DELETE | `/api/sql-examples[/{id}]` | 列出 / 反馈入库 / 删除示例；POST 可带 `datasource_id`（校验归属）与 `source`（manual/chat 白名单） |
+| GET/POST/DELETE | `/api/terminology[/{term}]` | 列出 / 新增更新 / 删除术语；POST 可带 `datasource_id` |
 
 ### 1.4 门控工具
 
@@ -111,11 +130,21 @@
 
 ## 五、文件清单
 
-- `app/text2sql/examples.py` — ExampleStore（含 5 条种子）
-- `app/text2sql/terminology.py` — TermStore（含 GMV/复购率/客单价 种子）
-- `app/agents/tools/sql_context_tool.py` — 合并门控工具
-- `app/api/routes_knowledge.py` — 示例库/术语库 CRUD API
+- `app/text2sql/examples.py` — ExampleStore（含 5 条种子；作用域去重 + verified-only 检索）
+- `app/text2sql/terminology.py` — TermStore（含 GMV/复购率/客单价 种子；作用域命中）
+- `app/text2sql/feedback.py` — SQL 执行记录器（ContextVar，对话回流的信号侧）
+- `app/agents/tools/sql_context_tool.py` — 合并门控工具（作用域检索）
+- `app/agents/tools/sql_tool.py` — execute_sql 成功路径 record
+- `app/services/chat_service.py` — recorder 接线 + `sql_result` SSE 事件
+- `app/api/routes_knowledge.py` — 示例库/术语库 CRUD API（datasource 归属校验 + source 白名单）
+- `app/db/knowledge_migration.py` — 作用域列幂等窄迁移
+- `evals/text2sql/export_failures.py` — 评测失败 → 候选示例（CLI 直写 DB）
+- `evals/text2sql/compare_reports.py` — 两份报告 → Markdown 对比
 - `app/core/dependencies.py` — 追加 `get_example_store/get_term_store` + gated_tools 注册
 - `app/main.py` — 追加一行路由注册
 - `app/skills/buildin/sql-generation/SKILL.md` — frontmatter 加 `sql_context_search` + 正文追加「④」小节
-- `tests/test_sql_knowledge.py` — store/工具/API/SKILL 依赖展开测试
+- `tests/test_sql_knowledge.py` — store/工具/API/SKILL 依赖展开 + 作用域隔离测试
+- `tests/test_sql_feedback.py` — 记录器生命周期/多轮取最后成功/流式下发测试
+- `tests/test_eval_export.py` — 评测回流与报告对比测试
+
+设计文档：`docs/openspec/sql-knowledge-loop.md`。
