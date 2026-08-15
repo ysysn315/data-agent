@@ -32,6 +32,17 @@ class ChatRequest(BaseModel):
     datasource_id: Optional[int] = Field(default=None, ge=1)
 
 
+class SQLResultPayload(BaseModel):
+    """本轮对话最后一次成功执行的 SQL（供前端「沉淀为示例」）。"""
+
+    question: str
+    sql: str
+    row_count: int
+    columns: List[str] = []
+    datasource_id: Optional[int] = None
+
+
 class ChatResponse(BaseModel):
     answer: str
     sources: List[str] = []
+    sql_result: Optional[SQLResultPayload] = None

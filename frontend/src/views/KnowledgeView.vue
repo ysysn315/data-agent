@@ -52,22 +52,53 @@
 
       <div v-if="loading" class="loading-state card"><div class="loading-spinner"></div></div>
       <div v-else-if="examples.length === 0" class="empty-state card"><p>还没有 SQL 示例。答对的问答存进来，检索时即可命中复用。</p></div>
-      <div v-else class="item-list">
-        <div v-for="ex in examples" :key="ex.id" class="card item-card">
-          <div class="item-head">
-            <div class="item-question">{{ ex.question }}</div>
-            <div class="item-actions">
-              <span class="badge" :class="ex.verified ? 'badge-success' : 'badge-warning'">{{ ex.verified ? '已确认' : '待确认' }}</span>
-              <button class="btn small btn-danger" @click="deleteExample(ex)" :disabled="deletingId === ex.id">
-                <span v-if="deletingId === ex.id" class="loading-spinner small"></span>
-                <span v-else>删除</span>
-              </button>
+      <template v-else>
+        <!-- 候选示例：对话待确认 / 评测失败导入，人工转正后才进 few-shot -->
+        <template v-if="candidateExamples.length > 0">
+          <div class="group-title">候选示例（{{ candidateExamples.length }}）—— 转正后才会注入 few-shot</div>
+          <div class="item-list">
+            <div v-for="ex in candidateExamples" :key="ex.id" class="card item-card candidate">
+              <div class="item-head">
+                <div class="item-question">{{ ex.question }}</div>
+                <div class="item-actions">
+                  <span class="badge" :class="ex.source === 'eval' ? 'badge-info' : 'badge-warning'">{{ ex.source === 'eval' ? '评测导入' : '待确认' }}</span>
+                  <button class="btn small btn-primary" @click="verifyExample(ex)" :disabled="deletingId === ex.id">转正</button>
+                  <button class="btn small btn-danger" @click="deleteExample(ex)" :disabled="deletingId === ex.id">
+                    <span v-if="deletingId === ex.id" class="loading-spinner small"></span>
+                    <span v-else>丢弃</span>
+                  </button>
+                </div>
+              </div>
+              <pre class="item-sql"><code>{{ ex.sql }}</code></pre>
+              <!-- 评测导入的错误模式标注：模型当时的错误 SQL 与报错，辅助人工判断 -->
+              <div v-if="ex.source === 'eval' && ex.meta && ex.meta.pred_sql" class="eval-meta">
+                <span class="eval-meta-label">模型当时生成（错误）：</span>
+                <pre class="item-sql muted"><code>{{ ex.meta.pred_sql }}</code></pre>
+                <p v-if="ex.meta.error" class="eval-error">{{ ex.meta.error }}</p>
+              </div>
+              <div class="item-id">{{ ex.id }}</div>
             </div>
           </div>
-          <pre class="item-sql"><code>{{ ex.sql }}</code></pre>
-          <div class="item-id">{{ ex.id }}</div>
+        </template>
+
+        <div v-if="verifiedExamples.length > 0" class="group-title">已生效示例（{{ verifiedExamples.length }}）—— 参与 few-shot 注入</div>
+        <div class="item-list">
+          <div v-for="ex in verifiedExamples" :key="ex.id" class="card item-card">
+            <div class="item-head">
+              <div class="item-question">{{ ex.question }}</div>
+              <div class="item-actions">
+                <span class="badge badge-success">已确认</span>
+                <button class="btn small btn-danger" @click="deleteExample(ex)" :disabled="deletingId === ex.id">
+                  <span v-if="deletingId === ex.id" class="loading-spinner small"></span>
+                  <span v-else>删除</span>
+                </button>
+              </div>
+            </div>
+            <pre class="item-sql"><code>{{ ex.sql }}</code></pre>
+            <div class="item-id">{{ ex.id }}</div>
+          </div>
         </div>
-      </div>
+      </template>
     </template>
 
     <!-- ============ 业务术语 ============ -->
@@ -126,7 +157,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
 const activeTab = ref('examples')
 const loading = ref(false)
@@ -137,6 +168,10 @@ const examples = ref([])
 const exForm = ref({ question: '', sql: '', verified: true })
 const exError = ref('')
 const exSubmitting = ref(false)
+
+// 候选（verified=false：评测导入/待确认）与已生效分组渲染
+const verifiedExamples = computed(() => examples.value.filter((e) => e.verified))
+const candidateExamples = computed(() => examples.value.filter((e) => !e.verified))
 
 async function loadExamples() {
   loading.value = true
@@ -172,6 +207,36 @@ async function addExample() {
     exError.value = `请求异常：${e.message}`
   } finally {
     exSubmitting.value = false
+  }
+}
+
+async function verifyExample(ex) {
+  // 转正 = 同作用域同问题覆盖写入 verified=true（后端 upsert 语义）
+  if (deletingId.value) return
+  deletingId.value = ex.id
+  try {
+    const res = await fetch('/api/sql-examples', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question: ex.question,
+        sql: ex.sql,
+        verified: true,
+        datasource_id: ex.datasource_id ?? null,
+        source: ex.source === 'eval' ? 'manual' : (ex.source || 'manual'),
+      }),
+    })
+    if (res.ok) {
+      const created = await res.json()
+      examples.value = examples.value.filter((e) => e.id !== created.id)
+      examples.value = [created, ...examples.value]
+    } else {
+      alert(`转正失败：${await readError(res)}`)
+    }
+  } catch (e) {
+    alert(`转正失败：${e.message}`)
+  } finally {
+    deletingId.value = ''
   }
 }
 
@@ -343,6 +408,17 @@ loadTerms()
 }
 .item-sql code { font-family: var(--font-mono); font-size: 12.5px; color: #a5f3e8; white-space: pre; }
 .item-id { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
+
+/* 分组标题与候选卡片 */
+.group-title {
+  font-size: 12.5px; font-weight: 600; color: var(--text-secondary);
+  padding: 4px 2px 0;
+}
+.item-card.candidate { border-left: 3px solid rgba(251, 191, 36, .6); }
+.eval-meta { display: flex; flex-direction: column; gap: 6px; }
+.eval-meta-label { font-size: 12px; color: var(--text-muted); }
+.item-sql.muted code { color: var(--text-muted); }
+.eval-error { font-size: 12px; color: var(--error-color); margin: 0; font-family: var(--font-mono); }
 
 .term-name { font-size: 15px; font-weight: 700; color: var(--text-primary); }
 .term-syn { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }

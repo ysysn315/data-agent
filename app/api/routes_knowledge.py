@@ -47,6 +47,7 @@ class SQLExampleResponse(BaseModel):
     verified: bool
     datasource_id: Optional[int] = None
     source: str = "manual"
+    meta: dict = {}
 
 
 class TermCreate(BaseModel):

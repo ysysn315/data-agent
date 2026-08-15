@@ -15,6 +15,7 @@ from loguru import logger
 
 from app.agents.tools.sql_guard import validate_sql
 from app.datasources.context import current_selection
+from app.text2sql.feedback import record_sql_execution
 
 DEFAULT_LIMIT = 100
 MAX_LIMIT = 1000
@@ -96,6 +97,7 @@ def create_execute_sql_tool(db_path: str, datasource_runtime=None):
             except Exception as e:  # noqa: BLE001 —— 工具边界，异常转成模型可纠错文本
                 logger.warning(f"SQL 执行失败: {e} | sql_sha256={_sql_fingerprint(sql)}")
                 return f"SQL 执行失败: {e}"
+            record_sql_execution(sql, payload.get("row_count", 0), payload.get("columns", []), selection.datasource_id)
             return json.dumps(payload, ensure_ascii=False, default=str)
 
         if not Path(db_path).exists():
@@ -120,6 +122,7 @@ def create_execute_sql_tool(db_path: str, datasource_runtime=None):
             logger.warning(f"SQL 执行失败: {e} | sql_sha256={_sql_fingerprint(sql)}")
             return f"SQL 执行失败: {e}"
 
+        record_sql_execution(sql, len(rows), columns, None)  # 演示库路径：datasource_id=None
         return json.dumps(
             {"columns": columns, "rows": [list(r) for r in rows], "row_count": len(rows)},
             ensure_ascii=False,

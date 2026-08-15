@@ -10,6 +10,7 @@ from app.datasources.context import use_datasource_graph_scope
 from app.datasources.service import normalize_workspace_id
 from app.rag.context import current_sources, use_metadata_filters
 from app.services.session_store import SessionStore
+from app.text2sql.feedback import latest_successful_sql, use_sql_recorder
 
 
 class ChatService:
@@ -31,13 +32,15 @@ class ChatService:
         with (
             use_datasource_graph_scope(datasource_id, normalize_workspace_id(workspace_id)),
             use_metadata_filters(metadata_filters),
+            use_sql_recorder(question),
         ):
             answer = await self.agent.chat(question, history=history, summary=summary)
             sources = current_sources()
+            sql_result = _sql_result_payload(latest_successful_sql())
 
         self.session_store.add_message(session_id, "user", question)
         self.session_store.add_message(session_id, "assistant", answer)
-        return {"answer": answer, "sources": sources}
+        return {"answer": answer, "sources": sources, "sql_result": sql_result}
 
     async def chat_stream(
         self,
@@ -55,6 +58,7 @@ class ChatService:
         with (
             use_datasource_graph_scope(datasource_id, normalize_workspace_id(workspace_id)),
             use_metadata_filters(metadata_filters),
+            use_sql_recorder(question),
         ):
             async for chunk in self.agent.chat_stream(question, history=history, summary=summary):
                 # chat_agent yield {"type": "reasoning"|"content", "text": str}
@@ -64,6 +68,7 @@ class ChatService:
                 if chunk.get("type") == "content":
                     collected_content.append(text)  # 仅最终答案入会话历史
             sources = current_sources()
+            sql_result = _sql_result_payload(latest_successful_sql())
 
         # 只存最终答案（content），思考过程不入历史，保持与非流式 chat() 一致
         answer = "".join(collected_content)
@@ -72,3 +77,19 @@ class ChatService:
             self.session_store.add_message(session_id, "assistant", answer)
         logger.info(f"流式对话完成 - Session: {session_id}, 长度: {len(answer)}")
         yield {"type": "sources", "data": sources}
+        # 本轮若执行过 SQL，随流下发结构化结果（前端「沉淀为示例」用；旧前端忽略未知类型）
+        if sql_result is not None:
+            yield {"type": "sql_result", "data": sql_result}
+
+
+def _sql_result_payload(record) -> Optional[dict]:
+    """SQLExecutionRecord → SSE/响应负载；无记录（本轮没执行 SQL）返回 None。"""
+    if record is None:
+        return None
+    return {
+        "question": record.question,
+        "sql": record.sql,
+        "row_count": record.row_count,
+        "columns": record.columns,
+        "datasource_id": record.datasource_id,
+    }
