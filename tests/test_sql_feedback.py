@@ -17,7 +17,6 @@ from app.agents.tools.sql_tool import create_execute_sql_tool
 from app.services.chat_service import ChatService
 from app.text2sql.feedback import latest_successful_sql, use_sql_recorder
 
-
 # ========== recorder 与工具直录 ==========
 
 

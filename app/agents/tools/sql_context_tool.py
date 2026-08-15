@@ -39,7 +39,7 @@ def create_sql_context_tool(example_store: ExampleStore, term_store: TermStore):
         scope_datasource_id = selection.datasource_id if selection is not None else None
         scope_workspace_id = graph_scope.workspace_id if graph_scope is not None else 0
 
-        term_hits = term_store.match(question, datasource_id=scope_datasource_id)
+        term_hits = term_store.match(question, datasource_id=scope_datasource_id, workspace_id=scope_workspace_id)
         examples = example_store.search(
             question,
             top_k=3,

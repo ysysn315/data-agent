@@ -33,11 +33,10 @@
 | `source` VARCHAR(32) DEFAULT 'manual' | 仅示例表 | manual / chat / eval |
 | `meta` JSON DEFAULT '{}' | 仅示例表 | chat:{session_id}；eval:{case_id,tags,pred_sql,error,report} |
 
-去重升级：示例 add 从"全局同 question 覆盖"改为**按作用域覆盖**（平台数据源按
-datasource_id，演示作用域按 workspace_id；否则平台示例会覆盖演示库同题示例——
-正是要消除的串数据，鉴权开启后不同 workspace 的演示库同题也各自独立）；术语例外——表主键仍是
-term（全局唯一），同一术语不能双作用域并存，挪作用域 = 一次带 datasource_id 的
-覆盖写入（术语量级极小，不值得为此复合主键重建表）。
+去重升级：示例与术语都改为**作用域内唯一**——示例按 (question, datasource_id, workspace_id)
+（平台示例不覆盖演示库同题示例，鉴权开启后不同 workspace 各自独立）；术语唯一键
+(term, datasource_id, workspace_id)（数据源 11 与 22 各配各的 GMV 口径，互不覆盖），
+表主键换自增 id，旧部署经 knowledge_migration 重建表迁移。
 
 ### 2.2 作用域检索
 

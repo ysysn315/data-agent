@@ -386,6 +386,65 @@ async def test_workspace_isolation(auth_on, tmp_path):
         app.dependency_overrides.clear()
 
 
+async def test_knowledge_tenant_isolation(auth_on, tmp_path):
+    """知识管理 API 租户隔离（外部 CR 反例回归）：
+
+    - 未登录只能看到 ws=0 的演示数据，看不到其它 workspace 的 SQL/术语
+    - workspace A 的用户不能删除 workspace B 的示例（视同 404）
+    - 同一术语在两个数据源各自存在，互不覆盖（作用域内唯一）
+    """
+    from app.core.dependencies import get_datasource_service, get_example_store, get_term_store
+    from app.text2sql.examples import ExampleStore
+    from app.text2sql.terminology import TermStore
+
+    await auth.create_user("root", "admin", "default")
+    a = await auth.create_user("ua", "member", "alpha")
+    b = await auth.create_user("ub", "member", "beta")
+
+    ex = ExampleStore(tmp_path / "e.json", seed=False)
+    ex.add("租户 B 的秘密", "SELECT secret FROM tenant_b", verified=True, workspace_id=b["workspace_id"])
+    tm = TermStore(tmp_path / "t.json", seed=False)
+    tm.add("GMV", ["成交额"], "数据源 11 口径", datasource_id=11, workspace_id=a["workspace_id"])
+
+    class _FakeDS:
+        async def get_source(self, datasource_id, workspace_id):
+            # 数据源 11 属 alpha、22 属 beta；其余不存在
+            owner = {11: a["workspace_id"], 22: b["workspace_id"]}.get(datasource_id)
+            if owner != workspace_id:
+                from app.datasources.models import DataSourceNotFoundError
+
+                raise DataSourceNotFoundError(f"数据源不存在: {datasource_id}")
+            return {"id": datasource_id}
+
+    app.dependency_overrides[get_example_store] = lambda: ex
+    app.dependency_overrides[get_term_store] = lambda: tm
+    app.dependency_overrides[get_datasource_service] = lambda: _FakeDS()
+    try:
+        async with _client() as c:
+            # 未登录：读口开放但只见 ws=0（演示作用域），看不到租户 B 的记录
+            examples = (await c.get("/api/sql-examples")).json()
+            assert all(e.get("workspace_id", 0) == 0 for e in examples)
+            assert all("tenant_b" not in e["sql"] for e in examples)
+
+            # workspace A 用户：看不到 B 的记录 → 删除视同 404
+            secret_id = [r["id"] for r in ex.list() if "tenant_b" in r["sql"]][0]
+            r = await c.delete(f"/api/sql-examples/{secret_id}", headers=_bearer(a["api_key"]))
+            assert r.status_code == 404
+            assert any("tenant_b" in r0["sql"] for r0 in ex.list())  # 记录仍在
+
+            # 术语作用域内唯一：数据源 22 写同名 GMV 不覆盖数据源 11 的
+            r = await c.post(
+                "/api/terminology",
+                headers=_bearer(b["api_key"]),
+                json={"term": "GMV", "synonyms": [], "definition": "数据源 22 口径", "datasource_id": 22},
+            )
+            assert r.status_code == 201
+            defs = {t["datasource_id"]: t["definition"] for t in tm.list() if t["term"] == "GMV"}
+            assert defs[11] == "数据源 11 口径" and defs[22] == "数据源 22 口径"
+    finally:
+        app.dependency_overrides.clear()
+
+
 # ========== 7. 保护清单矩阵化断言（逐口 401/403/放行） ==========
 
 

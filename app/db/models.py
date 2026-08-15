@@ -97,14 +97,18 @@ class SQLExampleModel(Base):
 
 
 class TerminologyModel(Base):
-    """terminology 表：业务术语库（term 为主键，同义词/口径存 JSON）。
+    """terminology 表：业务术语库（作用域内唯一，同义词/口径存 JSON）。
 
+    唯一键 (term, datasource_id, workspace_id)：同一术语可在不同作用域各自存在
+    （数据源 11 与 22 各配各的 GMV 口径），跨作用域互不覆盖。
     作用域列语义同 sql_examples：datasource_id NULL=演示全局；workspace_id 0=种子/demo。
     """
 
     __tablename__ = "terminology"
+    __table_args__ = (UniqueConstraint("term", "datasource_id", "workspace_id", name="uq_terminology_scope_term"),)
 
-    term: Mapped[str] = mapped_column(String(256), primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    term: Mapped[str] = mapped_column(String(256), nullable=False, index=True)
     synonyms: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     definition: Mapped[str] = mapped_column(Text, nullable=False, default="")
     sql_hint: Mapped[str | None] = mapped_column(Text, nullable=True)

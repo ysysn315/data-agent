@@ -415,12 +415,8 @@ async def test_knowledge_scope_columns_added_to_legacy_tables(tmp_path):
             "term VARCHAR(256) PRIMARY KEY, synonyms JSON NOT NULL, definition TEXT NOT NULL, "
             "sql_hint TEXT, created_at DATETIME NOT NULL)"
         )
-        conn.execute(
-            "INSERT INTO sql_examples VALUES ('e1', '旧问题', 'SELECT 1', 1, '2026-01-01 00:00:00')"
-        )
-        conn.execute(
-            "INSERT INTO terminology VALUES ('GMV', '[]', '成交总额', 'SUM(price)', '2026-01-01 00:00:00')"
-        )
+        conn.execute("INSERT INTO sql_examples VALUES ('e1', '旧问题', 'SELECT 1', 1, '2026-01-01 00:00:00')")
+        conn.execute("INSERT INTO terminology VALUES ('GMV', '[]', '成交总额', 'SUM(price)', '2026-01-01 00:00:00')")
         conn.commit()
     finally:
         conn.close()
@@ -476,5 +472,36 @@ async def test_knowledge_repo_roundtrips_scope_fields(tmp_path):
         await tm.upsert({"term": "动销率", "synonyms": [], "definition": "d", "datasource_id": 7, "workspace_id": 3})
         terms = await tm.list_all()
         assert terms[0]["datasource_id"] == 7 and terms[0]["workspace_id"] == 3
+    finally:
+        await engine.dispose()
+
+
+async def test_terminology_repo_scope_uniqueness(tmp_path):
+    """术语作用域内唯一：(term, datasource_id, workspace_id) upsert；同 term 不同作用域共存。"""
+    engine, sm = create_engine_and_sessionmaker(_db_url(tmp_path))
+    await init_db(engine)
+    try:
+        tm = TerminologyRepository(sm)
+        await tm.upsert(
+            {"term": "GMV", "synonyms": [], "definition": "数据源 11 口径", "datasource_id": 11, "workspace_id": 1}
+        )
+        # 数据源 22 各自一条（旧实现按全局 term 覆盖会丢掉 11 的）
+        await tm.upsert(
+            {"term": "GMV", "synonyms": [], "definition": "数据源 22 口径", "datasource_id": 22, "workspace_id": 1}
+        )
+        rows = {r["datasource_id"]: r["definition"] for r in await tm.list_all()}
+        assert rows == {11: "数据源 11 口径", 22: "数据源 22 口径"}
+
+        # 同作用域 upsert 覆盖（更新口径）
+        await tm.upsert(
+            {"term": "GMV", "synonyms": ["成交额"], "definition": "新口径", "datasource_id": 11, "workspace_id": 1}
+        )
+        rows = {r["datasource_id"]: r["definition"] for r in await tm.list_all()}
+        assert rows[11] == "新口径" and rows[22] == "数据源 22 口径"
+
+        # 按作用域删除
+        assert await tm.delete("GMV", datasource_id=11, workspace_id=1) is True
+        assert {r["datasource_id"] for r in await tm.list_all()} == {22}
+        assert await tm.delete("GMV", datasource_id=11, workspace_id=1) is False
     finally:
         await engine.dispose()

@@ -19,8 +19,12 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from loguru import logger
+
+if TYPE_CHECKING:
+    from app.text2sql.examples import ExampleStore
 
 _HERE = Path(__file__).resolve().parent
 DEFAULT_REPORT = _HERE / "reports" / "execution_latest.json"
@@ -30,21 +34,18 @@ def load_failed_cases(report_path: Path) -> list[dict]:
     """读报告并过滤失败 case（缺 golden_sql 的跳过——没有正确答案可沉淀）。"""
     report = json.loads(report_path.read_text(encoding="utf-8"))
     cases = report.get("cases", [])
-    failed = [
-        c
-        for c in cases
-        if not c.get("correct") and c.get("question") and c.get("golden_sql")
-    ]
+    failed = [c for c in cases if not c.get("correct") and c.get("question") and c.get("golden_sql")]
     return failed
 
 
-def build_candidate(case: dict, report_path: Path, datasource_id: int | None) -> dict:
+def build_candidate(case: dict, report_path: Path, datasource_id: int | None, workspace_id: int = 0) -> dict:
     """失败 case → 候选示例字段（meta 保留错误模式标注与报告出处）。"""
     return {
         "question": case["question"],
         "sql": case["golden_sql"],
         "verified": False,
         "datasource_id": datasource_id,
+        "workspace_id": workspace_id,
         "source": "eval",
         "meta": {
             "case_id": case.get("id"),
@@ -56,18 +57,23 @@ def build_candidate(case: dict, report_path: Path, datasource_id: int | None) ->
     }
 
 
-def should_skip(store: ExampleStore | None, candidate: dict) -> bool:
-    """跳过规则：同作用域同问题已存在已验证示例 → 不降级已有知识。
+def _same_scope(rec: dict, candidate: dict) -> bool:
+    """作用域相等：平台数据源按 datasource_id；演示作用域按 (NULL, workspace_id)。"""
+    if candidate.get("datasource_id") is not None:
+        return rec.get("datasource_id") == candidate.get("datasource_id")
+    return rec.get("datasource_id") is None and int(rec.get("workspace_id") or 0) == int(
+        candidate.get("workspace_id") or 0
+    )
+
+
+def should_skip(store: "ExampleStore | None", candidate: dict) -> bool:
+    """跳过规则：同作用域（datasource + workspace）同问题已存在已验证示例 → 不降级已有知识。
 
     store 传 None 时恒不跳过（无库可查），便于纯函数测试。
     """
     if store is None:
         return False
-    existing = [
-        r
-        for r in store.list()
-        if r["question"] == candidate["question"] and r.get("datasource_id") == candidate.get("datasource_id")
-    ]
+    existing = [r for r in store.list() if r["question"] == candidate["question"] and _same_scope(r, candidate)]
     return any(r.get("verified") for r in existing)
 
 
@@ -75,6 +81,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="评测失败 case 导入候选 SQL 示例")
     parser.add_argument("--report", type=Path, default=DEFAULT_REPORT, help="评测报告 JSON 路径")
     parser.add_argument("--datasource-id", type=int, default=None, help="归属数据源（默认演示作用域）")
+    parser.add_argument(
+        "--workspace-id",
+        type=int,
+        default=0,
+        help="归属 workspace（默认 0=演示；演示作用域的候选按 workspace 隔离）",
+    )
     parser.add_argument("--dry-run", action="store_true", help="只打印将导入的内容，不写库")
     args = parser.parse_args()
 
@@ -83,11 +95,12 @@ def main() -> None:
         logger.info(f"报告 {args.report} 无失败 case（或缺 golden_sql），无需导入")
         return
 
-    candidates = [build_candidate(c, args.report, args.datasource_id) for c in failed]
+    candidates = [build_candidate(c, args.report, args.datasource_id, args.workspace_id) for c in failed]
 
     if args.dry_run:
         for cand in candidates:
-            print(f"[候选] {cand['question']}\n  golden: {cand['sql']}\n  错误: {cand['meta'].get('error') or cand['meta'].get('pred_sql')}")
+            err = cand["meta"].get("error") or cand["meta"].get("pred_sql")
+            print(f"[候选] {cand['question']}\n  golden: {cand['sql']}\n  错误: {err}")
         print(f"\n共 {len(candidates)} 条候选（dry-run，未写库）")
         return
 

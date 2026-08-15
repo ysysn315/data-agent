@@ -136,11 +136,15 @@
       <div v-if="loading" class="loading-state card"><div class="loading-spinner"></div></div>
       <div v-else-if="terms.length === 0" class="empty-state card"><p>还没有业务术语。补录 GMV / 复购率 等口径，可提升 Text-to-SQL 的术语理解。</p></div>
       <div v-else class="item-list">
-        <div v-for="t in terms" :key="t.term" class="card item-card">
+        <div v-for="t in terms" :key="termKey(t)" class="card item-card">
           <div class="item-head">
-            <div class="term-name">{{ t.term }}</div>
-            <button class="btn small btn-danger" @click="deleteTerm(t)" :disabled="deletingId === t.term">
-              <span v-if="deletingId === t.term" class="loading-spinner small"></span>
+            <div class="term-name">
+              {{ t.term }}
+              <!-- 同一术语可在不同作用域各自存在（作用域内唯一），标注归属便于区分 -->
+              <span v-if="t.datasource_id != null" class="badge badge-info">数据源 {{ t.datasource_id }}</span>
+            </div>
+            <button class="btn small btn-danger" @click="deleteTerm(t)" :disabled="deletingId === termKey(t)">
+              <span v-if="deletingId === termKey(t)" class="loading-spinner small"></span>
               <span v-else>删除</span>
             </button>
           </div>
@@ -312,13 +316,19 @@ async function addTerm() {
   }
 }
 
+// 术语作用域内唯一：同 term 可能多作用域多条，key 与删除都带作用域
+function termKey(t) {
+  return `${t.term}#${t.datasource_id ?? 'demo'}`
+}
+
 async function deleteTerm(t) {
   if (deletingId.value) return
-  deletingId.value = t.term
+  deletingId.value = termKey(t)
   try {
-    const res = await fetch(`/api/terminology/${encodeURIComponent(t.term)}`, { method: 'DELETE' })
+    const scope = t.datasource_id != null ? `?datasource_id=${t.datasource_id}` : ''
+    const res = await fetch(`/api/terminology/${encodeURIComponent(t.term)}${scope}`, { method: 'DELETE' })
     if (res.ok || res.status === 204) {
-      terms.value = terms.value.filter((x) => x.term !== t.term)
+      terms.value = terms.value.filter((x) => termKey(x) !== termKey(t))
     } else {
       alert(`删除失败：${await readError(res)}`)
     }

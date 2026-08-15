@@ -386,7 +386,8 @@ class SQLExampleRepository:
 
 
 class TerminologyRepository:
-    """业务术语库存储后端（供 TermStore 的 DB 版）。term 为主键。"""
+    """业务术语库存储后端（供 TermStore 的 DB 版）。作用域内唯一：
+    (term, datasource_id, workspace_id)——同 term 可在不同作用域各自存在。"""
 
     def __init__(self, sessionmaker: async_sessionmaker):
         self._sm = sessionmaker
@@ -402,6 +403,15 @@ class TerminologyRepository:
             "workspace_id": row.workspace_id or 0,
         }
 
+    @staticmethod
+    def _scope_filter(stmt, rec: dict):
+        """按作用域键过滤（term + datasource + workspace）。"""
+        return stmt.where(
+            TerminologyModel.term == rec["term"],
+            TerminologyModel.datasource_id == rec.get("datasource_id"),
+            TerminologyModel.workspace_id == int(rec.get("workspace_id") or 0),
+        )
+
     async def list_all(self) -> list[dict]:
         async with self._sm() as session:
             stmt = select(TerminologyModel).order_by(TerminologyModel.created_at, TerminologyModel.term)
@@ -410,7 +420,7 @@ class TerminologyRepository:
 
     async def upsert(self, rec: dict) -> None:
         async with self._sm() as session:
-            row = await session.get(TerminologyModel, rec["term"])
+            row = (await session.execute(self._scope_filter(select(TerminologyModel), rec))).scalar_one_or_none()
             if row is None:
                 row = TerminologyModel(term=rec["term"])
                 session.add(row)
@@ -421,9 +431,12 @@ class TerminologyRepository:
             row.workspace_id = int(rec.get("workspace_id") or 0)
             await session.commit()
 
-    async def delete(self, term: str) -> bool:
+    async def delete(self, term: str, datasource_id: int | None = None, workspace_id: int = 0) -> bool:
         async with self._sm() as session:
-            row = await session.get(TerminologyModel, term)
+            stmt = self._scope_filter(
+                select(TerminologyModel), {"term": term, "datasource_id": datasource_id, "workspace_id": workspace_id}
+            )
+            row = (await session.execute(stmt)).scalar_one_or_none()
             if row is None:
                 return False
             await session.delete(row)

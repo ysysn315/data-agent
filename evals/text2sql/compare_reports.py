@@ -39,10 +39,25 @@ def compare(baseline: dict, after: dict, base_name: str, after_name: str) -> str
     lines.append("")
     lines.append("| 指标 | 基线 | 对比 | 变化 |")
     lines.append("|---|---|---|---|")
-    lines.append(
-        f"| 执行准确率 | {_pct(b_sum)} | {_pct(a_sum)} | {sign}{delta * 100:.2f}pp |"
-    )
+    lines.append(f"| 执行准确率 | {_pct(b_sum)} | {_pct(a_sum)} | {sign}{delta * 100:.2f}pp |")
     lines.append("")
+
+    # 样本集一致性：case ID 集合不同时，总体准确率差不构成可比的"知识增强收益"，
+    # 显式警示并单独列出新增/移除 case（不算进翻转）。
+    b_ids = {c["id"] for c in baseline.get("cases", [])}
+    a_ids = {c["id"] for c in after.get("cases", [])}
+    only_base, only_after = sorted(b_ids - a_ids), sorted(a_ids - b_ids)
+    if only_base or only_after:
+        lines.append(
+            f"> ⚠️ 两份报告样本集不一致（基线 {len(b_ids)} 例 / 对比 {len(a_ids)} 例），"
+            "总体准确率差不可直接解读为知识增强收益。"
+        )
+        lines.append("")
+        if only_after:
+            lines.append(f"对比报告新增 case：{', '.join(only_after)}")
+        if only_base:
+            lines.append(f"对比报告移除 case：{', '.join(only_base)}")
+        lines.append("")
 
     # 按题型标签分解（对比两边并集；只在一侧出现的标签也列出）
     b_tags, a_tags = baseline.get("by_tag", {}), after.get("by_tag", {})
@@ -51,18 +66,20 @@ def compare(baseline: dict, after: dict, base_name: str, after_name: str) -> str
     lines.append("| 标签 | 基线 | 对比 | 变化 |")
     lines.append("|---|---|---|---|")
     for tag in sorted(set(b_tags) | set(a_tags)):
-        b, a = b_tags.get(tag, {"accuracy": 0.0, "correct": 0, "total": 0}), a_tags.get(
-            tag, {"accuracy": 0.0, "correct": 0, "total": 0}
+        b, a = (
+            b_tags.get(tag, {"accuracy": 0.0, "correct": 0, "total": 0}),
+            a_tags.get(tag, {"accuracy": 0.0, "correct": 0, "total": 0}),
         )
         d = a["accuracy"] - b["accuracy"]
         lines.append(f"| {tag} | {_pct(b)} | {_pct(a)} | {'+' if d >= 0 else ''}{d * 100:.2f}pp |")
     lines.append("")
 
-    # case 级翻转
+    # case 级翻转：只统计两份报告都有的 case（交集），新增/移除的已在上方单独列出
     b_cases = {c["id"]: c for c in baseline.get("cases", [])}
     a_cases = {c["id"]: c for c in after.get("cases", [])}
-    newly_pass = [a_cases[i] for i in a_cases if not b_cases.get(i, {}).get("correct") and a_cases[i].get("correct")]
-    newly_fail = [a_cases[i] for i in a_cases if b_cases.get(i, {}).get("correct") and not a_cases[i].get("correct")]
+    common_ids = b_ids & a_ids
+    newly_pass = [a_cases[i] for i in common_ids if not b_cases[i].get("correct") and a_cases[i].get("correct")]
+    newly_fail = [a_cases[i] for i in common_ids if b_cases[i].get("correct") and not a_cases[i].get("correct")]
 
     lines.append("## case 级翻转")
     lines.append("")

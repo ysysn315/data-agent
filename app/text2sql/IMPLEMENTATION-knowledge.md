@@ -44,8 +44,10 @@
 幂等窄迁移）：`datasource_id=NULL` 是演示库全局作用域（`workspace_id=0` 为内置种子）；
 平台数据源请求只检索 `datasource_id=本数据源` 的知识，跨作用域不串。`sql_context_search`
 此前在选了平台数据源时整体禁用（怕全局知识串入租户），作用域化后改为分域检索。
-去重键：示例按 `(question, datasource_id)`（平台示例不顶掉演示库同题示例）；
-术语主键仍是 term，同 term 不能双作用域并存，挪作用域 = 一次带 `datasource_id` 的覆盖。
+去重键（作用域内唯一）：示例按 `(question, datasource_id, workspace_id)`；
+术语按 `(term, datasource_id, workspace_id)`（表主键换自增 id，同 term 可在
+不同作用域各自存在，跨作用域互不覆盖）。知识管理 API 的 GET/DELETE 按
+workspace 过滤/校验归属（匿名视为 ws=0 只见演示数据），跨租户记录视同不存在。
 
 ### 1.3 API 一览（`app/api/routes_knowledge.py`，挂 `/api`）
 
