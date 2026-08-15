@@ -224,6 +224,7 @@ async function verifyExample(ex) {
         verified: true,
         datasource_id: ex.datasource_id ?? null,
         source: ex.source === 'eval' ? 'manual' : (ex.source || 'manual'),
+        meta: ex.meta || {},  // 转正保留评测错误标注（pred_sql/error/case_id），可追溯不丢
       }),
     })
     if (res.ok) {

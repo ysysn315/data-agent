@@ -64,7 +64,7 @@ def compare(baseline: dict, after: dict, base_name: str, after_name: str) -> str
     newly_pass = [a_cases[i] for i in a_cases if not b_cases.get(i, {}).get("correct") and a_cases[i].get("correct")]
     newly_fail = [a_cases[i] for i in a_cases if b_cases.get(i, {}).get("correct") and not a_cases[i].get("correct")]
 
-    lines.append(f"## case 级翻转")
+    lines.append("## case 级翻转")
     lines.append("")
     lines.append(f"新增通过 {len(newly_pass)} 例：")
     for c in newly_pass:

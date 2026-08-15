@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 
 from evals.text2sql.compare_reports import compare
-from evals.text2sql.export_failures import build_candidate, load_failed_cases
+from evals.text2sql.export_failures import build_candidate, load_failed_cases, should_skip
 from app.text2sql.examples import ExampleStore
 
 
@@ -50,18 +50,20 @@ def test_build_candidate_keeps_error_in_meta(tmp_path):
 
 
 def test_import_skips_verified_same_question(tmp_path):
-    """跳过规则（main 内逻辑）：同作用域同问题已 verified → 不降级；否则覆盖幂等。"""
+    """跳过规则（should_skip，main 实际调用）：同作用域同问题已 verified → 不降级；否则导入。"""
     store = ExampleStore(tmp_path / "e.json", seed=False)
     store.add("各州 GMV", "SELECT verified_version")  # 已验证知识
 
-    # 模拟 main 的跳过判断
-    cand = {"question": "各州 GMV", "sql": "SELECT golden", "verified": False, "datasource_id": None,
-            "source": "eval", "meta": {}}
-    existing = [r for r in store.list() if r["question"] == cand["question"] and r.get("datasource_id") == cand["datasource_id"]]
-    assert any(r.get("verified") for r in existing)  # 应跳过
+    # 同题同作用域已验证 → 跳过
+    assert should_skip(store, {"question": "各州 GMV", "datasource_id": None}) is True
+    # 不同作用域 / 新问题 / store 为 None → 不跳过
+    assert should_skip(store, {"question": "各州 GMV", "datasource_id": 7}) is False
+    assert should_skip(store, {"question": "新问题", "datasource_id": None}) is False
+    assert should_skip(None, {"question": "任意", "datasource_id": None}) is False
 
-    # 新问题正常导入候选；二次导入覆盖（幂等，不堆积）
-    cand["question"] = "新问题"
+    # 未跳过的候选导入；二次导入覆盖（幂等，不堆积）
+    cand = {"question": "新问题", "sql": "SELECT golden", "verified": False, "datasource_id": None,
+            "source": "eval", "meta": {}}
     store.add(**cand)
     store.add(**cand)
     candidates = [r for r in store.list() if not r["verified"]]

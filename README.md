@@ -158,7 +158,7 @@ evals/
 ├── text2sql/     # 28 条执行准确率评测与原始报告
 └── rag/          # 检索/生成数据集、指标和历史 baseline
 frontend/         # Vue 3 前端
-tests/            # 21 个 test_*.py 文件；含 conftest 共 22 个 Python 测试文件
+tests/            # 23 个 test_*.py 文件；含 conftest 共 24 个 Python 测试文件
 ```
 
 ## 文档索引

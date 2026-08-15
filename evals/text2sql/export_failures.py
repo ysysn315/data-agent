@@ -56,6 +56,21 @@ def build_candidate(case: dict, report_path: Path, datasource_id: int | None) ->
     }
 
 
+def should_skip(store: ExampleStore | None, candidate: dict) -> bool:
+    """跳过规则：同作用域同问题已存在已验证示例 → 不降级已有知识。
+
+    store 传 None 时恒不跳过（无库可查），便于纯函数测试。
+    """
+    if store is None:
+        return False
+    existing = [
+        r
+        for r in store.list()
+        if r["question"] == candidate["question"] and r.get("datasource_id") == candidate.get("datasource_id")
+    ]
+    return any(r.get("verified") for r in existing)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="评测失败 case 导入候选 SQL 示例")
     parser.add_argument("--report", type=Path, default=DEFAULT_REPORT, help="评测报告 JSON 路径")
@@ -92,12 +107,7 @@ def main() -> None:
     imported = skipped = 0
     for cand in candidates:
         # 同作用域同问题已是已验证知识 → 跳过（不降级已有知识），否则按 (question, scope) 覆盖幂等导入
-        existing = [
-            r
-            for r in store.list()
-            if r["question"] == cand["question"] and r.get("datasource_id") == cand["datasource_id"]
-        ]
-        if any(r.get("verified") for r in existing):
+        if should_skip(store, cand):
             skipped += 1
             continue
         store.add(**cand)

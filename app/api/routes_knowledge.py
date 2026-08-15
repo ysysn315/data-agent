@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 
 from app.core.dependencies import get_current_user, get_datasource_service, get_example_store, get_term_store
 from app.datasources.models import DataSourceNotFoundError
-from app.datasources.service import normalize_workspace_id
+from app.datasources.service import DataSourceService, normalize_workspace_id
 from app.text2sql.examples import ExampleStore
 from app.text2sql.terminology import TermStore
 
@@ -25,6 +25,21 @@ router = APIRouter(tags=["knowledge"])
 
 # 写口守卫：auth_enabled=True 时需登录；demo 下 get_current_user 恒放行（见 dependencies.py）。
 # 读口（list_*）不挂守卫，保持开放。受保护清单集中在 app/core/auth.PROTECTED_ENDPOINTS。
+
+
+async def resolve_workspace(
+    datasource_id: Optional[int],
+    user: dict,
+    datasource_service: DataSourceService,
+) -> int:
+    """解析 workspace 并校验可选数据源归属（跨工作空间 404），两个写口共用。"""
+    workspace_id = normalize_workspace_id(user.get("workspace_id") if user else None)
+    if datasource_id is not None:
+        try:
+            await datasource_service.get_source(datasource_id, workspace_id)
+        except DataSourceNotFoundError as exc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return workspace_id
 
 
 # ========== 请求/响应模型 ==========
@@ -38,6 +53,7 @@ class SQLExampleCreate(BaseModel):
     verified: bool = Field(True, description="是否人工确认结果正确（False=候选，不进 few-shot）")
     datasource_id: Optional[int] = Field(None, description="归属数据源；None=演示库全局作用域")
     source: Literal["manual", "chat"] = Field("manual", description="来源（eval 仅允许 CLI 写入）")
+    meta: dict = Field(default_factory=dict, description="附加信息（如转正时保留的评测错误标注）")
 
 
 class SQLExampleResponse(BaseModel):
@@ -87,18 +103,13 @@ async def create_sql_example(
     req: SQLExampleCreate,
     store: ExampleStore = Depends(get_example_store),
     user: dict = Depends(get_current_user),
-    datasource_service=Depends(get_datasource_service),
+    datasource_service: DataSourceService = Depends(get_datasource_service),
 ):
     """新增一条 SQL 示例（答对的问答入库；同作用域同问题则更新）
 
     datasource_id 有值时校验数据源归属（跨工作空间 404），防把示例挂到别人的数据源下。
     """
-    workspace_id = normalize_workspace_id(user.get("workspace_id") if user else None)
-    if req.datasource_id is not None:
-        try:
-            await datasource_service.get_source(req.datasource_id, workspace_id)
-        except DataSourceNotFoundError as exc:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    workspace_id = await resolve_workspace(req.datasource_id, user, datasource_service)
 
     try:
         return store.add(
@@ -108,6 +119,7 @@ async def create_sql_example(
             datasource_id=req.datasource_id,
             workspace_id=workspace_id,
             source=req.source,
+            meta=req.meta or None,
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -143,15 +155,10 @@ async def create_term(
     req: TermCreate,
     store: TermStore = Depends(get_term_store),
     user: dict = Depends(get_current_user),
-    datasource_service=Depends(get_datasource_service),
+    datasource_service: DataSourceService = Depends(get_datasource_service),
 ):
     """新增/更新业务术语（term 全局唯一，可同时改归属数据源）"""
-    workspace_id = normalize_workspace_id(user.get("workspace_id") if user else None)
-    if req.datasource_id is not None:
-        try:
-            await datasource_service.get_source(req.datasource_id, workspace_id)
-        except DataSourceNotFoundError as exc:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    await resolve_workspace(req.datasource_id, user, datasource_service)
 
     try:
         return store.add(req.term, req.synonyms, req.definition, req.sql_hint, datasource_id=req.datasource_id)

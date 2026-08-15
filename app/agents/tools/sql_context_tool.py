@@ -35,8 +35,9 @@ def create_sql_context_tool(example_store: ExampleStore, term_store: TermStore):
         # workspace 取自图谱作用域（use_datasource_graph_scope 总是设置它，含演示路径）；
         # 演示路径 current_selection() 为 None，拿不到 workspace，故不直接用 selection。
         selection = current_selection()
+        graph_scope = current_graph_scope()
         scope_datasource_id = selection.datasource_id if selection is not None else None
-        scope_workspace_id = current_graph_scope().workspace_id if current_graph_scope() is not None else 0
+        scope_workspace_id = graph_scope.workspace_id if graph_scope is not None else 0
 
         term_hits = term_store.match(question, datasource_id=scope_datasource_id)
         examples = example_store.search(

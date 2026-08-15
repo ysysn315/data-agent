@@ -186,7 +186,8 @@ class ExampleStore:
 
     @staticmethod
     def _in_scope(rec: dict, datasource_id: Optional[int], workspace_id: int) -> bool:
-        """作用域匹配：平台数据源按 datasource_id；演示库按 (NULL, workspace)。"""
+        """作用域匹配：平台数据源按 datasource_id（租户内隔离，workspace 不参与）；
+        演示库按 (NULL, workspace)——鉴权开启后不同 workspace 的演示库知识互不可见。"""
         if datasource_id is not None:
             return rec.get("datasource_id") == datasource_id
         return rec.get("datasource_id") is None and int(rec.get("workspace_id") or 0) == int(workspace_id or 0)
@@ -205,9 +206,10 @@ class ExampleStore:
     ) -> dict:
         """新增/更新一条示例（反馈接口：答对的 question→SQL 入库）。
 
-        去重键是 (question, datasource_id)：同一问题在不同作用域互不覆盖，
-        平台数据源的示例不会把演示库同题示例顶掉。verified=False 即候选
-        （对话待确认 / 评测失败导入），转正 = 再次 add 覆盖为 True。
+        去重键是 (question, datasource_id, workspace_id)（演示作用域）：同一问题在不同
+        作用域互不覆盖，平台数据源的示例不会把演示库同题示例顶掉，鉴权开启后不同
+        workspace 的演示库同题示例也各自独立。verified=False 即候选（对话待确认 /
+        评测失败导入），转正 = 再次 add 覆盖为 True。
         """
         if not question or not question.strip():
             raise ValueError("question 不能为空")
@@ -217,7 +219,7 @@ class ExampleStore:
         q = question.strip()
         rec = self._make_record(question, sql, verified, datasource_id, workspace_id, source, meta)
         for i, existing in enumerate(self._examples):
-            if existing["question"] == q and existing.get("datasource_id") == datasource_id:
+            if existing["question"] == q and self._in_scope(existing, datasource_id, workspace_id):
                 # 覆盖时保留原 id，外部（前端列表）持有的引用不失效
                 rec["id"] = existing["id"]
                 self._examples[i] = rec
