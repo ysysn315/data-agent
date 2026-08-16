@@ -42,7 +42,70 @@ class SQLResultPayload(BaseModel):
     datasource_id: Optional[int] = None
 
 
+class TermHitPayload(BaseModel):
+    hit_key: str
+    rank: int
+    term: str
+    definition: str = ""
+
+
+class ExampleHitPayload(BaseModel):
+    hit_key: str
+    rank: int
+    question: str
+    sql: str
+
+
+class DocHitPayload(BaseModel):
+    hit_key: str
+    rank: int
+    source: str
+    title: str = ""
+    snippet: str = ""
+
+
+class GraphHitPayload(BaseModel):
+    hit_key: str
+    rank: int
+    kind: str
+    query: str
+    summary: str = ""
+    result_count: int = 0
+
+
+class HitsPayload(BaseModel):
+    """单次工具调用的命中明细。"""
+
+    terms: List[TermHitPayload] = []
+    examples: List[ExampleHitPayload] = []
+    docs: List[DocHitPayload] = []
+    graph: List[GraphHitPayload] = []
+
+
+class ToolCallPayload(BaseModel):
+    """一次工具调用的轨迹（args 已脱敏截断；错误只有稳定枚举与安全文案）。"""
+
+    call_id: str
+    name: str
+    args: str = ""
+    duration_ms: Optional[int] = None
+    status: str = "running"
+    attempts: Optional[int] = None
+    error_code: Optional[str] = None
+    public_message: Optional[str] = None
+    hits: HitsPayload = HitsPayload()
+
+
+class ContextHitsPayload(BaseModel):
+    """本轮对话的工具调用与检索命中轨迹（可解释性面板）。"""
+
+    tool_calls: List[ToolCallPayload] = []
+    summary: dict = {}
+    truncated: bool = False
+
+
 class ChatResponse(BaseModel):
     answer: str
     sources: List[str] = []
     sql_result: Optional[SQLResultPayload] = None
+    context_hits: Optional[ContextHitsPayload] = None

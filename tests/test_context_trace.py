@@ -13,6 +13,7 @@ from app.agents.context_trace import (
     context_hits_payload,
     current_context_trace,
     finish_tool_call,
+    record_doc_hits,
     record_example_hits,
     record_term_hits,
     record_tool_start,
@@ -287,3 +288,97 @@ async def test_middleware_records_success_and_degradation():
     assert "10.0.0.1" not in bad["public_message"]  # 原始异常只在后端日志
     # args 摘要经脱敏（本例 SQL 无敏感键，原样保留）
     assert "SELECT 1" in ok["args"]
+
+
+# ========== SSE / 响应下发 ==========
+
+
+class _TraceSessionStore:
+    def get_history(self, _sid):
+        return []
+
+    def get_summary(self, _sid):
+        return ""
+
+    def add_message(self, *_a):
+        pass
+
+
+class _TraceAgent:
+    """fake agent：chat_stream 内模拟 middleware 记录 + 工具命中。"""
+
+    async def chat(self, question, history=None, summary=""):
+        call = record_tool_start("call_1", "sql_context_search", {"question": question})
+        with use_active_tool_trace(call):
+            record_term_hits([{"term": "GMV", "definition": "成交总额"}])
+        finish_tool_call(call, status="success", attempts=1)
+        return "答案"
+
+    async def chat_stream(self, question, history=None, summary=""):
+        yield {"type": "content", "text": "答案"}
+        call = record_tool_start("call_1", "sql_context_search", {"question": question})
+        with use_active_tool_trace(call):
+            record_term_hits([{"term": "GMV", "definition": "成交总额"}])
+        finish_tool_call(call, status="success", attempts=1)
+
+
+async def test_chat_service_emits_context_hits_after_sql_result():
+    """流末顺序 sources → sql_result（条件）→ context_hits（条件）。"""
+    from app.services.chat_service import ChatService
+
+    service = ChatService(_TraceAgent(), _TraceSessionStore())
+    events = [event async for event in service.chat_stream("s1", "GMV 怎么算")]
+
+    assert [e["type"] for e in events] == ["content", "sources", "context_hits"]
+    payload = events[-1]["data"]
+    assert payload["summary"]["terms"] == 1
+    assert payload["tool_calls"][0]["name"] == "sql_context_search"
+
+
+async def test_chat_service_without_tools_keeps_legacy_events():
+    """无工具调用：事件序列与改造前完全一致（无 context_hits）。"""
+    from app.services.chat_service import ChatService
+
+    class _PlainAgent:
+        async def chat(self, q, history=None, summary=""):
+            return "答案"
+
+        async def chat_stream(self, q, history=None, summary=""):
+            yield {"type": "content", "text": "答案"}
+
+    service = ChatService(_PlainAgent(), _TraceSessionStore())
+    events = [event async for event in service.chat_stream("s1", "问题")]
+    assert events == [
+        {"type": "content", "data": "答案"},
+        {"type": "sources", "data": []},
+    ]
+    result = await service.chat("s1", "问题")
+    assert result["context_hits"] is None
+
+
+def test_context_hits_serialization_contract():
+    """序列化契约：SSE json.dumps 与 Pydantic ChatResponse 双向字段齐全、无敏感字段。"""
+    import json
+
+    from app.schemas.chat import ChatResponse
+
+    with use_context_trace():
+        call = record_tool_start("c1", "t", {"password": "x", "q": "问题"})
+        with use_active_tool_trace(call):
+            record_term_hits([{"term": "GMV", "definition": "d"}])
+            record_doc_hits([{"source": "ops.md", "title": "运维", "chunk_index": 1, "content": "片段"}])
+        finish_tool_call(call, status="error", attempts=2)
+        payload = context_hits_payload()
+
+    # SSE 路径：纯 JSON 可序列化
+    text = json.dumps({"type": "context_hits", "data": payload}, ensure_ascii=False)
+    assert "context_hits" in text and payload["tool_calls"][0]["args"] != "x"  # 密码已脱敏
+    assert "password" in payload["tool_calls"][0]["args"]  # 键名保留、值脱敏
+
+    # 非流式路径：Pydantic 校验通过且字段齐全
+    resp = ChatResponse(answer="a", sources=[], context_hits=payload)
+    tc = resp.context_hits.tool_calls[0]
+    assert tc.name == "t" and tc.status == "error" and tc.attempts == 2
+    assert tc.error_code == "tool_failure" and tc.public_message
+    assert tc.hits.terms[0].term == "GMV" and tc.hits.docs[0].source == "ops.md"
+    assert resp.model_dump()["context_hits"]["summary"]["terms"] == 1
