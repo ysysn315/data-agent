@@ -110,7 +110,7 @@ class ExampleStore:
             return False
         try:
             data = json.loads(self.save_path.read_text(encoding="utf-8"))
-            self._examples = list(data.get("examples", []))
+            self._examples = [self._normalize(r) for r in data.get("examples", [])]
             logger.info(f"加载 SQL 示例库: {len(self._examples)} 条")
             return True
         except Exception as e:
@@ -121,14 +121,14 @@ class ExampleStore:
         """DB 版加载：表空且有历史 JSON 时一次性迁移入库，否则交由种子逻辑处理。"""
         rows = self._run(self._repo.list_all())
         if rows:
-            self._examples = rows
+            self._examples = [self._normalize(r) for r in rows]
             return True
         if self.save_path is not None and self.save_path.exists():
             try:
                 data = json.loads(self.save_path.read_text(encoding="utf-8"))
             except Exception as e:
                 raise ValueError(f"SQL 示例库解析失败 {self.save_path}: {e}")
-            legacy = list(data.get("examples", []))
+            legacy = [self._normalize(r) for r in data.get("examples", [])]
             if legacy:
                 self._examples = legacy
                 self._run(self._repo.replace_all(legacy))
@@ -150,20 +150,66 @@ class ExampleStore:
         tmp.rename(self.save_path)
 
     @staticmethod
-    def _make_record(question: str, sql: str, verified: bool) -> dict:
+    def _make_record(
+        question: str,
+        sql: str,
+        verified: bool,
+        datasource_id: Optional[int] = None,
+        workspace_id: int = 0,
+        source: str = "manual",
+        meta: Optional[dict] = None,
+    ) -> dict:
         return {
             "id": uuid.uuid4().hex[:12],
             "question": question.strip(),
             "sql": sql.strip(),
             "verified": bool(verified),
+            "datasource_id": datasource_id,
+            "workspace_id": int(workspace_id or 0),
+            "source": source,
+            "meta": dict(meta or {}),
         }
+
+    @staticmethod
+    def _normalize(rec: dict) -> dict:
+        """统一记录结构：旧数据（无作用域字段）缺省归入演示作用域（与 DB 默认值一致）。"""
+        return {
+            "id": rec.get("id") or uuid.uuid4().hex[:12],
+            "question": (rec.get("question") or "").strip(),
+            "sql": (rec.get("sql") or "").strip(),
+            "verified": bool(rec.get("verified", True)),
+            "datasource_id": rec.get("datasource_id"),
+            "workspace_id": int(rec.get("workspace_id") or 0),
+            "source": rec.get("source") or "manual",
+            "meta": dict(rec.get("meta") or {}),
+        }
+
+    @staticmethod
+    def _in_scope(rec: dict, datasource_id: Optional[int], workspace_id: int) -> bool:
+        """作用域匹配：平台数据源按 datasource_id（租户内隔离，workspace 不参与）；
+        演示库按 (NULL, workspace)——鉴权开启后不同 workspace 的演示库知识互不可见。"""
+        if datasource_id is not None:
+            return rec.get("datasource_id") == datasource_id
+        return rec.get("datasource_id") is None and int(rec.get("workspace_id") or 0) == int(workspace_id or 0)
 
     # ========== 增删查 ==========
 
-    def add(self, question: str, sql: str, verified: bool = True) -> dict:
-        """新增一条示例（反馈接口：答对的 question→SQL 入库）。
+    def add(
+        self,
+        question: str,
+        sql: str,
+        verified: bool = True,
+        datasource_id: Optional[int] = None,
+        workspace_id: int = 0,
+        source: str = "manual",
+        meta: Optional[dict] = None,
+    ) -> dict:
+        """新增/更新一条示例（反馈接口：答对的 question→SQL 入库）。
 
-        同一 question 已存在时视为更新（覆盖 SQL 与 verified），避免重复堆积。
+        去重键是 (question, datasource_id, workspace_id)（演示作用域）：同一问题在不同
+        作用域互不覆盖，平台数据源的示例不会把演示库同题示例顶掉，鉴权开启后不同
+        workspace 的演示库同题示例也各自独立。verified=False 即候选（对话待确认 /
+        评测失败导入），转正 = 再次 add 覆盖为 True。
         """
         if not question or not question.strip():
             raise ValueError("question 不能为空")
@@ -171,14 +217,15 @@ class ExampleStore:
             raise ValueError("sql 不能为空")
 
         q = question.strip()
-        for rec in self._examples:
-            if rec["question"] == q:
-                rec["sql"] = sql.strip()
-                rec["verified"] = bool(verified)
+        rec = self._make_record(question, sql, verified, datasource_id, workspace_id, source, meta)
+        for i, existing in enumerate(self._examples):
+            if existing["question"] == q and self._in_scope(existing, datasource_id, workspace_id):
+                # 覆盖时保留原 id，外部（前端列表）持有的引用不失效
+                rec["id"] = existing["id"]
+                self._examples[i] = rec
                 self._save()
                 return rec
 
-        rec = self._make_record(question, sql, verified)
         self._examples.append(rec)
         self._save()
         return rec
@@ -196,12 +243,20 @@ class ExampleStore:
         self._save()
         return True
 
-    def search(self, question: str, top_k: int = 3) -> list[dict]:
-        """按问题检索最相似的示例（jieba 词元重叠打分，降序取 top_k）。
+    def search(
+        self,
+        question: str,
+        top_k: int = 3,
+        datasource_id: Optional[int] = None,
+        workspace_id: int = 0,
+        verified_only: bool = True,
+    ) -> list[dict]:
+        """按问题检索当前作用域内最相似的示例（jieba 词元重叠打分，降序取 top_k）。
 
         打分：候选示例 question 的词元集合与查询词元集合的交集大小。
         与 SkillService._tokenize 共用分词，保证中文切分口径一致。
-        无重叠（score=0）的示例不返回；示例上千后应换向量召回。
+        verified_only=True 时候选（未转正）示例不返回——few-shot 只注入已验证
+        知识，候选经人工转正后才生效（防污染）；无重叠（score=0）不返回。
         """
         if not question or not question.strip():
             return []
@@ -212,6 +267,10 @@ class ExampleStore:
 
         scored: list[tuple[dict, int]] = []
         for rec in self._examples:
+            if verified_only and not rec.get("verified"):
+                continue
+            if not self._in_scope(rec, datasource_id, workspace_id):
+                continue
             overlap = len(SkillService._tokenize(rec["question"]) & query_tokens)
             if overlap > 0:
                 scored.append((rec, overlap))

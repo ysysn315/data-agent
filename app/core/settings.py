@@ -44,6 +44,14 @@ class Settings(BaseSettings):
     milvus_host: str = "localhost"
     milvus_port: int = 19530
     milvus_collection: str = "knowledge_base"
+    graph_entity_embedding_enabled: bool = False
+    graph_entity_top_k: int = 5
+    graph_entity_min_score: float = 0.72
+    graph_entity_merge_margin: float = 0.05
+    graph_entity_collection: str = "graph_entities"
+    graph_entity_milvus_enabled: bool = False
+    graph_entity_embedding_dim: int = 1024
+    graph_entity_vector_cache_size: int = 10000
 
     # RAG 配置
     doc_chunk_max_size: int = 800

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, Float, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -79,6 +79,8 @@ class SQLExampleModel(Base):
     """sql_examples 表：question→SQL 示例库（few-shot 运营闭环）。
 
     example_id 直接用领域层生成的 12 位 hex 作主键（与内存版 dict 的 "id" 一致）。
+    verified=False 即候选示例（对话沉淀待确认 / 评测失败导入），人工转正后进 few-shot。
+    datasource_id NULL=演示库全局作用域；workspace_id 0=内置种子/无鉴权 demo。
     """
 
     __tablename__ = "sql_examples"
@@ -87,41 +89,111 @@ class SQLExampleModel(Base):
     question: Mapped[str] = mapped_column(Text, nullable=False)
     sql: Mapped[str] = mapped_column(Text, nullable=False)
     verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    datasource_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    workspace_id: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    source: Mapped[str] = mapped_column(String(32), nullable=False, default="manual")
+    meta: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
 
 
 class TerminologyModel(Base):
-    """terminology 表：业务术语库（term 为唯一键，同义词/口径存 JSON）。"""
+    """terminology 表：业务术语库（作用域内唯一，同义词/口径存 JSON）。
+
+    唯一键 (scope_key, term)：同一术语可在不同作用域各自存在（数据源 11 与 22
+    各配各的 GMV 口径），跨作用域互不覆盖。scope_key 非空（graph_triples 同款），
+    避免 SQL 标准"唯一索引中 NULL 互不相等"导致演示作用域（datasource NULL）
+    可插入重复 term；datasource_id/workspace_id 原始列仍保留供查询过滤。
+    """
 
     __tablename__ = "terminology"
+    __table_args__ = (UniqueConstraint("scope_key", "term", name="uq_terminology_scope_term"),)
 
-    term: Mapped[str] = mapped_column(String(256), primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    term: Mapped[str] = mapped_column(String(256), nullable=False, index=True)
     synonyms: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     definition: Mapped[str] = mapped_column(Text, nullable=False, default="")
     sql_hint: Mapped[str | None] = mapped_column(Text, nullable=True)
+    scope_key: Mapped[str] = mapped_column(String(128), nullable=False, default="workspace:0", index=True)
+    datasource_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    workspace_id: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
 
 
-# ========== 知识图谱（E 轮追加；本段 import 就近声明，不改动文件头部） ==========
+# ========== 知识图谱（平台化扩展） ==========
 
 
 class GraphTripleModel(Base):
-    """graph_triples 表：知识图谱三元组（轻量版图谱的唯一持久化层）。
+    """作用域内的知识图谱关系。
 
-    (subject, predicate, object) 唯一约束保证入库幂等；NetworkX 内存图是本表的
-    只读镜像（app/graph/store.GraphStore 惰性重建），不另设图数据库（取舍见
-    app/graph/IMPLEMENTATION.md §4，Neo4j 升级路径预留在文档里）。
+    ``subject/object`` 仍保留为接口兼容和可读快照；新代码同时记录实体 ID，
+    NetworkX 查询镜像按 ``scope_key`` 构建，避免不同 workspace/datasource 串图。
     """
 
     __tablename__ = "graph_triples"
-    __table_args__ = (UniqueConstraint("subject", "predicate", "object", name="uq_graph_triples_spo"),)
+    __table_args__ = (
+        UniqueConstraint("scope_key", "subject", "predicate", "object", name="uq_graph_triples_scope_spo"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     subject: Mapped[str] = mapped_column(String(256), nullable=False, index=True)
     predicate: Mapped[str] = mapped_column(String(256), nullable=False)
     object: Mapped[str] = mapped_column(String(256), nullable=False, index=True)
-    # 来源标记：seed（首启种子）/ manual（API 手动补录）/ llm（LLM 抽取）
+    scope_key: Mapped[str] = mapped_column(String(128), nullable=False, default="workspace:0", index=True)
+    workspace_id: Mapped[int] = mapped_column(Integer, nullable=False, default=0, index=True)
+    datasource_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    subject_entity_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    object_entity_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    # 来源标记：seed（首启种子）/ manual（API 手动补录）/ llm（LLM 抽取）/ schema_reviewed
     source: Mapped[str] = mapped_column(String(64), nullable=False, default="manual")
+    # source 保留兼容旧接口；source_type 是可扩展的来源分类，confidence 是事实置信度。
+    source_type: Mapped[str] = mapped_column(String(64), nullable=False, default="manual")
+    confidence: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    source_ref: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    provenance: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
+
+
+class GraphEntityModel(Base):
+    """作用域内的实体主表。
+
+    图结构边仍保存在 ``graph_triples``，本表负责稳定实体 ID、规范名称、别名、
+    轻量属性和合并状态。``attributes`` 保留多值及 provenance，避免 LLM 草稿
+    覆盖人工审核结果。
+    """
+
+    __tablename__ = "graph_entities"
+    __table_args__ = (UniqueConstraint("scope_key", "normalized_name", name="uq_graph_entities_scope_name"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    scope_key: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    workspace_id: Mapped[int] = mapped_column(Integer, nullable=False, default=0, index=True)
+    datasource_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    canonical_name: Mapped[str] = mapped_column(String(256), nullable=False)
+    normalized_name: Mapped[str] = mapped_column(String(256), nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(64), nullable=False, default="unknown")
+    aliases: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    attributes: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="active", index=True)
+    merged_into_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    embedding_status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
+    embedding_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
+
+
+class GraphEntityAliasModel(Base):
+    """实体别名索引，供作用域内精确消歧。"""
+
+    __tablename__ = "graph_entity_aliases"
+    __table_args__ = (UniqueConstraint("scope_key", "normalized_alias", name="uq_graph_entity_alias_scope_name"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    scope_key: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    entity_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    alias: Mapped[str] = mapped_column(String(256), nullable=False)
+    normalized_alias: Mapped[str] = mapped_column(String(256), nullable=False)
+    source: Mapped[str] = mapped_column(String(64), nullable=False, default="manual")
+    confidence: Mapped[float] = mapped_column(default=1.0)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
 
 

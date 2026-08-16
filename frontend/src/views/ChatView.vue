@@ -55,6 +55,17 @@
               {{ source }}
             </span>
           </div>
+          <!-- 本轮执行过 SQL：一键沉淀为已验证示例（知识回流，人工确认后才入库） -->
+          <div v-if="msg.sqlResult && !msg.sqlResult.saved" class="sql-sink">
+            <span class="sql-sink-label">本轮执行了 SQL（{{ msg.sqlResult.row_count }} 行）</span>
+            <button class="btn btn-secondary small" @click="saveExample(msg.sqlResult)" :disabled="msg.sqlResult.saving">
+              <span v-if="msg.sqlResult.saving" class="loading-spinner small"></span>
+              <template v-else>沉淀为示例</template>
+            </button>
+          </div>
+          <div v-else-if="msg.sqlResult && msg.sqlResult.saved" class="sql-sink saved">
+            ✓ 已沉淀为 SQL 示例
+          </div>
         </div>
       </div>
 
@@ -202,6 +213,8 @@ const streamChat = async (question, assistantMessage) => {
           scrollToBottom()
         } else if (payload.type === 'sources') {
           assistantMessage.sources = payload.data || []
+        } else if (payload.type === 'sql_result') {
+          assistantMessage.sqlResult = payload.data
         } else if (payload.type === 'error') {
           assistantMessage.content += `\n\n❌ ${payload.data}`
         }
@@ -220,6 +233,31 @@ const quickChat = async (question, assistantMessage) => {
   const data = await response.json()
   assistantMessage.content = data.answer || ''
   assistantMessage.sources = data.sources || []
+  if (data.sql_result) assistantMessage.sqlResult = data.sql_result
+}
+
+// 一键沉淀：人工确认（verified=true）后经示例库接口入库，同作用域同问题覆盖
+const saveExample = async (sqlResult) => {
+  sqlResult.saving = true
+  try {
+    const response = await fetch('/api/sql-examples', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question: sqlResult.question,
+        sql: sqlResult.sql,
+        verified: true,
+        datasource_id: sqlResult.datasource_id,
+        source: 'chat',
+      })
+    })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    sqlResult.saved = true
+  } catch (error) {
+    alert(`沉淀失败: ${error.message}`)
+  } finally {
+    sqlResult.saving = false
+  }
 }
 
 const sendMessage = async () => {
@@ -337,6 +375,15 @@ onMounted(async () => {
   border-top: 1px dashed var(--border-color);
 }
 .sources-label { font-size: 11px; color: var(--text-muted); margin-right: 6px; }
+
+/* SQL 沉淀条 */
+.sql-sink {
+  margin-top: 8px; padding-top: 8px;
+  border-top: 1px dashed var(--border-color);
+  display: flex; align-items: center; gap: 10px;
+}
+.sql-sink-label { font-size: 12px; color: var(--text-secondary); }
+.sql-sink.saved { font-size: 12px; color: var(--accent); }
 
 /* 欢迎态 */
 .welcome-message {

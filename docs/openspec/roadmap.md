@@ -19,7 +19,7 @@
 | 数据源接入 + 自动 Schema 扫描 + AI 语义草稿/人工审核 | SQLBot 思路 + 自研闭环 | ✅ SQLite/PG/MySQL；真实远端 smoke 待环境 |
 | Schema 相关表召回 | SQLBot | ⏳ `question` 已预留但未参与筛选；当前全量返回所选 Schema |
 | 只读 SQL 执行（execute_sql，按方言 AST + 数据库只读） | SQLBot 思路 | ✅ |
-| pytest 测试体系（21 个文件） | — | ✅ pytest/CI 验证；Docker/Redis 不可用时外部集成用例按环境跳过 |
+| pytest 测试体系（23 个 test_*.py 文件，含 conftest 共 24 个 Python 文件） | — | ✅ pytest/CI 验证；Docker/Redis 不可用时外部集成用例按环境跳过 |
 | Text-to-SQL 执行准确率评估（28 例）+ 模型对比 | my-agent 思路扩展 | ✅ 3 份可区分报告，最高 89.29%（25/28） |
 | Langfuse 调用链追踪（默认关闭） | Yuxi | ✅ |
 | 持久化层（应用状态、图谱、用户与数据源语义目录） | Yuxi | ✅（D 轮起，持续扩展）|
@@ -27,7 +27,8 @@
 | 技能语义匹配（embedding + jieba 回退） | 自研增量 | ✅（D 轮）|
 | Analysis Agent（P-O-R 工作流 + Markdown 报告） | my-agent | ✅（E 轮）|
 | 技能脚本容器沙箱（Docker 一次性容器） | Yuxi | ✅ 可切换；默认 subprocess，真机记录见实现文档 |
-| 知识图谱（三元组抽取 + graph_search 技能） | Yuxi | ✅（E 轮）|
+| 知识图谱基础（三元组抽取 + graph_search 技能） | Yuxi | ✅（E 轮）|
+| 知识图谱平台化（workspace/datasource 作用域、实体消歧、路径工具、Schema 同步、可选 Embedding） | 自研 | 🚧 当前分支待 PR |
 | 用户体系 + API Key 鉴权 + workspace-lite（默认关闭） | Yuxi/SQLBot | ✅（F 轮，非全资源租户隔离）|
 | 前端 v2：任务中心 / 图谱 / 知识管理 / 数据源语义审核 | — | ✅ |
 
@@ -110,7 +111,7 @@
 | 方向 | 说明 | 优先级 |
 |---|---|---|
 | 评测基准层扩展 | 参考 Spider / BIRD / ELT-Bench 建基线，扩展现有 text2sql + RAG evals（已具备基础数据集与指标） | 🔴 高 |
-| 知识飞轮（单人版） | 个人踩坑库 + 采纳反馈蒸馏置信度 + 长期未验证自动降权退场。该平台自认区别于通用 Agent 的核心差异化 | 🟡 中（差异化高，但工作量大、需做深否则被追问穿） |
+| 知识飞轮（单人版） | 个人踩坑库 + 采纳反馈蒸馏置信度 + 长期未验证自动降权退场。该平台自认区别于通用 Agent 的核心差异化 | 🟡 中（最小版已落地：对话一键沉淀 / 评测失败导入候选 / 人工转正闸 / 作用域隔离，见 `docs/openspec/sql-knowledge-loop.md`；自动蒸馏与降权退场待做） |
 | 上下文四层降级 | 历史裁剪 → 截断工具返回 → 模型摘要 → 紧急兜底，按代价从低到高逐层收敛。data-agent 目前只有摘要 | 🟢 低（demo 场景上下文很少爆，待长对话场景出现再做） |
 | 规范分层 | 术语库从单层扩到全局 / 业务线两层 | 🟢 低（收益边际，可有可无） |
 

@@ -6,6 +6,7 @@ from __future__ import annotations
 from langchain_core.tools import tool
 
 from app.datasources.context import current_selection
+from app.graph.scope import current_graph_scope
 from app.text2sql.examples import ExampleStore
 from app.text2sql.terminology import TermStore
 
@@ -28,16 +29,24 @@ def create_sql_context_tool(example_store: ExampleStore, term_store: TermStore):
         参数:
             question: 用户的自然语言问题
         """
-        if current_selection() is not None:
-            # 现有术语/示例表尚未带 datasource_id/workspace_id。平台数据源请求必须
-            # 禁用这份全局兼容数据，避免把演示库或其它数据源的口径/SQL 串入当前租户。
-            return (
-                "当前平台数据源未配置数据源级术语和历史 SQL 示例；"
-                "请只依据 schema_search 返回的已审核 M-Schema 生成 SQL。"
-            )
+        # 作用域检索：平台数据源只看自己的术语/示例，演示库只看全局（datasource NULL），
+        # 跨作用域知识不串入。示例只注入已验证（verified）条目——候选示例（对话待确认/
+        # 评测导入）经人工转正后才生效，防污染。
+        # workspace 取自图谱作用域（use_datasource_graph_scope 总是设置它，含演示路径）；
+        # 演示路径 current_selection() 为 None，拿不到 workspace，故不直接用 selection。
+        selection = current_selection()
+        graph_scope = current_graph_scope()
+        scope_datasource_id = selection.datasource_id if selection is not None else None
+        scope_workspace_id = graph_scope.workspace_id if graph_scope is not None else 0
 
-        term_hits = term_store.match(question)
-        examples = example_store.search(question, top_k=3)
+        term_hits = term_store.match(question, datasource_id=scope_datasource_id, workspace_id=scope_workspace_id)
+        examples = example_store.search(
+            question,
+            top_k=3,
+            datasource_id=scope_datasource_id,
+            workspace_id=scope_workspace_id,
+            verified_only=True,
+        )
 
         if not term_hits and not examples:
             return "未命中任何业务术语或相似示例。请直接依据 schema_search 返回的 M-Schema 生成 SQL。"
@@ -56,10 +65,9 @@ def create_sql_context_tool(example_store: ExampleStore, term_store: TermStore):
             parts.append("## 命中的业务术语\n（无）")
 
         if examples:
-            lines = ["## 相似历史 SQL 示例（few-shot 参考，请按当前问题调整）"]
+            lines = ["## 相似历史 SQL 示例（已验证，few-shot 参考，请按当前问题调整）"]
             for i, ex in enumerate(examples, 1):
-                mark = "✓已验证" if ex.get("verified") else "未验证"
-                lines.append(f"{i}. [{mark}] 问题：{ex['question']}")
+                lines.append(f"{i}. 问题：{ex['question']}")
                 lines.append(f"   SQL：{ex['sql']}")
             parts.append("\n".join(lines))
         else:

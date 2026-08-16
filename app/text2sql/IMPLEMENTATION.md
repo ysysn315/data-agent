@@ -105,7 +105,7 @@ SQLite 使用 URI `mode=ro` 并用 progress handler 限时；PostgreSQL 在事�
 ## 八、当前边界
 
 - `schema_search(question)` 当前未按问题筛表，而是全量注入一个 Schema 的 M-Schema；大库需要表级 embedding/关键词召回、关联表扩展和 token 预算；
-- 请求级 `datasource_id` 目前只贯通 `/api/chat` 与 `/api/chat_stream`；Analysis Agent、ARQ 后台对话任务和执行准确率评测仍固定使用演示库；
+- 请求级 `datasource_id` 已贯通 `/api/chat`、`/api/chat_stream`、同步 Analysis 和 ARQ Chat/Analysis 任务；执行准确率评测仍固定使用演示库；
 - 没有行列级数据权限，租户隔离只覆盖数据源目录，数据面权限依赖只读数据库账号；
 - 术语和历史 SQL 示例尚未按数据源建模，平台数据源请求当前会禁用全局兼容库；
 - 没有凭证轮换 API、定时 schema 同步和审批历史表；

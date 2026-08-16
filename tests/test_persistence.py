@@ -23,6 +23,7 @@ from pathlib import Path
 import pytest
 
 from app.db.engine import create_engine_and_sessionmaker, init_db
+from app.db.models import TerminologyModel
 from app.db.repositories import (
     MCPRepository,
     SqlAlchemySkillRepository,
@@ -393,3 +394,179 @@ def test_term_store_seed_when_empty(sync_db):
     assert run(repo.count()) == len(SEED_TERMS)
     TermStore(tmp_path / "terminology.json", repo=repo, runner=run)
     assert run(repo.count()) == len(SEED_TERMS)
+
+
+# ========== 知识库作用域列：幂等窄迁移 ==========
+
+
+async def test_knowledge_scope_columns_added_to_legacy_tables(tmp_path):
+    """旧版（无作用域列）sql_examples/terminology 升级后补齐新列，旧数据保留。"""
+    db_file = tmp_path / "legacy.db"
+
+    # 手工建旧版表结构（模拟本轮改动前的存量部署）并写入数据
+    conn = sqlite3.connect(db_file)
+    try:
+        conn.execute(
+            "CREATE TABLE sql_examples ("
+            "example_id VARCHAR(64) PRIMARY KEY, question TEXT NOT NULL, sql TEXT NOT NULL, "
+            "verified BOOLEAN NOT NULL, created_at DATETIME NOT NULL)"
+        )
+        conn.execute(
+            "CREATE TABLE terminology ("
+            "term VARCHAR(256) PRIMARY KEY, synonyms JSON NOT NULL, definition TEXT NOT NULL, "
+            "sql_hint TEXT, created_at DATETIME NOT NULL)"
+        )
+        conn.execute("INSERT INTO sql_examples VALUES ('e1', '旧问题', 'SELECT 1', 1, '2026-01-01 00:00:00')")
+        conn.execute("INSERT INTO terminology VALUES ('GMV', '[]', '成交总额', 'SUM(price)', '2026-01-01 00:00:00')")
+        conn.commit()
+    finally:
+        conn.close()
+
+    engine, sm = create_engine_and_sessionmaker(f"sqlite+aiosqlite:///{db_file}")
+    await init_db(engine)
+    try:
+        ex_cols = _table_columns(db_file, "sql_examples")
+        assert {"datasource_id", "workspace_id", "source", "meta"} <= ex_cols
+        tm_cols = _table_columns(db_file, "terminology")
+        assert {"datasource_id", "workspace_id"} <= tm_cols
+
+        # 旧数据保留且默认值归入演示作用域
+        rows = await SQLExampleRepository(sm).list_all()
+        assert len(rows) == 1
+        assert rows[0]["datasource_id"] is None and rows[0]["workspace_id"] == 0
+        assert rows[0]["source"] == "manual"
+        terms = await TerminologyRepository(sm).list_all()
+        assert terms[0]["term"] == "GMV" and terms[0]["workspace_id"] == 0
+    finally:
+        await engine.dispose()
+
+    # 二次 init_db 幂等：不报错、列不重复
+    engine2, _ = create_engine_and_sessionmaker(f"sqlite+aiosqlite:///{db_file}")
+    await init_db(engine2)
+    await engine2.dispose()
+
+
+async def test_knowledge_repo_roundtrips_scope_fields(tmp_path):
+    """仓储收发作用域字段（datasource_id/workspace_id/source/meta）完整。"""
+    engine, sm = create_engine_and_sessionmaker(_db_url(tmp_path))
+    await init_db(engine)
+    try:
+        ex = SQLExampleRepository(sm)
+        await ex.upsert(
+            {
+                "id": "s1",
+                "question": "平台问题",
+                "sql": "SELECT 2",
+                "verified": False,
+                "datasource_id": 7,
+                "workspace_id": 3,
+                "source": "eval",
+                "meta": {"case_id": "c1", "pred_sql": "SELECT 9"},
+            }
+        )
+        rows = await ex.list_all()
+        assert rows[0]["datasource_id"] == 7 and rows[0]["workspace_id"] == 3
+        assert rows[0]["source"] == "eval" and rows[0]["meta"]["case_id"] == "c1"
+        assert rows[0]["verified"] is False
+
+        tm = TerminologyRepository(sm)
+        await tm.upsert({"term": "动销率", "synonyms": [], "definition": "d", "datasource_id": 7, "workspace_id": 3})
+        terms = await tm.list_all()
+        assert terms[0]["datasource_id"] == 7 and terms[0]["workspace_id"] == 3
+    finally:
+        await engine.dispose()
+
+
+async def test_terminology_repo_scope_uniqueness(tmp_path):
+    """术语作用域内唯一：(term, datasource_id, workspace_id) upsert；同 term 不同作用域共存。"""
+    engine, sm = create_engine_and_sessionmaker(_db_url(tmp_path))
+    await init_db(engine)
+    try:
+        tm = TerminologyRepository(sm)
+        await tm.upsert(
+            {"term": "GMV", "synonyms": [], "definition": "数据源 11 口径", "datasource_id": 11, "workspace_id": 1}
+        )
+        # 数据源 22 各自一条（旧实现按全局 term 覆盖会丢掉 11 的）
+        await tm.upsert(
+            {"term": "GMV", "synonyms": [], "definition": "数据源 22 口径", "datasource_id": 22, "workspace_id": 1}
+        )
+        rows = {r["datasource_id"]: r["definition"] for r in await tm.list_all()}
+        assert rows == {11: "数据源 11 口径", 22: "数据源 22 口径"}
+
+        # 同作用域 upsert 覆盖（更新口径）
+        await tm.upsert(
+            {"term": "GMV", "synonyms": ["成交额"], "definition": "新口径", "datasource_id": 11, "workspace_id": 1}
+        )
+        rows = {r["datasource_id"]: r["definition"] for r in await tm.list_all()}
+        assert rows[11] == "新口径" and rows[22] == "数据源 22 口径"
+
+        # 按作用域删除
+        assert await tm.delete("GMV", datasource_id=11, workspace_id=1) is True
+        assert {r["datasource_id"] for r in await tm.list_all()} == {22}
+        assert await tm.delete("GMV", datasource_id=11, workspace_id=1) is False
+    finally:
+        await engine.dispose()
+
+
+async def test_terminology_demo_scope_uniqueness_no_null_hole(tmp_path):
+    """演示作用域（datasource NULL）同 term 不能重复插入（外部 CR：NULL 唯一索引漏洞回归）。
+
+    旧唯一约束 (term, datasource_id, workspace_id) 在 datasource_id=NULL 时
+    SQL 标准视 NULL 互不相等，可插多条；改 scope_key 非空列后由 DB 层拦住。
+    """
+    engine, sm = create_engine_and_sessionmaker(_db_url(tmp_path))
+    await init_db(engine)
+    try:
+        tm = TerminologyRepository(sm)
+        await tm.upsert({"term": "GMV", "synonyms": [], "definition": "v1", "datasource_id": None, "workspace_id": 0})
+        # 绕过领域层直插重复（模拟旁路写入）：撞唯一约束
+        from sqlalchemy.exc import IntegrityError
+
+        with pytest.raises(IntegrityError):
+            async with sm() as session:
+                session.add(
+                    TerminologyModel(
+                        term="GMV",
+                        synonyms=[],
+                        definition="dup",
+                        scope_key="workspace:0",
+                        datasource_id=None,
+                        workspace_id=0,
+                    )
+                )
+                await session.commit()
+    finally:
+        await engine.dispose()
+
+
+async def test_knowledge_migration_survives_duplicate_demo_terms(tmp_path):
+    """旧 NULL 漏洞版产生的重复演示词条：迁移去重保留最新一条，不因建索引失败（外部 CR 回归）。"""
+    db_file = tmp_path / "dup.db"
+
+    # 手工建"有作用域列但无 scope_key"的旧版表（NULL 唯一漏洞版），插入两条同 scope 重复 term
+    conn = sqlite3.connect(db_file)
+    try:
+        conn.execute(
+            "CREATE TABLE terminology ("
+            "id INTEGER NOT NULL PRIMARY KEY, term VARCHAR(256) NOT NULL, synonyms JSON NOT NULL, "
+            "definition TEXT NOT NULL, sql_hint TEXT, datasource_id INTEGER, "
+            "workspace_id INTEGER NOT NULL DEFAULT 0, created_at DATETIME NOT NULL)"
+        )
+        conn.execute("INSERT INTO terminology VALUES (1, 'GMV', '[]', '旧口径', NULL, NULL, 0, '2026-01-01 00:00:00')")
+        conn.execute("INSERT INTO terminology VALUES (2, 'GMV', '[]', '新口径', NULL, NULL, 0, '2026-06-01 00:00:00')")
+        conn.commit()
+    finally:
+        conn.close()
+
+    engine, sm = create_engine_and_sessionmaker(f"sqlite+aiosqlite:///{db_file}")
+    await init_db(engine)  # 修复前在此 IntegrityError
+    try:
+        rows = await TerminologyRepository(sm).list_all()
+        assert len(rows) == 1 and rows[0]["definition"] == "新口径"  # 保留最新
+    finally:
+        await engine.dispose()
+
+    # 二次 init_db 幂等
+    engine2, _ = create_engine_and_sessionmaker(f"sqlite+aiosqlite:///{db_file}")
+    await init_db(engine2)
+    await engine2.dispose()

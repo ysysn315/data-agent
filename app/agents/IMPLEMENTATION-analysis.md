@@ -136,9 +136,9 @@ Planner/Reflection 做规划与复盘，与 Operation 的执行 LLM（ChatAgent 
 若另起一套 `bind_tools`（原版做法），等于把这些能力重造一遍、还要各自维护。让每个
 Operation 步骤"就是一次完整对话"，分析层只做编排——新增技能自动被分析复用，零改动。
 
-当前复用不包含平台数据源选择：`AnalysisRequest` 与异步分析任务都没有
-`workspace_id + datasource_id`，Operation 因此仍使用演示库。若后续接入，必须由 API 在调用前校验
-数据源归属，并在整个图执行期间设置请求级数据源上下文，不能把切库参数暴露给模型。
+平台数据源选择由 `AnalysisRequest.datasource_id` 或异步任务入队参数承载；API/worker 在整个
+图执行期间设置 `use_datasource` 与 GraphScope，并先校验数据源归属。`workspace_id` 由服务端
+覆盖，模型不会获得切库参数；评测任务仍固定使用演示库。
 
 **为什么报告在代码里拼接而不是让 LLM 一次性生成？** 报告的**结构**（概述/各步发现/
 结论与建议/附：SQL 清单）应当确定、可断言、可被前端稳定渲染；LLM 一次性生成整篇

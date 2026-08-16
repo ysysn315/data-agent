@@ -74,8 +74,13 @@ def create_engine_and_sessionmaker(
 
 
 async def init_db(engine: AsyncEngine) -> None:
-    """建表（create_all 幂等）。测试与运行时共用同一入口。"""
+    """先升级旧图谱/知识库表，再幂等建表。测试与运行时共用同一入口。"""
     async with engine.begin() as conn:
+        from app.db.graph_migration import upgrade_graph_schema
+        from app.db.knowledge_migration import upgrade_knowledge_schema
+
+        await conn.run_sync(upgrade_graph_schema)
+        await conn.run_sync(upgrade_knowledge_schema)
         await conn.run_sync(Base.metadata.create_all)
 
 

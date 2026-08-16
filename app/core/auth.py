@@ -79,6 +79,14 @@ PROTECTED_ENDPOINTS: list[tuple[str, str, str]] = [
     ("GET", "/api/datasources/{datasource_id}/metadata", "login"),
     ("PUT", "/api/datasources/{datasource_id}/metadata/{table_id}/review", "login"),
     ("GET", "/api/datasources/{datasource_id}/m-schema", "login"),
+    # 图谱：写入/抽取/目录同步/合并会改变共享知识，只允许 admin；查询按 workspace 读
+    ("POST", "/api/graph/triples", "admin"),
+    ("POST", "/api/graph/extract", "admin"),
+    ("POST", "/api/graph/entities/merge", "admin"),
+    ("POST", "/api/graph/sync-catalog", "admin"),
+    ("GET", "/api/graph/entity/{name}", "login"),
+    ("GET", "/api/graph/path", "login"),
+    ("GET", "/api/graph/stats", "login"),
 ]
 
 

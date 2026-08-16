@@ -245,7 +245,7 @@ async def get_chat_agent():
         from app.agents.chat_agent import ChatAgent
         from app.agents.middlewares import ToolRuntimeMiddleware
         from app.agents.tools.datetime_tool import get_current_datetime
-        from app.agents.tools.graph_tool import create_graph_search_tool
+        from app.agents.tools.graph_tool import create_graph_path_tool, create_graph_search_tool
         from app.agents.tools.schema_tool import create_schema_search_tool
         from app.agents.tools.sql_context_tool import create_sql_context_tool
         from app.agents.tools.sql_tool import create_execute_sql_tool
@@ -287,6 +287,7 @@ async def get_chat_agent():
             create_schema_search_tool(settings.sqlite_db_path, datasource_runtime=get_datasource_runtime()),
             create_sql_context_tool(get_example_store(), get_term_store()),
             create_graph_search_tool(get_graph_service()),
+            create_graph_path_tool(get_graph_service()),
         ]
 
         _chat_agent = ChatAgent(
@@ -408,8 +409,8 @@ def get_graph_service():
     """GraphService 单例（graph_triples 表 + NetworkX 内存镜像；首启表空写入演示种子）。
 
     LLM 惰性注入：llm_provider 传工厂而非实例，不调抽取接口就不要求配置 LLM_API_KEY。
-    注意：reset_singletons 早于本段存在、未覆盖 _graph_service（本文件权限边界为
-    只在末尾追加）；测试请用 dependency_overrides 注入独立实例，不依赖单例重置。
+    图谱查询作用域由请求级 GraphScope ContextVar 提供；单例本身不持有用户租户状态。
+    reset_singletons 会同步清理该服务，测试仍可用 dependency_overrides 注入独立实例。
     """
     global _graph_service
     if _graph_service is None:

@@ -119,13 +119,28 @@ class TermStore:
 
     @staticmethod
     def _normalize(item: dict) -> dict:
-        """统一词条结构，缺省字段补齐。"""
+        """统一词条结构，缺省字段补齐（旧数据无作用域字段 → 演示作用域）。"""
         return {
             "term": (item.get("term") or "").strip(),
             "synonyms": [s.strip() for s in (item.get("synonyms") or []) if s and s.strip()],
             "definition": (item.get("definition") or "").strip(),
             "sql_hint": (item.get("sql_hint") or "").strip() or None,
+            "datasource_id": item.get("datasource_id"),
+            "workspace_id": int(item.get("workspace_id") or 0),
         }
+
+    @staticmethod
+    def _in_scope(rec: dict, datasource_id: Optional[int], workspace_id: int = 0) -> bool:
+        """作用域匹配：平台数据源按 (datasource_id, workspace)；演示库按 (NULL, workspace)。
+
+        平台分支也比对 workspace——防御纵深：数据源归属虽由路由层校验
+        （resolve_workspace 404），领域层不应依赖上层把关（CLI 直写等旁路没有这层闸）。
+        """
+        if datasource_id is not None:
+            return rec.get("datasource_id") == datasource_id and int(rec.get("workspace_id") or 0) == int(
+                workspace_id or 0
+            )
+        return rec.get("datasource_id") is None and int(rec.get("workspace_id") or 0) == int(workspace_id or 0)
 
     # ========== 增删查 ==========
 
@@ -135,8 +150,14 @@ class TermStore:
         synonyms: Optional[list[str]] = None,
         definition: str = "",
         sql_hint: Optional[str] = None,
+        datasource_id: Optional[int] = None,
+        workspace_id: int = 0,
     ) -> dict:
-        """新增/更新一个术语（term 作为唯一键，已存在则覆盖）。"""
+        """新增/更新一个术语——作用域内唯一：(term, datasource_id, workspace_id)。
+
+        同一术语可在不同作用域各自存在（数据源 11 与 22 各配各的 GMV 口径），
+        跨作用域互不覆盖；同作用域同 term 则覆盖更新。
+        """
         if not term or not term.strip():
             raise ValueError("term 不能为空")
 
@@ -146,11 +167,13 @@ class TermStore:
                 "synonyms": synonyms or [],
                 "definition": definition,
                 "sql_hint": sql_hint,
+                "datasource_id": datasource_id,
+                "workspace_id": workspace_id,
             }
         )
 
         for i, existing in enumerate(self._terms):
-            if existing["term"] == rec["term"]:
+            if existing["term"] == rec["term"] and self._in_scope(existing, datasource_id, workspace_id):
                 self._terms[i] = rec
                 self._save()
                 return rec
@@ -162,19 +185,23 @@ class TermStore:
     def list(self) -> list[dict]:
         return [dict(rec) for rec in self._terms]
 
-    def delete(self, term: str) -> bool:
+    def delete(self, term: str, datasource_id: Optional[int] = None, workspace_id: int = 0) -> bool:
+        """按 (term, 作用域) 删除，返回是否删掉。"""
         before = len(self._terms)
-        self._terms = [t for t in self._terms if t["term"] != term]
+        self._terms = [
+            t for t in self._terms if not (t["term"] == term and self._in_scope(t, datasource_id, workspace_id))
+        ]
         if len(self._terms) == before:
             return False
         self._save()
         return True
 
-    def match(self, question: str) -> list[dict]:
-        """返回问题中命中的术语（term 或某个同义词是问题子串）。
+    def match(self, question: str, datasource_id: Optional[int] = None, workspace_id: int = 0) -> list[dict]:
+        """返回问题在指定作用域内命中的术语（term 或某个同义词是问题子串）。
 
         大小写不敏感（英文术语如 GMV 常被小写输入）。命中即返回该词条，供
-        sql_context_search 注入 prompt。
+        sql_context_search 注入 prompt；跨作用域词条不串入（平台数据源只看
+        自己的口径，演示库按 workspace 隔离）。
         """
         if not question or not question.strip():
             return []
@@ -182,6 +209,8 @@ class TermStore:
         q = question.lower()
         hits: list[dict] = []
         for rec in self._terms:
+            if not self._in_scope(rec, datasource_id, workspace_id):
+                continue
             candidates = [rec["term"], *rec["synonyms"]]
             if any(c and c.lower() in q for c in candidates):
                 hits.append(dict(rec))
