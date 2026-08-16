@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """演示数据导入脚本 —— Kaggle Brazilian E-Commerce → SQLite。
 
+数据集出处（换机器时从这里重新下载，需 Kaggle 账号）：
+    https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce
+    （Olist 公司发布的 2016-2018 巴西电商订单数据，~140MB，文件名 olist_*_dataset.csv）
+
 对应 roadmap P0-1：让 ./data/ecommerce.db（settings.sqlite_db_path 默认值）
 能被一条命令生成，demo 不依赖网络。
 

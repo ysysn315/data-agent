@@ -47,11 +47,23 @@
 1. Milvus 已启动，collection 维度与当前 Embedding 模型一致；
 2. 当前 `.env` 已配置 Embedding/LLM 所需的 key、base URL 和 model；
 3. 脚本通过 `LLMFactory` 使用 `app/core/settings.py` 当前配置字段；
-4. 实验所需的正式文档与噪声文档目录存在；
+4. 实验所需的正式文档与噪声文档目录存在（见下节"测试语料"）；
 5. 使用 BGE 时已按需安装 torch/FlagEmbedding 并准备模型缓存；
 6. 输出单独落到带模型、数据集和配置标识的报告，不覆盖历史 baseline。
 
-第 4 项依赖仓库外的正式文档目录；若缺少语料，本目录仍不是开箱即跑的可复现实验包。可先离线检查数据集和指标单元逻辑，但不要把缺少外部依赖归因于 RAG 算法本身。
+## 测试语料
+
+`aiops-docs/`（9 篇正式排障手册）与 `aiops-docs-noise/`（3 篇干扰文档）随仓库提供，
+是检索/生成评测引用的全部语料：
+
+- 正式手册：CPU/磁盘/内存/服务不可用/慢响应五大主题 + K8s Ingress TLS、MySQL 备份恢复、
+  WAF 处置、缓存调优；内容覆盖数据集全部 `expected_keywords`（已脚本化校验）。
+- 噪声文档（刻意设计，检验系统区分能力）：`monitoring_glossary_noise.md`（纯术语罗列）、
+  `perf_capacity_planning_false_friend.md`（容量规划≠故障排查的易混文档）、
+  `mock_incident_drill_script.md`（演练脚本≠真实处置）。
+
+仍需注意：Milvus/Embedding 等外部依赖就绪前，本目录不能完整复现实验；语料已随仓库，
+但历史 baseline 只作参照（见上）。
 
 ## 知识库辅助脚本
 
