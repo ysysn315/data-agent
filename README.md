@@ -4,10 +4,11 @@
 
 ## 当前状态
 
-本文描述当前分支代码（2026-08-14）。实现事实以代码、测试和评测原始报告为准；历史需求与差距分析仅用于解释设计过程。
+本文描述当前分支代码（2026-08-16）。实现事实以代码、测试和评测原始报告为准；历史需求与差距分析仅用于解释设计过程。
 
 - 自动化测试：提交前使用 pytest/CI 验证；Docker/Redis 不可用时，外部集成用例会按环境跳过。
-- Text-to-SQL：28 条分层用例；仓库内 3 份可区分的模型报告，最高执行准确率为 **89.29%（25/28）**。
+- Text-to-SQL：50 条双轴分层用例（easy 10 / medium 20 / hard 20，18 类能力标签）；仓库内
+  3 份扩容前 28 题历史模型报告，最高为 **89.29%（25/28）**，50 题新基线待统一重跑。
 - RAG：主 Chat 已接入 Milvus 稠密召回，并在知识库单例首次初始化时恢复 BM25 索引，统一走查询改写/扩展、BM25+向量 RRF 与可选重排；BGE 本地重排仍需额外安装，未配置时回退 LLM/融合排序。
 - 沙箱与追踪均为可选能力：技能脚本默认使用 `subprocess`，可切换 Docker；Langfuse 默认关闭。
 
@@ -74,15 +75,17 @@ flowchart TB
 
 ### Text-to-SQL
 
-判定口径是 **execution accuracy**：golden SQL 和模型 SQL 在同一数据库执行后比较结果集，而不是比较 SQL 字符串。比较过程处理列序、无显式排序时的行序和浮点容差。
+判定口径是 **execution accuracy**：golden SQL 和模型 SQL 在同一数据库执行后比较结果集，而不是比较 SQL 字符串。比较过程处理列序、无显式排序时的行序和浮点容差。当前 50 题按难度与能力标签双轴统计，并可切换 Skills/M-Schema 语义注释做消融。
 
-| 报告 | 正确数 | 准确率 |
+以下是扩容前 28 题的历史报告，仅用于保留原始证据，不能直接代表当前 50 题结果：
+
+| 历史报告 | 正确数 | 准确率 |
 |---|---:|---:|
 | `execution_qwen3.7-plus.json` | 25 / 28 | **89.29%** |
 | `execution_qwen3-coder-plus.json` | 24 / 28 | 85.71% |
 | `execution_qwen3-coder-flash.json` | 23 / 28 | 82.14% |
 
-`execution_latest.json` 当前与 coder-flash 报告相同（23/28），不是最高成绩。仓库没有可核验的 qwen3.7-max 26/28 原始报告，因此项目文档和简历都不再使用旧的 92.86% 数字。
+`execution_latest.json` 当前仍是 28 题 coder-flash 历史报告（23/28），不是最高成绩。仓库没有可核验的 qwen3.7-max 26/28 原始报告，因此项目文档和简历都不再使用旧的 92.86% 数字；50 题模型结果必须重跑后再引用。
 
 ### RAG
 
@@ -138,7 +141,21 @@ docker compose up -d redis
 ### Text-to-SQL 评测
 
 ```bash
-.venv/bin/python -m evals.text2sql.run_execution_eval --limit 10
+# 完整 50 题；用独立文件保留不同模型/配置结果
+.venv/bin/python -m evals.text2sql.run_execution_eval \
+  --run-name full --output /tmp/t2s-full.json
+
+# 消融：关闭 SQL 技能正文 / 关闭 M-Schema 业务注释
+.venv/bin/python -m evals.text2sql.run_execution_eval \
+  --no-skill --run-name no-skill --output /tmp/t2s-no-skill.json
+.venv/bin/python -m evals.text2sql.run_execution_eval \
+  --schema-mode columns --run-name columns-only --output /tmp/t2s-columns.json
+
+# 困难窗口题定向回归；也可用 --model 横向切模型
+.venv/bin/python -m evals.text2sql.run_execution_eval \
+  --difficulty hard --tag 窗口函数 --output /tmp/t2s-hard-window.json
+
+.venv/bin/python -m evals.text2sql.compare_reports /tmp/t2s-full.json /tmp/t2s-no-skill.json
 ```
 
 RAG 评测依赖 Milvus、Embedding、LLM、可选重排模型和测试语料；运行前请先看 [RAG 评测说明](evals/rag/README.md)，不要把历史 baseline 当成当前可复现结果。
@@ -159,10 +176,10 @@ app/
 ├── tasks/        # ARQ + Redis Streams 异步任务
 └── text2sql/     # M-Schema、SQL 示例与术语
 evals/
-├── text2sql/     # 28 条执行准确率评测与原始报告
+├── text2sql/     # 50 条执行准确率评测与 28 题历史原始报告
 └── rag/          # 检索/生成数据集、指标和历史 baseline
 frontend/         # Vue 3 前端
-tests/            # 23 个 test_*.py 文件；含 conftest 共 24 个 Python 测试文件
+tests/            # 24 个 test_*.py 文件；含 conftest 共 25 个 Python 测试文件
 ```
 
 ## 文档索引

@@ -6,9 +6,9 @@
 
 | 主题 | 当前可核验事实 | 不要说 |
 |---|---|---|
-| 测试 | 提交前用 pytest/CI 验证；23 个 test_*.py 文件（含 conftest 共 24 个 Python 文件），Docker/Redis 不可用时外部集成用例按环境跳过 | 所有外部集成都已真机跑通 |
+| 测试 | 提交前用 pytest/CI 验证；24 个 test_*.py 文件（含 conftest 共 25 个 Python 文件），Docker/Redis 不可用时外部集成用例按环境跳过 | 所有外部集成都已真机跑通 |
 | Skills | 5 个内置技能；阶段测量约 1183→150 tokens/请求 | 当前 5 个技能仍精确等于早期测量口径 |
-| Text-to-SQL | 支持 SQLite/PG/MySQL 接入、AI 语义草稿与人工审核；28 条演示集最高 89.29%（25/28） | 已有行列级权限或真实 PG/MySQL 集成环境全覆盖 |
+| Text-to-SQL | 支持 SQLite/PG/MySQL 接入、AI 语义草稿与人工审核；50 条双轴评测，28 题历史报告最高 89.29%（25/28） | 50 题模型基线待重跑；没有真实 PG/MySQL 集成环境全覆盖 |
 | RAG | 主 Chat 已贯通 BM25 恢复、查询改写/扩展、RRF 与可选重排；独立实验可切换模型 | 本地 BGE 需额外依赖；BM25 是有上限的进程内派生索引 |
 | 图谱 | workspace/datasource 作用域的 SQLite+NetworkX 轻量图谱；实体别名/消歧、路径工具、可选 Embedding、显式 LLM 抽取 | GraphRAG、Neo4j、大规模图推理 |
 | 沙箱 | 默认 subprocess，可切 Docker 一次性容器 | 所有 Agent/工具默认运行在 Docker |
@@ -29,7 +29,7 @@
 2. **能力扩展**：Skills 只向模型披露名称和描述，模型读取正文后才激活并解锁工具；外部 MCP 工具也只在相关技能激活后加载。
 3. **知识增强**：文档和表格进入 Milvus 知识库；知识库单例首次初始化恢复 BM25，主 Chat 统一执行查询改写/扩展、RRF 和重排；作用域图谱保存指标口径与实体关系，并由 Agent 路径工具查询。
 4. **复杂任务**：Analysis Agent 进行规划、逐步执行和反思；长任务通过 ARQ、Redis Streams 和 SSE 异步推送进度。
-5. **效果与可靠性**：工具层有超时、重试、熔断和降级；SQL 有双重只读；评测以结果集等价性衡量 28 条 SQL，用原始报告支撑 89.29% 最高准确率。
+5. **效果与可靠性**：工具层有超时、重试、熔断和降级；SQL 有双重只读；当前以结果集等价性校验 50 条 SQL，并按难度/能力标签分析。89.29% 来自扩容前 28 题原始报告，不能说成 50 题成绩。
 
 ## 2. 五条简历主线
 
@@ -163,9 +163,9 @@ Langfuse callbacks 默认关闭；同步/流式 Chat 以及 Analysis 的 Operati
 
 ### 2.5 评测与回归
 
-**Text-to-SQL**：28 条分层用例覆盖单表聚合、多表 JOIN、TopN、时间过滤和 CTE。golden SQL 与模型 SQL 在同一库执行，比较归一化结果集。
+**Text-to-SQL**：50 条用例按 easy 10 / medium 20 / hard 20 分层，并用 18 类能力标签覆盖单表聚合、多表 JOIN、TopN、时间过滤、CTE、窗口函数、相关子查询、反连接、去重与一对多防重复、日期/业务口径等。golden SQL 与模型 SQL 在同一库执行，比较归一化结果集；runner 可关闭 Skills 正文或 M-Schema 业务注释做单变量消融。
 
-可核验报告：
+扩容前 28 题可核验历史报告：
 
 - qwen3.7-plus：25/28，89.29%；
 - qwen3-coder-plus：24/28，85.71%；
@@ -175,7 +175,7 @@ Langfuse callbacks 默认关闭；同步/流式 Chat 以及 Analysis 的 Operati
 
 **高频追问**：
 
-1. 28 条会不会太少？——是演示级人工精标集，作用是建立可回归的最低基线，不代表生产泛化能力。
+1. 50 条够不够？——比初版 28 条更能拉开复杂能力差异，但仍是单一电商 Schema 的人工精标演示集，只代表这套受控基准，不代表跨库生产泛化能力。
 2. 如何处理 SQL 结果顺序？——golden 有外层 ORDER BY 时严格比较行序，否则按多重集合比较；TopN 并列仍可能暴露 tiebreaker 歧义。
 3. 为什么 RAG 不写提升数字？——当前缺少与现行配置对应的完整 reports，只有历史 baseline，不能把两者混成对照实验。
 
@@ -209,7 +209,8 @@ Chat Agent 初始化需要 SkillService，两者曾复用同一把不可重入�
 | RAG 主线与实验链路 | `app/rag/`、`app/core/dependencies.py`、`evals/rag/` | 主 Chat 已统一组装；实验可独立切换配置 |
 | 轻量知识图谱平台化 | `app/graph/`、`app/api/routes_graph.py`、`tests/test_knowledge_graph.py` | 非 GraphRAG/Neo4j；Milvus 实体索引默认关闭 |
 | P-O-R + ARQ/Streams/SSE | `app/agents/analysis_agent.py`、`app/tasks/` | 历史回放，不是断点续传 |
-| 89.29%（25/28） | `execution_qwen3.7-plus.json` | 3 份可区分报告、数据集较小 |
+| 50 条 golden 全部离线可执行 | `dataset.json`、`test_text2sql_eval.py` | 单一电商 Schema；模型分数待统一重跑 |
+| 89.29%（25/28，历史） | `execution_qwen3.7-plus.json` | 扩容前 28 题报告，不能冒充 50 题结果 |
 
 ## 5. 面试前自检
 

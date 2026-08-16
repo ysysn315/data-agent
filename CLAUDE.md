@@ -39,18 +39,18 @@ docker compose up -d redis
 .venv/bin/arq app.tasks.worker.WorkerSettings
 
 # Text-to-SQL 评测
-.venv/bin/python -m evals.text2sql.run_execution_eval --limit 10
+.venv/bin/python -m evals.text2sql.run_execution_eval --difficulty hard --limit 10
 ```
 
 默认 Chat/Text-to-SQL 不依赖 Milvus、Redis、Docker 或 Langfuse。知识库工具需 `ENABLE_KB_TOOL=true` + Milvus；Docker 技能沙箱需 `SKILL_SANDBOX_MODE=docker`；Langfuse 需开关和两把 key 同时就绪。
 
 RAG 评测依赖外部语料、Milvus、Embedding 和可选重排模型。运行前先读 `evals/rag/README.md`，不要把仓库中的历史 baseline 当作当前可复现实验结果。
 
-## 当前事实基线（2026-08-13）
+## 当前事实基线（2026-08-16）
 
 - pytest/CI 结果以实际运行环境为准；Docker/Redis 不可用时，外部集成用例会按环境跳过。
 - 5 个内置技能：schema-retrieval、sql-generation、sqlite-query、data-visualization、knowledge-graph。
-- Text-to-SQL 有 3 份可区分的模型报告，最高 `89.29%（25/28）`；`execution_latest.json` 当前是 23/28。
+- Text-to-SQL 当前数据集为 50 条（easy 10 / medium 20 / hard 20）；3 份模型报告均是扩容前 28 题历史报告，最高 `89.29%（25/28）`，不得冒充 50 题成绩。
 - 主 Chat 的知识库工具已接入 Milvus 稠密召回、BM25 恢复、查询改写/扩展、RRF、元数据过滤和可选重排；BM25 是受上限约束的进程内派生索引。
 - 技能脚本默认 `subprocess`；Docker 是可切换的一次性容器执行器。
 - Redis Streams 能保存并回放历史事件，但 HTTP SSE 未暴露 `Last-Event-ID/after_seq`，前端不自动重连。

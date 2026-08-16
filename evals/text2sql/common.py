@@ -110,11 +110,12 @@ def compare_result_sets(
 
 
 def build_report(case_results: list[dict]) -> dict:
-    """把逐例结果聚合成报告字典：总分 + 按 tags 分桶 + 每例明细。
+    """把逐例结果聚合成报告字典：总分 + 按标签/难度分桶 + 每例明细。
 
     每个 case_result 至少包含：
         id: str
         tags: list[str]
+        difficulty: str       —— easy / medium / hard
         correct: bool          —— 是否判为执行等价
     可选（原样带入 cases 明细）：question / golden_sql / pred_sql / error / ...
 
@@ -134,6 +135,18 @@ def build_report(case_results: list[dict]) -> dict:
     for bucket in by_tag.values():
         bucket["accuracy"] = round(bucket["correct"] / bucket["total"], 4) if bucket["total"] else 0.0
 
+    by_difficulty: dict[str, dict] = {}
+    for c in case_results:
+        difficulty = c.get("difficulty")
+        if not difficulty:
+            continue
+        bucket = by_difficulty.setdefault(difficulty, {"total": 0, "correct": 0})
+        bucket["total"] += 1
+        if c.get("correct"):
+            bucket["correct"] += 1
+    for bucket in by_difficulty.values():
+        bucket["accuracy"] = round(bucket["correct"] / bucket["total"], 4) if bucket["total"] else 0.0
+
     return {
         "summary": {
             "total": total,
@@ -141,5 +154,8 @@ def build_report(case_results: list[dict]) -> dict:
             "accuracy": round(correct / total, 4) if total else 0.0,
         },
         "by_tag": dict(sorted(by_tag.items())),
+        "by_difficulty": {
+            level: by_difficulty[level] for level in ("easy", "medium", "hard") if level in by_difficulty
+        },
         "cases": case_results,
     }

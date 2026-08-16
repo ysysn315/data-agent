@@ -56,6 +56,7 @@ def test_build_candidate_keeps_error_in_meta(tmp_path):
         "id": "bad1",
         "question": "各州 GMV",
         "tags": ["JOIN", "TopN"],
+        "difficulty": "hard",
         "golden_sql": "SELECT 1",
         "pred_sql": "SELECT 2",
         "error": "结果不等价",
@@ -67,6 +68,7 @@ def test_build_candidate_keeps_error_in_meta(tmp_path):
     assert cand["verified"] is False and cand["source"] == "eval" and cand["datasource_id"] is None
     assert cand["meta"]["pred_sql"] == "SELECT 2" and cand["meta"]["error"] == "结果不等价"
     assert cand["meta"]["tags"] == ["JOIN", "TopN"] and cand["meta"]["case_id"] == "bad1"
+    assert cand["meta"]["difficulty"] == "hard"
 
 
 def test_import_skips_verified_same_question(tmp_path):
@@ -115,6 +117,10 @@ def test_compare_reports_markdown(tmp_path):
         "JOIN": {"total": 1, "correct": 0, "accuracy": 0.0},
         "单表": {"total": 1, "correct": 1, "accuracy": 1.0},
     }
+    base_data["by_difficulty"] = {
+        "easy": {"total": 1, "correct": 1, "accuracy": 1.0},
+        "hard": {"total": 1, "correct": 0, "accuracy": 0.0},
+    }
     base.write_text(json.dumps(base_data, ensure_ascii=False), encoding="utf-8")
 
     _write_report(
@@ -130,6 +136,10 @@ def test_compare_reports_markdown(tmp_path):
         "JOIN": {"total": 1, "correct": 1, "accuracy": 1.0},
         "单表": {"total": 1, "correct": 1, "accuracy": 1.0},
     }
+    after_data["by_difficulty"] = {
+        "easy": {"total": 1, "correct": 1, "accuracy": 1.0},
+        "hard": {"total": 1, "correct": 1, "accuracy": 1.0},
+    }
     after.write_text(json.dumps(after_data, ensure_ascii=False), encoding="utf-8")
 
     md = compare(
@@ -141,6 +151,7 @@ def test_compare_reports_markdown(tmp_path):
     assert "+50.00pp" in md  # 总体 50% → 100%
     assert "JOIN" in md and "新增通过 1 例" in md and "c1" in md
     assert "新增失败 0 例" in md
+    assert "按难度" in md and "| 困难 | 0.00%（0/1） | 100.00%（1/1） | +100.00pp |" in md
 
 
 def test_compare_reports_flags_sample_set_mismatch(tmp_path):
@@ -165,3 +176,20 @@ def test_compare_reports_flags_sample_set_mismatch(tmp_path):
     assert "样本集不一致" in md  # 显式警示
     assert "新增 case：new1" in md  # 单独列出，不混入翻转
     assert "新增通过 0 例" in md  # 新增正确题不算翻转（c1 未变化）
+
+
+def test_compare_reports_flags_dataset_content_change(tmp_path):
+    """ID 相同但题面/golden 等内容发生变化时，也不能当作严格可比。"""
+    base = tmp_path / "base.json"
+    after = tmp_path / "after.json"
+    cases = [{"id": "c1", "question": "q1", "tags": [], "correct": True}]
+    _write_report(base, cases)
+    _write_report(after, cases)
+
+    base_data = json.loads(base.read_text(encoding="utf-8"))
+    after_data = json.loads(after.read_text(encoding="utf-8"))
+    base_data["meta"] = {"dataset_fingerprint": "old"}
+    after_data["meta"] = {"dataset_fingerprint": "new"}
+
+    md = compare(base_data, after_data, "base.json", "after.json")
+    assert "数据集内容指纹不同" in md

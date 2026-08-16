@@ -19,8 +19,8 @@
 | 数据源接入 + 自动 Schema 扫描 + AI 语义草稿/人工审核 | SQLBot 思路 + 自研闭环 | ✅ SQLite/PG/MySQL；真实远端 smoke 待环境 |
 | Schema 相关表召回 | SQLBot | ⏳ `question` 已预留但未参与筛选；当前全量返回所选 Schema |
 | 只读 SQL 执行（execute_sql，按方言 AST + 数据库只读） | SQLBot 思路 | ✅ |
-| pytest 测试体系（23 个 test_*.py 文件，含 conftest 共 24 个 Python 文件） | — | ✅ pytest/CI 验证；Docker/Redis 不可用时外部集成用例按环境跳过 |
-| Text-to-SQL 执行准确率评估（28 例）+ 模型对比 | my-agent 思路扩展 | ✅ 3 份可区分报告，最高 89.29%（25/28） |
+| pytest 测试体系（24 个 test_*.py 文件，含 conftest 共 25 个 Python 文件） | — | ✅ pytest/CI 验证；Docker/Redis 不可用时外部集成用例按环境跳过 |
+| Text-to-SQL 执行准确率评估（50 例）+ 模型/消融对比 | my-agent 思路扩展 | ✅ 10/20/20 难度分层、18 类能力标签；3 份 28 题历史报告最高 89.29%（25/28），50 题基线待重跑 |
 | Langfuse 调用链追踪（默认关闭） | Yuxi | ✅ |
 | 持久化层（应用状态、图谱、用户与数据源语义目录） | Yuxi | ✅（D 轮起，持续扩展）|
 | 异步执行（ARQ + Redis Streams + SSE） | Yuxi | ✅（D 轮）|
@@ -62,8 +62,8 @@
    自动补 LIMIT、拦截 DDL/DML。讲点：Text-to-SQL 的可靠性工程。
 2. **评估体系复活（my-agent 强项 + 扩展到 SQL，3 天）** ⭐⭐⭐⭐⭐
    - 迁回 evals/rag 的数据集与 baseline（my-agent-original 有现成的）
-   - 新增 Text-to-SQL 评估：20-30 个 question→SQL→期望结果 用例，
-     执行结果对比（execution accuracy），出准确率报告
+   - 初版 Text-to-SQL 评估：20-30 个 question→SQL→期望结果用例；现已扩展为 50 例，
+     增加难度轴、复杂 SQL 能力标签与 Skills/M-Schema 消融，按 execution accuracy 出报告
    - 讲点：**"我能量化我的 Agent 有多准"，绝大多数简历项目做不到**
 3. **SQL 示例库 / 数据训练（抄 SQLBot 核心卖点，2 天）** ⭐⭐⭐⭐
    question→SQL 对存储 + few-shot 注入 prompt + 反馈接口（答对存档）。
@@ -148,4 +148,4 @@ MicroVM / 预热池 / Nydus 懒加载 / CRIU / 三级配额结算等大规模能
 | "M-Schema + 业务语义 + sqlglot AST + SQLite 只读" | Text-to-SQL、知识库、SQL Guard |
 | "多格式 RAG + 混合检索实验链路 + 轻量知识图谱" | 主 Chat/实验链路分层；Graph 实现与测试 |
 | "P-O-R 多步分析 + ARQ/Streams/SSE + 可选 Langfuse" | Analysis、Tasks、Tracing；历史回放而非断点续传 |
-| "28 条 SQL 评测最高 89.29%；40+60 RAG 数据集" | 原始模型报告、RAG 数据集与指标 |
+| "50 条 SQL 双轴评测；28 题历史报告最高 89.29%；40+60 RAG 数据集" | 当前 golden 校验、历史模型原始报告、RAG 数据集与指标；不把 28 题分数冒充 50 题结果 |

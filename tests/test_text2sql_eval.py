@@ -14,6 +14,7 @@
 import json
 import sqlite3
 import sys
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -29,10 +30,31 @@ from evals.text2sql.common import (  # noqa: E402
     compare_result_sets,
     golden_has_order_by,
 )
+from evals.text2sql.run_execution_eval import dataset_fingerprint, select_cases  # noqa: E402
 
 DATASET_PATH = Path(__file__).parent.parent / "evals" / "text2sql" / "dataset.json"
 DATASET = json.loads(DATASET_PATH.read_text(encoding="utf-8"))
-EXPECTED_TAGS = {"单表聚合", "多表JOIN", "时间过滤", "TopN", "CTE"}
+EXPECTED_TAGS = {
+    "单表聚合",
+    "多表JOIN",
+    "时间过滤",
+    "TopN",
+    "CTE",
+    "条件聚合",
+    "HAVING",
+    "去重计数",
+    "反连接",
+    "NULL处理",
+    "日期计算",
+    "防重复聚合",
+    "窗口函数",
+    "子查询",
+    "相关子查询",
+    "集合运算",
+    "CASE表达式",
+    "业务口径",
+}
+EXPECTED_DIFFICULTIES = {"easy": 10, "medium": 20, "hard": 20}
 
 
 @pytest.fixture(scope="module")
@@ -55,23 +77,45 @@ def _run(db_path: str, sql: str) -> list[tuple]:
 
 
 def test_dataset_size_and_tags():
-    """规模 25~30，标签只用约定的 5 个分层。"""
-    assert 25 <= len(DATASET) <= 30, f"用例数 {len(DATASET)} 不在 25~30 区间"
+    """固定 50 条，ID/字段完整，标签和难度都受控。"""
+    assert len(DATASET) == 50
     ids = [c["id"] for c in DATASET]
     assert len(ids) == len(set(ids)), "存在重复 id"
+    assert ids == [f"t2s_{i:03d}" for i in range(1, 51)], "case ID 应连续，便于报告对齐"
     for c in DATASET:
         assert c["question"].strip()
         assert c["golden_sql"].strip()
         assert c["tags"], f"{c['id']} 缺少 tags"
         assert set(c["tags"]) <= EXPECTED_TAGS, f"{c['id']} 含未知标签 {c['tags']}"
+        assert c["difficulty"] in EXPECTED_DIFFICULTIES, f"{c['id']} 难度无效"
+
+    counts = Counter(c["difficulty"] for c in DATASET)
+    assert counts == EXPECTED_DIFFICULTIES
 
 
-def test_all_five_layers_covered():
-    """五个难度分层都要有覆盖。"""
+def test_all_capability_tags_covered():
+    """基础与挑战能力标签都必须实际有题覆盖。"""
     used = set()
     for c in DATASET:
         used.update(c["tags"])
-    assert used >= EXPECTED_TAGS, f"缺少分层: {EXPECTED_TAGS - used}"
+    assert used == EXPECTED_TAGS, f"标签集合不匹配，缺少 {EXPECTED_TAGS - used}，多出 {used - EXPECTED_TAGS}"
+
+
+def test_select_cases_supports_repeatable_filters_and_limit():
+    hard_windows = select_cases(DATASET, tags=["窗口函数"], difficulties=["hard"])
+    assert [c["id"] for c in hard_windows] == ["t2s_044", "t2s_045", "t2s_046", "t2s_047"]
+
+    join_topn = select_cases(DATASET, tags=["多表JOIN", "TopN"], limit=2)
+    assert [c["id"] for c in join_topn] == ["t2s_019", "t2s_020"]
+
+
+def test_dataset_fingerprint_is_stable_and_content_sensitive():
+    first = dataset_fingerprint(DATASET)
+    assert first == dataset_fingerprint(list(DATASET))
+
+    changed = [dict(case) for case in DATASET]
+    changed[0]["question"] = "改过的题面"
+    assert dataset_fingerprint(changed) != first
 
 
 @pytest.mark.parametrize("case", DATASET, ids=[c["id"] for c in DATASET])
@@ -156,10 +200,10 @@ def test_normalize_none_handling():
 
 def test_build_report_aggregates_overall_and_by_tag():
     mock = [
-        {"id": "a", "tags": ["单表聚合"], "correct": True},
-        {"id": "b", "tags": ["单表聚合", "TopN"], "correct": False},
-        {"id": "c", "tags": ["多表JOIN"], "correct": True},
-        {"id": "d", "tags": ["TopN"], "correct": True},
+        {"id": "a", "tags": ["单表聚合"], "difficulty": "easy", "correct": True},
+        {"id": "b", "tags": ["单表聚合", "TopN"], "difficulty": "medium", "correct": False},
+        {"id": "c", "tags": ["多表JOIN"], "difficulty": "medium", "correct": True},
+        {"id": "d", "tags": ["TopN"], "difficulty": "hard", "correct": True},
     ]
     report = build_report(mock)
 
@@ -172,6 +216,12 @@ def test_build_report_aggregates_overall_and_by_tag():
     assert report["by_tag"]["TopN"] == {"total": 2, "correct": 1, "accuracy": 0.5}
     assert report["by_tag"]["多表JOIN"] == {"total": 1, "correct": 1, "accuracy": 1.0}
 
+    assert report["by_difficulty"] == {
+        "easy": {"total": 1, "correct": 1, "accuracy": 1.0},
+        "medium": {"total": 2, "correct": 1, "accuracy": 0.5},
+        "hard": {"total": 1, "correct": 1, "accuracy": 1.0},
+    }
+
     # 明细原样带出
     assert len(report["cases"]) == 4
 
@@ -181,3 +231,4 @@ def test_build_report_empty():
     report = build_report([])
     assert report["summary"] == {"total": 0, "correct": 0, "accuracy": 0.0}
     assert report["by_tag"] == {}
+    assert report["by_difficulty"] == {}

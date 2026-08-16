@@ -42,20 +42,27 @@
 ```bash
 # 先备好演示库（合成模式，固定种子可复现）
 python scripts/import_ecommerce.py --synthetic --db ./data/ecommerce.db
-# 跑评估（--limit 抽样；--model 覆盖模型）
-.venv/bin/python -m evals.text2sql.run_execution_eval --limit 10
+# 跑完整 50 题并保留独立报告（--model 覆盖模型）
+.venv/bin/python -m evals.text2sql.run_execution_eval \
+  --model qwen3.7-plus --run-name qwen-full \
+  --output evals/text2sql/reports/execution_qwen-full-50.json
 ```
 
 流程（`run_execution_eval.py`）：**M-Schema + sql-generation 技能正文组装 prompt →
 LLMFactory 调 LLM 生成 SQL → `sql_guard.validate_sql` 校验 → 执行 → 与 golden 结果集
-按 execution accuracy 对比**，报告落 `reports/execution_latest.json`（总分 + 按 tags
-分桶 + 每例明细）。它把项目三块能力（Skills 即提示词模板 / M-Schema / sqlglot 校验）
-串起来做端到端度量。
+按 execution accuracy 对比**，报告默认落 `reports/execution_latest.json`，包含总分、
+按能力标签、按难度与每例明细。它把项目三块能力（Skills 即提示词模板 / M-Schema /
+sqlglot 校验）串起来做端到端度量。
 
-- 数据集 `dataset.json`：28 例，难度分层 `tags` ∈ {单表聚合, 多表JOIN, 时间过滤, TopN, CTE}。
-- 当前仓库有 3 份可区分的模型报告：qwen3.7-plus 25/28（89.29%）、
-  qwen3-coder-plus 24/28（85.71%）、qwen3-coder-flash 23/28（82.14%）。
-  `execution_latest.json` 当前与 coder-flash 相同，不代表最高成绩。
+- 数据集 `dataset.json`：50 例，难度为 easy 10 / medium 20 / hard 20；能力标签从原有
+  单表聚合、JOIN、时间、TopN、CTE 扩展到窗口函数、相关子查询、HAVING、反连接、
+  条件聚合、日期计算、去重计数、一对多防重复、集合运算和业务口径等 18 类。
+- runner 支持 `--tag`、`--difficulty` 精确抽样；支持 `--no-skill` 与
+  `--schema-mode columns`（只保留表/列/类型，不注入业务注释）做消融；`--output` 防止
+  不同模型/配置互相覆盖。报告记录数据集指纹，`compare_reports.py` 会提示样本或内容不一致。
+- 仓库现有 3 份模型报告是**扩容前 28 题历史基线**：qwen3.7-plus 25/28（89.29%）、
+  qwen3-coder-plus 24/28（85.71%）、qwen3-coder-flash 23/28（82.14%）。扩容后必须在
+  同一 50 题与相同开关上重跑，旧分数不能直接当作新数据集结果。
 - 离线测试（`tests/test_text2sql_eval.py`）用原生 sqlite3 跑 golden，避免依赖 LLM 与网络。
 
 ---
@@ -78,20 +85,48 @@ LLMFactory 调 LLM 生成 SQL → `sql_guard.validate_sql` 校验 → 执行 →
 3. **浮点容差**：金额/均值列量化到固定小数位（默认 2 位）再比，吸收 `ROUND` 与原始
    浮点、以及浮点累加末位抖动；顺带让 `COUNT` 的 int 与等值 float 判等。
 
-### 数据集分层设计（`dataset.json`）
+### 数据集双轴分层设计（`dataset.json`）
 
-28 例按 SQL 能力**难度分层**打 `tags`，一个用例可带多个标签（分桶各计一次）：
+50 例同时标注 `difficulty` 与多值 `tags`：难度轴回答“复杂题是否明显退化”，能力轴回答
+“具体弱在 JOIN、窗口函数还是业务口径”。一个用例可进入多个能力桶，但只属于一个难度桶。
 
-| 标签 | 覆盖能力 | 例 |
+| 能力组 | 代表标签 | 重点反例 |
 |---|---|---|
-| 单表聚合 | GROUP BY / COUNT / SUM / AVG / WHERE | "每种订单状态各有多少订单" |
-| 多表JOIN | 2~3 表 JOIN + 聚合 + 别名 | "各州客户贡献的销售额" |
-| 时间过滤 | TEXT 时间列区间过滤 / strftime 按月 | "2017 年每月订单数" |
-| TopN | ORDER BY + LIMIT（行序敏感） | "客户数最多的前 5 个州" |
-| CTE | WITH 子句 / 派生表 | "各州销售额取前 5" |
+| 基础查询 | 单表聚合、时间过滤、TopN | GROUP BY、区间边界、稳定排序 |
+| 多表与基数 | 多表JOIN、去重计数、防重复聚合 | items × payments 扇出导致金额翻倍 |
+| 分组与条件 | HAVING、条件聚合、CASE表达式、NULL处理 | WHERE/HAVING 混淆、NULL 被漏计 |
+| 复杂结构 | CTE、子查询、相关子查询、窗口函数、集合运算 | Top1 per group、累计/月环比、EXCEPT |
+| 业务计算 | 日期计算、反连接、业务口径 | 准时送达率、平均订单金额、从未下单 |
 
-分桶报告用于定位"哪类查询最弱"（如 CTE 明显低于单表聚合），指导后续 prompt 调优。
-每条 golden 都先在合成库上真实执行验证过、且保证有结果（离线测试逐条守护）。
+难度分布刻意固定为 easy 10 / medium 20 / hard 20，避免简单题占多数把总体分数“冲高”。
+每条 golden 都由离线测试在固定种子合成库上真实执行，保证可执行且至少返回一行。
+
+### 模型与功能消融
+
+同一轮对比必须保持数据集指纹和 case ID 一致，只改变一个变量：
+
+```bash
+# 完整能力
+.venv/bin/python -m evals.text2sql.run_execution_eval \
+  --run-name full --output /tmp/t2s-full.json
+
+# 关闭 sql-generation 技能正文
+.venv/bin/python -m evals.text2sql.run_execution_eval \
+  --no-skill --run-name no-skill --output /tmp/t2s-no-skill.json
+
+# 关闭 M-Schema 业务注释，仅保留物理表/列/类型
+.venv/bin/python -m evals.text2sql.run_execution_eval \
+  --schema-mode columns --run-name columns-only --output /tmp/t2s-columns.json
+
+# 只回归困难窗口题；--tag 可重复，多个标签按交集筛选
+.venv/bin/python -m evals.text2sql.run_execution_eval \
+  --difficulty hard --tag 窗口函数 --output /tmp/t2s-hard-window.json
+
+.venv/bin/python -m evals.text2sql.compare_reports /tmp/t2s-full.json /tmp/t2s-no-skill.json
+```
+
+比较报告同时输出总体、标签、难度和 case 翻转。不同模型也应复用同一配置，只改 `--model`；
+不要把全量报告与标签子集报告、28 题历史报告与 50 题报告直接比较百分点。
 
 ---
 
@@ -103,7 +138,7 @@ LLMFactory 调 LLM 生成 SQL → `sql_guard.validate_sql` 校验 → 执行 →
   把"命中率"换成"执行准确率"，把"gold_sources"换成"golden 结果集"。
 - **Yuxi 的 benchmark 生成思路**（`backend/package/yuxi/knowledge/eval/benchmark_generation.py`）：
   Yuxi 用 LLM 从知识库 chunk **自动生成**评测问答对（图 PPR 扩展选相关 chunk、可控并发），
-  免人工标注、可规模化。本项目 demo 规模小，`dataset.json` 走**人工精标 + 真实执行校验**
+  免人工标注、可规模化。本项目 demo 规模可控，`dataset.json` 走**人工精标 + 真实执行校验**
   更可控可讲；但"用 LLM 批量造 question→SQL 对"是明确的扩展方向（与 SQL 示例库 P1-3 相通）。
 - **SQLBot 没有评估体系**：SQLBot 提供了 M-Schema、方言提示词、行列权限等领域能力，
   却**没有**量化 Text-to-SQL 准确率的评估闭环。这正是本项目的差异化 ——
