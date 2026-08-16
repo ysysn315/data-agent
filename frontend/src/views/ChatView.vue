@@ -49,6 +49,40 @@
         </div>
         <div class="message-content">
           <div class="markdown-content" v-html="renderMarkdown(msg.content)"></div>
+          <!-- 可解释性面板：本轮工具调用与检索命中（默认折叠；摘要按 hit_key 去重计数） -->
+          <details v-if="msg.contextHits" class="context-hits">
+            <summary>
+              调用 {{ msg.contextHits.tool_calls.length }} 个工具
+              <template v-if="contextSummary(msg.contextHits)">，命中 {{ contextSummary(msg.contextHits) }}</template>
+              <span v-if="msg.contextHits.truncated" class="hits-truncated">（已截断）</span>
+            </summary>
+            <div v-for="call in msg.contextHits.tool_calls" :key="call.call_id" class="hit-call">
+              <div class="hit-call-head">
+                <span class="badge" :class="call.status === 'success' ? 'badge-success' : 'badge-warning'">
+                  {{ call.status }}
+                </span>
+                <code class="hit-tool-name">{{ call.name }}</code>
+                <span v-if="call.duration_ms != null" class="hit-duration">{{ call.duration_ms }}ms</span>
+                <span v-if="call.error_code" class="hit-error">{{ call.public_message }}</span>
+                <code v-if="call.args" class="hit-args" :title="call.args">{{ call.args }}</code>
+              </div>
+              <div v-if="call.hits.terms.length || call.hits.examples.length || call.hits.docs.length || call.hits.graph.length" class="hit-lists">
+                <div v-for="t in call.hits.terms" :key="`t-${t.hit_key}`" class="hit-row">
+                  <span class="hit-kind">术语</span>{{ t.term }}<span class="hit-sub"> —— {{ t.definition }}</span>
+                </div>
+                <div v-for="e in call.hits.examples" :key="`e-${e.hit_key}`" class="hit-row">
+                  <span class="hit-kind">示例</span>{{ e.question }}
+                  <pre class="hit-sql">{{ e.sql }}</pre>
+                </div>
+                <div v-for="d in call.hits.docs" :key="`d-${d.hit_key}`" class="hit-row">
+                  <span class="hit-kind">文档</span>{{ d.source }}<span class="hit-sub"> —— {{ d.snippet }}</span>
+                </div>
+                <div v-for="g in call.hits.graph" :key="`g-${g.hit_key}`" class="hit-row">
+                  <span class="hit-kind">图谱</span>{{ g.query }}<span class="hit-sub"> —— {{ g.summary }}（{{ g.result_count }}）</span>
+                </div>
+              </div>
+            </div>
+          </details>
           <div v-if="msg.sources && msg.sources.length > 0" class="message-sources">
             <span class="sources-label">参考来源</span>
             <span v-for="(source, i) in msg.sources" :key="i" class="source-tag">
@@ -215,6 +249,8 @@ const streamChat = async (question, assistantMessage) => {
           assistantMessage.sources = payload.data || []
         } else if (payload.type === 'sql_result') {
           assistantMessage.sqlResult = payload.data
+        } else if (payload.type === 'context_hits') {
+          assistantMessage.contextHits = payload.data
         } else if (payload.type === 'error') {
           assistantMessage.content += `\n\n❌ ${payload.data}`
         }
@@ -234,6 +270,18 @@ const quickChat = async (question, assistantMessage) => {
   assistantMessage.content = data.answer || ''
   assistantMessage.sources = data.sources || []
   if (data.sql_result) assistantMessage.sqlResult = data.sql_result
+  if (data.context_hits) assistantMessage.contextHits = data.context_hits
+}
+
+// 摘要行：按 hit_key 去重的计数（后端 summary 字段），数量 0 的分组不进摘要
+const contextSummary = (hits) => {
+  const parts = []
+  const labels = { examples: '示例', terms: '术语', docs: '文档', graph: '图谱查询' }
+  for (const [kind, label] of Object.entries(labels)) {
+    const n = hits.summary?.[kind] || 0
+    if (n > 0) parts.push(`${n} ${label}`)
+  }
+  return parts.join(' / ')
 }
 
 // 一键沉淀：人工确认（verified=true）后经示例库接口入库，同作用域同问题覆盖
@@ -375,6 +423,41 @@ onMounted(async () => {
   border-top: 1px dashed var(--border-color);
 }
 .sources-label { font-size: 11px; color: var(--text-muted); margin-right: 6px; }
+
+/* 可解释性面板（默认折叠） */
+.context-hits {
+  margin-top: 8px; padding-top: 8px;
+  border-top: 1px dashed var(--border-color);
+  font-size: 12px;
+}
+.context-hits summary {
+  cursor: pointer; color: var(--text-secondary); user-select: none;
+}
+.context-hits[open] summary { margin-bottom: 8px; }
+.hits-truncated { color: var(--text-muted); }
+.hit-call { display: flex; flex-direction: column; gap: 6px; padding: 6px 0; }
+.hit-call + .hit-call { border-top: 1px dashed var(--border-color); }
+.hit-call-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.hit-tool-name { font-family: var(--font-mono); font-size: 11.5px; color: var(--accent); }
+.hit-duration { color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; }
+.hit-error { color: var(--error-color); }
+.hit-args {
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted);
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 120px;
+}
+.hit-lists { display: flex; flex-direction: column; gap: 4px; padding-left: 4px; }
+.hit-row { color: var(--text-primary); line-height: 1.5; }
+.hit-kind {
+  display: inline-block; margin-right: 6px; padding: 0 5px;
+  background: var(--bg-raised); border: 1px solid var(--border-strong);
+  border-radius: 4px; font-size: 10px; color: var(--text-muted);
+}
+.hit-sub { color: var(--text-secondary); }
+.hit-sql {
+  margin: 2px 0 0; padding: 4px 8px;
+  background: var(--bg-inset); border: 1px solid var(--border-color); border-radius: 4px;
+  font-family: var(--font-mono); font-size: 11px; color: #a5f3e8; overflow-x: auto;
+}
 
 /* SQL 沉淀条 */
 .sql-sink {
