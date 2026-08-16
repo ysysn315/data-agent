@@ -7,6 +7,8 @@ ToolRuntimeMiddleware：把 tool_runtime 的重试/超时/熔断/降级能力
 
 from __future__ import annotations
 
+import asyncio
+
 from langchain.agents.middleware import AgentMiddleware
 from langchain_core.messages import ToolMessage
 from loguru import logger
@@ -42,15 +44,20 @@ class ToolRuntimeMiddleware(AgentMiddleware):
 
         # 轨迹记录：start（含脱敏 args 摘要）→ 包住执行 → finish 补状态/耗时。
         # MCP override 时 request.tool_call 仍是模型原始调用的 name/args（记模型视角）。
-        # 注意：safe_tool_execute 只捕 Exception——客户端断流的 CancelledError 会穿出，
-        # execution 可能未赋值；此时轨迹记 cancelled 后原样上抛（不能吞取消）。
+        # safe_tool_execute 只捕 Exception：客户端断流的 CancelledError 与 policy
+        # disabled 路径的裸异常都会穿出（execution 可能未赋值）——区分记录后原样上抛：
+        # CancelledError 记 cancelled（取消是正常生命周期）；其它 BaseException
+        # 记 interrupted（ KeyboardInterrupt/系统退出/disabled 裸异常等），不吞任何异常。
         trace_call = record_tool_start(tool_call_id, tool_name, request.tool_call.get("args") or {})
         execution = None
         try:
             with use_active_tool_trace(trace_call):
                 execution = await safe_tool_execute(tool_name, invoke, {})
-        except BaseException:
+        except asyncio.CancelledError:
             finish_tool_call(trace_call, status="cancelled")
+            raise
+        except BaseException:
+            finish_tool_call(trace_call, status="interrupted")
             raise
         finally:
             if execution is not None:

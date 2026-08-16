@@ -1,7 +1,8 @@
-"""context_trace 记录器测试（基础节：生命周期/脱敏/上限/负载）。
+"""context_trace 记录器与可解释性链路测试。
 
-记录点接入、middleware 轨迹、SSE 下发的测试在后续 commit 随接线补齐；
-本文件先锁死记录器自身的语义契约。
+覆盖：生命周期/脱敏（键名+字符串级+截断顺序+白名单 fail-closed）/错误映射/
+去重摘要/请求级上限/四记录点直录/真实 ainvoke 线程传播/并发归位/middleware
+成功、降级与取消轨迹/MCP override 链/SSE 事件与序列化契约。
 """
 
 from __future__ import annotations
@@ -100,6 +101,10 @@ def test_finish_tool_call_maps_error_safely():
         call3 = record_tool_start("c3", "t", {})
         finish_tool_call(call3, status="cancelled")
         assert call3.error_code == "cancelled"
+
+        call3b = record_tool_start("c3b", "t", {})
+        finish_tool_call(call3b, status="interrupted")  # 非 Cancelled 的 BaseException 穿出
+        assert call3b.error_code == "unknown" and "中断" in call3b.public_message
 
         call4 = record_tool_start("c4", "t", {})
         finish_tool_call(call4, status="weird_unknown")  # 未识别状态
@@ -201,11 +206,15 @@ async def test_doc_tool_records_hits_and_keeps_sources(tmp_path):
                 {"content": "运维手册片段B", "metadata": {"source": "ops.md", "title": "运维", "chunk_index": 2}},
             ]
 
+    from app.rag.context import use_metadata_filters
+
     docs_tool = create_docs_tool(_Retriever())
-    with use_context_trace():
+    with use_context_trace(), use_metadata_filters(None):
         call = record_tool_start("c1", "query_internal_docs", {"query": "部署步骤"})
         with use_active_tool_trace(call):
             out = await docs_tool.ainvoke({"query": "部署步骤"})
+        # 粗粒度 sources 在 rag 上下文内仍被记录（该事件行为不变）
+        assert current_sources() == ["ops.md"]
         payload = context_hits_payload()
 
     assert "运维手册片段A" in out
@@ -213,8 +222,6 @@ async def test_doc_tool_records_hits_and_keeps_sources(tmp_path):
     assert len(hits) == 2
     assert hits[0]["source"] == "ops.md" and hits[0]["hit_key"] == "ops.md:1"
     assert "score" not in hits[0]  # score 刻意不记（口径不可比）
-    # 粗粒度 sources 不受影响
-    assert current_sources() == []  # 已退出 rag 上下文
     assert payload["summary"]["docs"] == 2
 
 
@@ -410,15 +417,18 @@ def test_unknown_mcp_tool_shows_keys_only():
     # 非法结构（str 而非 dict）也不泄漏原文
     assert summarize_args("mcp_x", "not-a-dict") == "（参数不可解析）"
 
-    # 本地工具序列化失败 fail closed：固定占位文本，绝不回退 str(args) 原文
-    class _Bad:
-        def __init__(self):
-            self.ok = 1
+    # fail closed：序列化抛错时返回固定占位文本，绝不回退 str(args) 原文
+    import app.agents.context_trace as ct
 
-    assert summarize_args("execute_sql", {"x": _Bad()}) != ""  # 可序列化（default=str）
-    bad_obj = object()
-    text = summarize_args("execute_sql", {"cycle": bad_obj})
-    assert isinstance(text, str)  # 任何输入都有安全输出
+    original_dumps = ct.json.dumps
+    ct.json.dumps = lambda *a, **k: (_ for _ in ()).throw(TypeError("boom"))
+    try:
+        assert summarize_args("execute_sql", {"secret_arg": "leak-me"}) == "（参数不可解析）"
+    finally:
+        ct.json.dumps = original_dumps
+
+    # 非 Bearer 的裸 Authorization 头（字符串级规则兜底）
+    assert "Basic dXNlcjpwYXNz" not in summarize_args("execute_sql", {"note": "Authorization: Basic dXNlcjpwYXNz"})
 
 
 async def test_middleware_cancellation_records_and_reraises():

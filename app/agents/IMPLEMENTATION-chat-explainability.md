@@ -42,9 +42,10 @@ SSE 流末事件顺序：`content* → sources → sql_result（条件）→ con
 
 - `summarize_args`：先脱敏再截断（160 字）。键名递归脱敏（password/token/api_key/
   secret/authorization/cookie/headers/credential → `"***"`）+ 字符串级模式脱敏
-  （DSN 密码段、`Bearer xxx`）。
-- 错误只传稳定枚举 `error_code`（timeout/tool_failure/circuit_open/unknown，按
-  ToolRuntime status 映射）+ 本模块独立安全映射的中文 `public_message`；原始
+  （DSN 密码段、`Bearer xxx`、裸 `Authorization: xxx`）；白名单外工具只展示参数名。
+- 错误只传稳定枚举 `error_code`（tool_failure/circuit_open/cancelled/unknown，
+  对齐 ToolRuntime 实际终态 degraded/circuit_open 与 middleware 捕获的穿出异常）
+  + 本模块独立安全映射的中文 `public_message`；原始
   `str(exc)` 只留后端日志。**不改 tool_runtime.py**（`ToolExecutionResult` 无异常
   类型，fallback 文案拼接原文——都不能直接复用）。
 - 请求级全局上限：`MAX_TOOL_CALLS=30`、`MAX_HITS_PER_TYPE=20` 按整个请求累计
@@ -76,7 +77,7 @@ SSE 流末事件顺序：`content* → sources → sql_result（条件）→ con
 
 ## ⑥ 测试
 
-`tests/test_context_trace.py`（17 例）：生命周期/嵌套键名与 DSN/Bearer 脱敏/截断顺序/
+`tests/test_context_trace.py`（21 例）：生命周期/嵌套键名与 DSN/Bearer 脱敏/截断顺序/
 错误映射/去重摘要/请求级上限/四记录点直录/**真实 ainvoke 的 ContextVar 线程传播**/
 同名工具并发归位/middleware 成功与降级轨迹（DSN 凭据不泄漏）/SSE 事件顺序与旧序列
 不变/双路径序列化契约。全部 fake service 进程内完成，不依赖 Redis/Milvus/Docker。

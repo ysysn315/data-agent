@@ -67,17 +67,17 @@
                 <code v-if="call.args" class="hit-args" :title="call.args">{{ call.args }}</code>
               </div>
               <div v-if="call.hits.terms.length || call.hits.examples.length || call.hits.docs.length || call.hits.graph.length" class="hit-lists">
-                <div v-for="t in call.hits.terms" :key="`t-${t.hit_key}`" class="hit-row">
+                <div v-for="t in call.hits.terms" :key="`t-${t.hit_key}-${t.rank}`" class="hit-row">
                   <span class="hit-kind">术语</span>{{ t.term }}<span class="hit-sub"> —— {{ t.definition }}</span>
                 </div>
-                <div v-for="e in call.hits.examples" :key="`e-${e.hit_key}`" class="hit-row">
+                <div v-for="e in call.hits.examples" :key="`e-${e.hit_key}-${e.rank}`" class="hit-row">
                   <span class="hit-kind">示例</span>{{ e.question }}
                   <pre class="hit-sql">{{ e.sql }}</pre>
                 </div>
-                <div v-for="d in call.hits.docs" :key="`d-${d.hit_key}`" class="hit-row">
+                <div v-for="d in call.hits.docs" :key="`d-${d.hit_key}-${d.rank}`" class="hit-row">
                   <span class="hit-kind">文档</span>{{ d.source }}<span class="hit-sub"> —— {{ d.snippet }}</span>
                 </div>
-                <div v-for="g in call.hits.graph" :key="`g-${g.hit_key}`" class="hit-row">
+                <div v-for="g in call.hits.graph" :key="`g-${g.hit_key}-${g.rank}`" class="hit-row">
                   <span class="hit-kind">图谱</span>{{ g.query }}<span class="hit-sub"> —— {{ g.summary }}（{{ g.result_count }}）</span>
                 </div>
               </div>

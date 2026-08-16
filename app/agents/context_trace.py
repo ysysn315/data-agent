@@ -17,6 +17,7 @@ public_message，原始 str(exc) 只留后端日志/Langfuse。
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import re
@@ -66,6 +67,7 @@ _SENSITIVE_KEY_MARKS = (
 # 字符串级脱敏：值本身含敏感形态（DSN 密码段 / Bearer / Authorization 头）
 _DSN_PASSWORD_RE = re.compile(r"(://[^:/@\s]+:)[^@/\s]+(@)")
 _BEARER_RE = re.compile(r"(?i)\b(bearer)\s+\S+")
+_AUTH_HEADER_RE = re.compile(r"(?i)\b(authorization)\s*[:=]\s*\S+")
 
 
 @dataclass(frozen=True)
@@ -140,11 +142,9 @@ class ContextTrace:
     tool_calls: list[ToolCallTrace] = field(default_factory=list)
     truncated: bool = False
     lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
-    # 请求级累计计数（含被上限丢弃的，保证计数口径）
-    _term_count: int = 0
-    _example_count: int = 0
-    _doc_count: int = 0
-    _graph_count: int = 0
+    # 请求级累计计数（含被上限丢弃的，保证计数口径）；dict 而非四个字段，
+    # _over_limit 按 kind 索引无需字符串反射（拼错键会 KeyError 显式失败）
+    hit_counts: dict = field(default_factory=lambda: {"term": 0, "example": 0, "doc": 0, "graph": 0})
 
 
 _trace: ContextVar[Optional[ContextTrace]] = ContextVar("context_trace", default=None)
@@ -191,8 +191,8 @@ def _redact_value(value, key_hint: str = "") -> object:
         return "***" if any(mark in key_hint.lower() for mark in _SENSITIVE_KEY_MARKS) else value
     if any(mark in key_hint.lower() for mark in _SENSITIVE_KEY_MARKS):
         return "***"
-    # 字符串级：DSN 密码段 / Bearer token（Authorization: xxx 由键名脱敏兜底）
-    return _BEARER_RE.sub(r"\1 ***", _DSN_PASSWORD_RE.sub(r"\1***\2", value))
+    # 字符串级：DSN 密码段 / Bearer token / 裸 Authorization 头（键名脱敏之外，值里直接出现时兜底）
+    return _AUTH_HEADER_RE.sub(r"\1 ***", _BEARER_RE.sub(r"\1 ***", _DSN_PASSWORD_RE.sub(r"\1***\2", value)))
 
 
 def summarize_args(tool_name: str, args: object) -> str:
@@ -219,11 +219,14 @@ def summarize_args(tool_name: str, args: object) -> str:
 
 # status → 稳定错误枚举与安全公开文案（独立映射，不复用 ToolRuntime 的降级文案——
 # 那边拼接原始异常原文，不能下发浏览器）。键对齐 ToolRuntime 实际终态：
-# success / degraded（重试耗尽的普通失败）/ circuit_open / cancelled（middleware 捕取消）。
+# success / degraded（重试耗尽的普通失败）/ circuit_open；cancelled 与 interrupted
+# 是 middleware 捕获穿出异常时记录的（取消 / 其它 BaseException 如系统退出、
+# policy disabled 路径的裸异常）。
 _ERROR_CODE_BY_STATUS = {
     "degraded": ("tool_failure", "工具执行失败，已降级处理"),
     "circuit_open": ("circuit_open", "工具熔断保护中，暂不可用"),
     "cancelled": ("cancelled", "请求已取消"),
+    "interrupted": ("unknown", "工具执行被中断"),
 }
 _UNKNOWN_ERROR = ("unknown", "工具执行异常，已降级处理")
 
@@ -278,11 +281,10 @@ def _over_limit(kind: str) -> bool:
     if trace is None:
         return True
     with trace.lock:
-        count = getattr(trace, f"_{kind}_count")
-        if count >= MAX_HITS_PER_TYPE:
+        if trace.hit_counts[kind] >= MAX_HITS_PER_TYPE:
             trace.truncated = True
             return True
-        setattr(trace, f"_{kind}_count", count + 1)
+        trace.hit_counts[kind] += 1
         return False
 
 
@@ -381,25 +383,12 @@ def context_hits_payload() -> Optional[dict]:
     if trace is None or not trace.tool_calls:
         return None
 
-    tool_calls = [
-        {
-            "call_id": c.call_id,
-            "name": c.name,
-            "args": c.args,
-            "duration_ms": c.duration_ms,
-            "status": c.status,
-            "attempts": c.attempts,
-            "error_code": c.error_code,
-            "public_message": c.public_message,
-            "hits": {
-                "terms": [t.__dict__ for t in c.hits.terms],
-                "examples": [e.__dict__ for e in c.hits.examples],
-                "docs": [d.__dict__ for d in c.hits.docs],
-                "graph": [g.__dict__ for g in c.hits.graph],
-            },
-        }
-        for c in trace.tool_calls
-    ]
+    # asdict 递归转 dict（不依赖实例内部表示）；显式剔除 started_at（只作内部计时）
+    tool_calls = []
+    for c in trace.tool_calls:
+        d = dataclasses.asdict(c)
+        d.pop("started_at", None)
+        tool_calls.append(d)
     # 摘要：按 hit_key 去重计数（跨调用去重——"命中几个不同示例"）
     deduped = {
         "terms": {h.hit_key for c in trace.tool_calls for h in c.hits.terms},
