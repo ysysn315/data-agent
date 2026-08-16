@@ -387,7 +387,8 @@ class SQLExampleRepository:
 
 class TerminologyRepository:
     """业务术语库存储后端（供 TermStore 的 DB 版）。作用域内唯一：
-    (term, datasource_id, workspace_id)——同 term 可在不同作用域各自存在。"""
+    (scope_key, term)——同 term 可在不同作用域各自存在；scope_key 非空列
+    规避"唯一索引中 NULL 互不相等"的重复漏洞（见 knowledge_migration）。"""
 
     def __init__(self, sessionmaker: async_sessionmaker):
         self._sm = sessionmaker
@@ -405,11 +406,13 @@ class TerminologyRepository:
 
     @staticmethod
     def _scope_filter(stmt, rec: dict):
-        """按作用域键过滤（term + datasource + workspace）。"""
+        """按作用域键过滤（scope_key + term）；scope_key 由 datasource/workspace 推导。"""
+        from app.db.knowledge_migration import terminology_scope_key
+
         return stmt.where(
             TerminologyModel.term == rec["term"],
-            TerminologyModel.datasource_id == rec.get("datasource_id"),
-            TerminologyModel.workspace_id == int(rec.get("workspace_id") or 0),
+            TerminologyModel.scope_key
+            == terminology_scope_key(rec.get("datasource_id"), int(rec.get("workspace_id") or 0)),
         )
 
     async def list_all(self) -> list[dict]:
@@ -419,6 +422,8 @@ class TerminologyRepository:
             return [self._to_dict(r) for r in rows]
 
     async def upsert(self, rec: dict) -> None:
+        from app.db.knowledge_migration import terminology_scope_key
+
         async with self._sm() as session:
             row = (await session.execute(self._scope_filter(select(TerminologyModel), rec))).scalar_one_or_none()
             if row is None:
@@ -429,6 +434,7 @@ class TerminologyRepository:
             row.sql_hint = rec.get("sql_hint")
             row.datasource_id = rec.get("datasource_id")
             row.workspace_id = int(rec.get("workspace_id") or 0)
+            row.scope_key = terminology_scope_key(rec.get("datasource_id"), row.workspace_id)
             await session.commit()
 
     async def delete(self, term: str, datasource_id: int | None = None, workspace_id: int = 0) -> bool:
@@ -444,17 +450,21 @@ class TerminologyRepository:
             return True
 
     async def replace_all(self, records: list[dict]) -> None:
+        from app.db.knowledge_migration import terminology_scope_key
+
         async with self._sm() as session:
             await session.execute(delete(TerminologyModel))
             for rec in records:
+                ws = int(rec.get("workspace_id") or 0)
                 session.add(
                     TerminologyModel(
                         term=rec["term"],
                         synonyms=list(rec.get("synonyms") or []),
                         definition=rec.get("definition") or "",
                         sql_hint=rec.get("sql_hint"),
+                        scope_key=terminology_scope_key(rec.get("datasource_id"), ws),
                         datasource_id=rec.get("datasource_id"),
-                        workspace_id=int(rec.get("workspace_id") or 0),
+                        workspace_id=ws,
                     )
                 )
             await session.commit()

@@ -1,14 +1,15 @@
 """SQL 知识库（示例/术语表）作用域列的幂等兼容迁移。
 
-背景与 graph_migration.py 相同：项目仍以 ``Base.metadata.create_all`` 起步、
+背景与 graph_migration.py 相同：项目仍以 ``Base.metadata.create_alL`` 起步、
 没有 Alembic，``create_all`` 不会给已有表补新列。本轮给 sql_examples / terminology
 加作用域列（datasource_id/workspace_id，示例表另有 source/meta），旧数据按默认值
 归入演示作用域（datasource_id=NULL、workspace_id=0、source='manual'），行为不变。
 
 术语表额外走一步重建：旧版 term 是主键（全局唯一），作用域化后唯一键改为
-(term, datasource_id, workspace_id)——同一术语可在不同作用域各自存在。SQLite
-不能删主键约束，参照 graph_migration 的临时表复制；PG 则 drop 旧主键再建唯一约束。
-主键换成自增 id，与 graph_triples 同款。
+(scope_key, term)——同一术语可在不同作用域各自存在。scope_key 非空
+（"datasource:N" / "workspace:N"，graph_triples 同款），规避 SQL 标准
+"唯一索引中 NULL 互不相等"的漏洞。SQLite 不能删主键约束，参照 graph_migration
+的临时表复制；PG 则 drop 旧主键再建唯一约束。主键换成自增 id。
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ _KNOWLEDGE_COLUMNS: list[tuple[str, str, str]] = [
     ("sql_examples", "meta", "JSON NOT NULL DEFAULT '{}'"),
     ("terminology", "datasource_id", "INTEGER"),
     ("terminology", "workspace_id", "INTEGER NOT NULL DEFAULT 0"),
+    ("terminology", "scope_key", "VARCHAR(128) NOT NULL DEFAULT 'workspace:0'"),
 ]
 
 _KNOWLEDGE_INDEXES: list[tuple[str, str, str]] = [
@@ -33,16 +35,34 @@ _KNOWLEDGE_INDEXES: list[tuple[str, str, str]] = [
 ]
 
 
-def _terminology_pk_is_term(inspector, tables: list[str]) -> bool:
-    """旧版 terminology：term 是主键（作用域化前），需要重建表。"""
+def terminology_scope_key(datasource_id: int | None, workspace_id: int) -> str:
+    """作用域键：平台数据源按数据源，演示按 workspace（graph.scope.GraphScope 同款口径）。"""
+    if datasource_id is not None:
+        return f"datasource:{datasource_id}"
+    return f"workspace:{workspace_id or 0}"
+
+
+def _terminology_needs_rebuild(inspector, tables: list[str]) -> bool:
+    """旧版 terminology 需要重建：term 是主键，或缺 scope_key 列（NULL 唯一漏洞版本）。"""
     if "terminology" not in tables:
         return False
     pk = inspector.get_pk_constraint("terminology").get("constrained_columns") or []
-    return pk == ["term"]
+    if pk == ["term"]:
+        return True
+    columns = {c["name"] for c in inspector.get_columns("terminology")}
+    return "scope_key" not in columns
 
 
 def _rebuild_terminology_sqlite(connection) -> None:
-    """SQLite：主键不能删，临时表复制（同 graph_migration 的做法）。"""
+    """SQLite：主键不能删，临时表复制（同 graph_migration 的做法）。
+
+    兼容三种旧结构：term 主键 / 已有作用域列但无 scope_key / 完整新版（不会进来）。
+    scope_key 从既有 datasource_id/workspace_id 推导，旧数据（NULL/0）归演示作用域。
+    """
+    has_ds = "datasource_id" in {c["name"] for c in inspect(connection).get_columns("terminology")}
+    ds_sel = "datasource_id" if has_ds else "NULL"
+    ws_sel = "workspace_id" if has_ds else "0"
+
     connection.exec_driver_sql(
         """
         CREATE TABLE terminology_v2 (
@@ -51,6 +71,7 @@ def _rebuild_terminology_sqlite(connection) -> None:
             synonyms JSON NOT NULL,
             definition TEXT NOT NULL,
             sql_hint TEXT,
+            scope_key VARCHAR(128) NOT NULL DEFAULT 'workspace:0',
             datasource_id INTEGER,
             workspace_id INTEGER NOT NULL DEFAULT 0,
             created_at DATETIME NOT NULL
@@ -58,31 +79,48 @@ def _rebuild_terminology_sqlite(connection) -> None:
         """
     )
     connection.exec_driver_sql(
-        """
+        f"""
         INSERT INTO terminology_v2 (term, synonyms, definition, sql_hint, datasource_id, workspace_id, created_at)
-        SELECT term, synonyms, definition, sql_hint, datasource_id, workspace_id, created_at FROM terminology
+        SELECT term, synonyms, definition, sql_hint, {ds_sel}, {ws_sel}, created_at FROM terminology
+        """
+    )
+    # scope_key 由迁移后的列推导（方言内都能跑的 CASE 表达式）
+    connection.exec_driver_sql(
+        """
+        UPDATE terminology_v2
+        SET scope_key = CASE WHEN datasource_id IS NOT NULL
+            THEN 'datasource:' || datasource_id
+            ELSE 'workspace:' || workspace_id END
         """
     )
     connection.exec_driver_sql("DROP TABLE terminology")
     connection.exec_driver_sql("ALTER TABLE terminology_v2 RENAME TO terminology")
-    _create_terminology_constraints(connection, "sqlite")
+    _create_terminology_constraints(connection)
 
 
 def _rebuild_terminology_pg(connection) -> None:
-    """PG：drop 旧主键，加自增 id 主键与作用域唯一约束。
+    """PG：drop 旧主键，加自增 id 主键与作用域唯一约束。正式部署后可换 Alembic。"""
+    inspector = inspect(connection)
+    columns = {c["name"] for c in inspector.get_columns("terminology")}
+    if "id" not in columns:
+        with suppress(Exception):
+            connection.exec_driver_sql("ALTER TABLE terminology DROP CONSTRAINT terminology_pkey")
+        connection.exec_driver_sql("ALTER TABLE terminology ADD COLUMN id SERIAL")
+        connection.exec_driver_sql("ALTER TABLE terminology ADD PRIMARY KEY (id)")
+    if "scope_key" not in columns:
+        connection.exec_driver_sql(
+            "ALTER TABLE terminology ADD COLUMN scope_key VARCHAR(128) NOT NULL DEFAULT 'workspace:0'"
+        )
+        connection.exec_driver_sql(
+            "UPDATE terminology SET scope_key = CASE WHEN datasource_id IS NOT NULL "
+            "THEN 'datasource:' || datasource_id ELSE 'workspace:' || workspace_id END"
+        )
+    _create_terminology_constraints(connection)
 
-    加 id 列（旧表没有）→ 重建主键 → 唯一约束。正式部署后可换 Alembic。
-    """
-    with suppress(Exception):
-        connection.exec_driver_sql("ALTER TABLE terminology DROP CONSTRAINT terminology_pkey")
-    connection.exec_driver_sql("ALTER TABLE terminology ADD COLUMN id SERIAL")
-    connection.exec_driver_sql("ALTER TABLE terminology ADD PRIMARY KEY (id)")
-    _create_terminology_constraints(connection, "postgresql")
 
-
-def _create_terminology_constraints(connection, dialect: str) -> None:
+def _create_terminology_constraints(connection) -> None:
     connection.exec_driver_sql(
-        "CREATE UNIQUE INDEX IF NOT EXISTS uq_terminology_scope_term ON terminology(term, datasource_id, workspace_id)"
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_terminology_scope_term ON terminology(scope_key, term)"
     )
     connection.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_terminology_datasource_id ON terminology(datasource_id)")
     connection.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_terminology_term ON terminology(term)")
@@ -104,14 +142,17 @@ def upgrade_knowledge_schema(connection) -> None:
         existing = {c["name"] for c in inspector.get_columns(table)}
         if column in existing:
             continue
+        # 术语表的 scope_key 走重建路径补齐（含数据回填），不在 ADD COLUMN 里做
+        if table == "terminology" and column == "scope_key":
+            continue
         if column == "meta" and dialect != "sqlite":
             # PG 的 JSON 列默认值需要显式 ::json 转型
             connection.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {column} JSON NOT NULL DEFAULT '{{}}'::json")
         else:
             connection.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}")
 
-    # 术语表主键仍是 term（旧部署）→ 重建为 id 主键 + 作用域唯一
-    if _terminology_pk_is_term(inspector, tables):
+    # 术语表是旧结构（term 主键 / 缺 scope_key）→ 重建为 id 主键 + scope_key 唯一
+    if _terminology_needs_rebuild(inspector, tables):
         if dialect == "sqlite":
             _rebuild_terminology_sqlite(connection)
         else:

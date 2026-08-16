@@ -107,9 +107,14 @@ async def list_sql_examples(
     store: ExampleStore = Depends(get_example_store),
     user: dict | None = Depends(get_current_user_optional),
 ):
-    """列出当前 workspace 的全部 SQL 示例（跨租户不串；匿名视为 ws=0 只见演示数据）"""
+    """列出当前 workspace 的全部 SQL 示例（跨租户不串；匿名只见演示作用域数据）"""
     ws = _workspace_of(user)
-    return [r for r in store.list() if int(r.get("workspace_id") or 0) == ws]
+    return [
+        r
+        for r in store.list()
+        if int(r.get("workspace_id") or 0) == ws
+        and (user is not None or r.get("datasource_id") is None)  # 匿名：仅演示作用域（datasource NULL）
+    ]
 
 
 @router.post(
@@ -169,9 +174,14 @@ async def list_terms(
     store: TermStore = Depends(get_term_store),
     user: dict | None = Depends(get_current_user_optional),
 ):
-    """列出当前 workspace 的业务术语（跨租户不串；匿名视为 ws=0 只见演示数据）"""
+    """列出当前 workspace 的业务术语（跨租户不串；匿名只见演示作用域数据）"""
     ws = _workspace_of(user)
-    return [t for t in store.list() if int(t.get("workspace_id") or 0) == ws]
+    return [
+        t
+        for t in store.list()
+        if int(t.get("workspace_id") or 0) == ws
+        and (user is not None or t.get("datasource_id") is None)  # 匿名：仅演示作用域
+    ]
 
 
 @router.post(
@@ -210,12 +220,14 @@ async def delete_term(
     term: str,
     store: TermStore = Depends(get_term_store),
     user: dict = Depends(get_current_user),
+    datasource_service: DataSourceService = Depends(get_datasource_service),
     datasource_id: Optional[int] = None,
 ):
     """按 (term, 作用域) 删除业务术语——仅限本 workspace，跨租户视同不存在。
 
-    datasource_id 缺省删演示作用域词条；同 term 多作用域时前端按卡片传参。
+    datasource_id 有值时先校验数据源归属（他人数据源 404），再按
+    (term, datasource, 当前 workspace) 删除；缺省删演示作用域词条。
     """
-    ws = _workspace_of(user)
+    ws = await resolve_workspace(datasource_id, user, datasource_service)
     if not store.delete(term, datasource_id=datasource_id, workspace_id=ws):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"术语不存在: {term}")

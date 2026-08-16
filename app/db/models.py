@@ -99,19 +99,21 @@ class SQLExampleModel(Base):
 class TerminologyModel(Base):
     """terminology 表：业务术语库（作用域内唯一，同义词/口径存 JSON）。
 
-    唯一键 (term, datasource_id, workspace_id)：同一术语可在不同作用域各自存在
-    （数据源 11 与 22 各配各的 GMV 口径），跨作用域互不覆盖。
-    作用域列语义同 sql_examples：datasource_id NULL=演示全局；workspace_id 0=种子/demo。
+    唯一键 (scope_key, term)：同一术语可在不同作用域各自存在（数据源 11 与 22
+    各配各的 GMV 口径），跨作用域互不覆盖。scope_key 非空（graph_triples 同款），
+    避免 SQL 标准"唯一索引中 NULL 互不相等"导致演示作用域（datasource NULL）
+    可插入重复 term；datasource_id/workspace_id 原始列仍保留供查询过滤。
     """
 
     __tablename__ = "terminology"
-    __table_args__ = (UniqueConstraint("term", "datasource_id", "workspace_id", name="uq_terminology_scope_term"),)
+    __table_args__ = (UniqueConstraint("scope_key", "term", name="uq_terminology_scope_term"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     term: Mapped[str] = mapped_column(String(256), nullable=False, index=True)
     synonyms: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     definition: Mapped[str] = mapped_column(Text, nullable=False, default="")
     sql_hint: Mapped[str | None] = mapped_column(Text, nullable=True)
+    scope_key: Mapped[str] = mapped_column(String(128), nullable=False, default="workspace:0", index=True)
     datasource_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     workspace_id: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)

@@ -131,9 +131,15 @@ class TermStore:
 
     @staticmethod
     def _in_scope(rec: dict, datasource_id: Optional[int], workspace_id: int = 0) -> bool:
-        """作用域匹配：平台数据源按 datasource_id（租户内隔离）；演示库按 (NULL, workspace)。"""
+        """作用域匹配：平台数据源按 (datasource_id, workspace)；演示库按 (NULL, workspace)。
+
+        平台分支也比对 workspace——防御纵深：数据源归属虽由路由层校验
+        （resolve_workspace 404），领域层不应依赖上层把关（CLI 直写等旁路没有这层闸）。
+        """
         if datasource_id is not None:
-            return rec.get("datasource_id") == datasource_id
+            return rec.get("datasource_id") == datasource_id and int(rec.get("workspace_id") or 0) == int(
+                workspace_id or 0
+            )
         return rec.get("datasource_id") is None and int(rec.get("workspace_id") or 0) == int(workspace_id or 0)
 
     # ========== 增删查 ==========

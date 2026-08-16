@@ -1,6 +1,6 @@
 """评测失败 case 导入候选示例库（知识回流闭环的评测侧入口）。
 
-    python -m evals.text2sql.export_failures [--report PATH] [--datasource-id N] [--dry-run]
+    python -m evals.text2sql.export_failures [--report PATH] [--datasource-id N --workspace-id M] [--dry-run]
 
 一句话流程：读评测报告（默认 execution_latest.json）里 correct=False 的 case，
 把 (question, golden_sql) 以候选示例（verified=False, source='eval'）写入示例库，
@@ -89,6 +89,11 @@ def main() -> None:
     )
     parser.add_argument("--dry-run", action="store_true", help="只打印将导入的内容，不写库")
     args = parser.parse_args()
+
+    # 平台数据源级候选必须显式声明 workspace：数据源归属某个 workspace，
+    # 混搭默认 ws=0 会把候选写进匿名可见的演示作用域（租户数据泄漏给匿名读）。
+    if args.datasource_id is not None and args.workspace_id == 0:
+        parser.error("--datasource-id 需要同时传 --workspace-id（该数据源所属 workspace）")
 
     failed = load_failed_cases(args.report)
     if not failed:

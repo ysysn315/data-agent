@@ -307,7 +307,8 @@ async function addTerm() {
     if (!res.ok) { termError.value = await readError(res); return }
     const created = await res.json()
     // term 唯一键，upsert：去重后置顶
-    terms.value = [created, ...terms.value.filter((t) => t.term !== created.term)]
+    // 作用域内唯一：只替换同作用域条目，其他数据源的同名术语保留
+    terms.value = [created, ...terms.value.filter((t) => termKey(t) !== termKey(created))]
     termForm.value = { term: '', synonyms: '', definition: '', sql_hint: '' }
   } catch (e) {
     termError.value = `请求异常：${e.message}`

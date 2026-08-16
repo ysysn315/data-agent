@@ -23,6 +23,7 @@ from pathlib import Path
 import pytest
 
 from app.db.engine import create_engine_and_sessionmaker, init_db
+from app.db.models import TerminologyModel
 from app.db.repositories import (
     MCPRepository,
     SqlAlchemySkillRepository,
@@ -503,5 +504,36 @@ async def test_terminology_repo_scope_uniqueness(tmp_path):
         assert await tm.delete("GMV", datasource_id=11, workspace_id=1) is True
         assert {r["datasource_id"] for r in await tm.list_all()} == {22}
         assert await tm.delete("GMV", datasource_id=11, workspace_id=1) is False
+    finally:
+        await engine.dispose()
+
+
+async def test_terminology_demo_scope_uniqueness_no_null_hole(tmp_path):
+    """演示作用域（datasource NULL）同 term 不能重复插入（外部 CR：NULL 唯一索引漏洞回归）。
+
+    旧唯一约束 (term, datasource_id, workspace_id) 在 datasource_id=NULL 时
+    SQL 标准视 NULL 互不相等，可插多条；改 scope_key 非空列后由 DB 层拦住。
+    """
+    engine, sm = create_engine_and_sessionmaker(_db_url(tmp_path))
+    await init_db(engine)
+    try:
+        tm = TerminologyRepository(sm)
+        await tm.upsert({"term": "GMV", "synonyms": [], "definition": "v1", "datasource_id": None, "workspace_id": 0})
+        # 绕过领域层直插重复（模拟旁路写入）：撞唯一约束
+        from sqlalchemy.exc import IntegrityError
+
+        with pytest.raises(IntegrityError):
+            async with sm() as session:
+                session.add(
+                    TerminologyModel(
+                        term="GMV",
+                        synonyms=[],
+                        definition="dup",
+                        scope_key="workspace:0",
+                        datasource_id=None,
+                        workspace_id=0,
+                    )
+                )
+                await session.commit()
     finally:
         await engine.dispose()

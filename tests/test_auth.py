@@ -389,8 +389,8 @@ async def test_workspace_isolation(auth_on, tmp_path):
 async def test_knowledge_tenant_isolation(auth_on, tmp_path):
     """知识管理 API 租户隔离（外部 CR 反例回归）：
 
-    - 未登录只能看到 ws=0 的演示数据，看不到其它 workspace 的 SQL/术语
-    - workspace A 的用户不能删除 workspace B 的示例（视同 404）
+    - 未登录只能看到 ws=0 的演示数据（且仅演示作用域，不含平台数据源级），看不到其它 workspace 的 SQL/术语
+    - workspace A 的用户不能删除 workspace B 的示例/术语（视同 404，包括借 datasource_id 越权）
     - 同一术语在两个数据源各自存在，互不覆盖（作用域内唯一）
     """
     from app.core.dependencies import get_datasource_service, get_example_store, get_term_store
@@ -403,8 +403,11 @@ async def test_knowledge_tenant_isolation(auth_on, tmp_path):
 
     ex = ExampleStore(tmp_path / "e.json", seed=False)
     ex.add("租户 B 的秘密", "SELECT secret FROM tenant_b", verified=True, workspace_id=b["workspace_id"])
+    # 平台数据源级示例（落在 B 的 workspace，但 datasource 维度）——匿名也不可见
+    ex.add("平台秘密", "SELECT secret FROM ds22", verified=True, datasource_id=22, workspace_id=b["workspace_id"])
     tm = TermStore(tmp_path / "t.json", seed=False)
     tm.add("GMV", ["成交额"], "数据源 11 口径", datasource_id=11, workspace_id=a["workspace_id"])
+    tm.add("ROI", ["投产比"], "数据源 22 口径", datasource_id=22, workspace_id=b["workspace_id"])
 
     class _FakeDS:
         async def get_source(self, datasource_id, workspace_id):
@@ -421,16 +424,23 @@ async def test_knowledge_tenant_isolation(auth_on, tmp_path):
     app.dependency_overrides[get_datasource_service] = lambda: _FakeDS()
     try:
         async with _client() as c:
-            # 未登录：读口开放但只见 ws=0（演示作用域），看不到租户 B 的记录
+            # 未登录：读口开放但只见 ws=0 的演示作用域（datasource NULL），看不到租户数据
             examples = (await c.get("/api/sql-examples")).json()
             assert all(e.get("workspace_id", 0) == 0 for e in examples)
             assert all("tenant_b" not in e["sql"] for e in examples)
+            assert all("ds22" not in e["sql"] for e in examples)  # 平台数据源级也不可见
+            assert all(t.get("datasource_id") is None for t in (await c.get("/api/terminology")).json())
 
             # workspace A 用户：看不到 B 的记录 → 删除视同 404
             secret_id = [r["id"] for r in ex.list() if "tenant_b" in r["sql"]][0]
             r = await c.delete(f"/api/sql-examples/{secret_id}", headers=_bearer(a["api_key"]))
             assert r.status_code == 404
             assert any("tenant_b" in r0["sql"] for r0 in ex.list())  # 记录仍在
+
+            # workspace A 用户借 datasource_id=22（B 的数据源）删术语 → 归属校验 404
+            r = await c.delete("/api/terminology/ROI?datasource_id=22", headers=_bearer(a["api_key"]))
+            assert r.status_code == 404
+            assert any(t["term"] == "ROI" for t in tm.list())  # 记录仍在
 
             # 术语作用域内唯一：数据源 22 写同名 GMV 不覆盖数据源 11 的
             r = await c.post(
