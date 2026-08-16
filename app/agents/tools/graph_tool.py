@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from langchain_core.tools import tool
 
+from app.agents.context_trace import record_graph_hit
 from app.graph.service import GraphService
 
 
@@ -34,10 +35,13 @@ def create_graph_search_tool(graph_service: GraphService):
         result = graph_service.query_entity(name, depth=depth)
         if result is None:
             candidates = graph_service.suggest_entities(name)
+            # 可解释性轨迹：未命中也留痕（相近实体提示是过程信息；无 recorder 空操作）
+            record_graph_hit("entity", name, f"未命中；相近实体：{'、'.join(candidates) or '无'}", len(candidates))
             if candidates:
                 return f"图谱中不存在实体「{name}」。相近实体：{'、'.join(candidates)}（请用精确名称重查）"
             return f"图谱中不存在实体「{name}」，也没有相近实体（图谱可能未覆盖该概念）。"
 
+        record_graph_hit("entity", name, f"{result['depth']} 跳邻居子图", len(result["edges"]))
         lines = [f"实体「{name}」的 {result['depth']} 跳邻居子图（{len(result['edges'])} 条关系）："]
         lines.extend(f"{e['subject']} -[{e['predicate']}]-> {e['object']}" for e in result["edges"])
         return "\n".join(lines)
@@ -67,16 +71,20 @@ def create_graph_path_tool(graph_service: GraphService):
         result = await graph_service.find_path_resolved(source, target, max_hops=max(1, min(int(max_hops), 5)))
         if result.get("status") == "ambiguous":
             candidates = result.get("candidates", {})
+            record_graph_hit("path", f"{source}→{target}", "实体解析存在歧义", 0)
             return (
                 f"实体解析存在歧义：起点候选={candidates.get('from', [])}，"
                 f"终点候选={candidates.get('to', [])}。请先向用户确认。"
             )
         if result.get("status") == "missing":
+            record_graph_hit("path", f"{source}→{target}", f"实体不存在：{'、'.join(result.get('missing', []))}", 0)
             return f"图谱中不存在实体：{'、'.join(result.get('missing', []))}。"
         if not result.get("found"):
+            record_graph_hit("path", f"{source}→{target}", "实体已解析但无路径", 0)
             return (
                 f"实体已解析，但 {source} 与 {target} 在 {result.get('scope', '')} 内没有不超过 {max_hops} 跳的路径。"
             )
+        record_graph_hit("path", f"{source}→{target}", f"{result['hops']} 跳路径", result["hops"])
         lines = [
             f"路径（{result['hops']} 跳，作用域 {result.get('scope', '')}）：{result['chain']}",
         ]

@@ -137,11 +137,15 @@ def use_context_trace() -> Iterator[None]:
 
 
 @contextmanager
-def use_active_tool_trace(trace: ToolCallTrace) -> Iterator[None]:
+def use_active_tool_trace(trace: Optional[ToolCallTrace]) -> Iterator[None]:
     """标记"当前正在执行的工具调用"（ToolRuntimeMiddleware 包住 handler 时进入）。
 
     工具内的 record_*_hits 经它归位到正确的调用，是 call_id 的传递通道。
+    trace 为 None（无请求级 recorder）时空操作，调用方无需分支。
     """
+    if trace is None:
+        yield
+        return
     token = _active_tool_trace.set(trace)
     try:
         yield
@@ -263,7 +267,9 @@ def record_example_hits(hits: Sequence[dict]) -> None:
         if _over_limit("example"):
             return
         call.hits.examples.append(
-            ExampleHit(hit_key=ex.get("question", ""), rank=rank, question=ex.get("question", ""), sql=ex.get("sql", ""))
+            ExampleHit(
+                hit_key=ex.get("question", ""), rank=rank, question=ex.get("question", ""), sql=ex.get("sql", "")
+            )
         )
 
 
@@ -302,7 +308,14 @@ def record_graph_hit(kind: str, query: str, summary: str, result_count: int) -> 
     if _over_limit("graph"):
         return
     call.hits.graph.append(
-        GraphHit(hit_key=f"{kind}:{query}", rank=len(call.hits.graph) + 1, kind=kind, query=query, summary=summary, result_count=result_count)
+        GraphHit(
+            hit_key=f"{kind}:{query}",
+            rank=len(call.hits.graph) + 1,
+            kind=kind,
+            query=query,
+            summary=summary,
+            result_count=result_count,
+        )
     )
 
 

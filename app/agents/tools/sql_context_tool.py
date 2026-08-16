@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from langchain_core.tools import tool
 
+from app.agents.context_trace import record_example_hits, record_term_hits
 from app.datasources.context import current_selection
 from app.graph.scope import current_graph_scope
 from app.text2sql.examples import ExampleStore
@@ -47,6 +48,9 @@ def create_sql_context_tool(example_store: ExampleStore, term_store: TermStore):
             workspace_id=scope_workspace_id,
             verified_only=True,
         )
+        # 可解释性轨迹：命中明细归位到本次调用（无 recorder 空操作）
+        record_term_hits(term_hits)
+        record_example_hits(examples)
 
         if not term_hits and not examples:
             return "未命中任何业务术语或相似示例。请直接依据 schema_search 返回的 M-Schema 生成 SQL。"

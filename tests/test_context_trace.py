@@ -10,8 +10,6 @@ from app.agents.context_trace import (
     ARGS_MAX_CHARS,
     MAX_HITS_PER_TYPE,
     MAX_TOOL_CALLS,
-    ExampleHit,
-    TermHit,
     context_hits_payload,
     current_context_trace,
     finish_tool_call,
@@ -22,7 +20,6 @@ from app.agents.context_trace import (
     use_active_tool_trace,
     use_context_trace,
 )
-
 
 # ========== 生命周期 ==========
 
@@ -156,3 +153,137 @@ def test_empty_payload_is_none():
     """recorder 内但零调用 → payload None（不下发事件）。"""
     with use_context_trace():
         assert context_hits_payload() is None
+
+
+# ========== 记录点接入与真实执行路径 ==========
+
+
+def test_sql_context_tool_records_hits(tmp_path):
+    """sql_context_search 命中明细经 active trace 归位（无 recorder 时空操作不炸）。"""
+    from app.agents.tools.sql_context_tool import create_sql_context_tool
+    from app.text2sql.examples import ExampleStore
+    from app.text2sql.terminology import TermStore
+
+    tool = create_sql_context_tool(ExampleStore(tmp_path / "e.json"), TermStore(tmp_path / "t.json"))
+
+    # 无 recorder：直调不炸
+    tool.invoke({"question": "各州的复购率是多少"})
+
+    with use_context_trace():
+        call = record_tool_start("c1", "sql_context_search", {"question": "各州的复购率是多少"})
+        with use_active_tool_trace(call):
+            tool.invoke({"question": "各州的复购率是多少"})
+        payload = context_hits_payload()
+    hits = payload["tool_calls"][0]["hits"]
+    assert any(t["term"] == "复购率" for t in hits["terms"])
+    assert hits["examples"]  # 演示库示例命中
+
+
+async def test_doc_tool_records_hits_and_keeps_sources(tmp_path):
+    """知识库工具：doc 明细记录 + 粗粒度 sources 事件行为不变。"""
+    from app.agents.tools.internal_docs_tool import create_docs_tool
+    from app.rag.context import current_sources
+
+    class _Retriever:
+        async def retrieve_multi_query(self, query, top_k=3, metadata_filters=None):
+            return [
+                {"content": "运维手册片段A" * 10, "metadata": {"source": "ops.md", "title": "运维", "chunk_index": 1}},
+                {"content": "运维手册片段B", "metadata": {"source": "ops.md", "title": "运维", "chunk_index": 2}},
+            ]
+
+    docs_tool = create_docs_tool(_Retriever())
+    with use_context_trace():
+        call = record_tool_start("c1", "query_internal_docs", {"query": "部署步骤"})
+        with use_active_tool_trace(call):
+            out = await docs_tool.ainvoke({"query": "部署步骤"})
+        payload = context_hits_payload()
+
+    assert "运维手册片段A" in out
+    hits = payload["tool_calls"][0]["hits"]["docs"]
+    assert len(hits) == 2
+    assert hits[0]["source"] == "ops.md" and hits[0]["hit_key"] == "ops.md:1"
+    assert "score" not in hits[0]  # score 刻意不记（口径不可比）
+    # 粗粒度 sources 不受影响
+    assert current_sources() == []  # 已退出 rag 上下文
+    assert payload["summary"]["docs"] == 2
+
+
+async def test_sync_tool_ainvoke_propagates_contextvar():
+    """真实 LangChain 路径：sync Tool 经 ainvoke（run_in_executor + copy_context）读得到 recorder。"""
+    from langchain_core.tools import tool as lc_tool
+
+    @lc_tool
+    def probe(x: str) -> str:
+        """测试探针：记录一个术语命中。"""
+        record_term_hits([{"term": x, "definition": "d"}])
+        return "ok"
+
+    with use_context_trace():
+        call = record_tool_start("c1", "probe", {"x": "GMV"})
+        with use_active_tool_trace(call):
+            out = await probe.ainvoke({"x": "GMV"})
+        payload = context_hits_payload()
+    assert out == "ok"
+    hits = payload["tool_calls"][0]["hits"]["terms"]
+    assert hits and hits[0]["term"] == "GMV"  # 执行线程里读到了 active trace
+
+
+async def test_concurrent_same_name_tools_do_not_cross():
+    """两个同名工具并发调用：hits 按 active trace 归位不串。"""
+    import asyncio
+
+    from langchain_core.tools import tool as lc_tool
+
+    @lc_tool
+    def probe(x: str) -> str:
+        """测试探针：记录一个术语命中。"""
+        record_term_hits([{"term": x, "definition": "d"}])
+        return x
+
+    async def run_one(call_id: str, value: str) -> None:
+        call = record_tool_start(call_id, "probe", {"x": value})
+        with use_active_tool_trace(call):
+            await probe.ainvoke({"x": value})
+
+    with use_context_trace():
+        await asyncio.gather(run_one("c1", "GMV"), run_one("c2", "复购率"))
+        payload = context_hits_payload()
+
+    by_id = {c["call_id"]: c for c in payload["tool_calls"]}
+    assert [t["term"] for t in by_id["c1"]["hits"]["terms"]] == ["GMV"]
+    assert [t["term"] for t in by_id["c2"]["hits"]["terms"]] == ["复购率"]
+
+
+async def test_middleware_records_success_and_degradation():
+    """middleware 轨迹：成功记 status/duration；失败记 error_code/public_message，原文不泄漏。"""
+    from app.agents.middlewares import ToolRuntimeMiddleware
+    from app.agents.tool_runtime import reset_tool_runtime_state
+
+    class _Request:
+        def __init__(self, name, args, call_id):
+            self.tool_call = {"name": name, "args": args, "id": call_id}
+
+    async def ok_handler(request):
+        return type("M", (), {"content": "结果"})()
+
+    async def bad_handler(request):
+        raise RuntimeError("连接失败: postgres://admin:p@ss@10.0.0.1:5432/prod")
+
+    mw = ToolRuntimeMiddleware()
+    reset_tool_runtime_state()
+    with use_context_trace():
+        await mw.awrap_tool_call(_Request("execute_sql", {"sql": "SELECT 1"}, "c1"), ok_handler)
+        await mw.awrap_tool_call(_Request("execute_sql", {"sql": "SELECT 1"}, "c2"), bad_handler)
+        payload = context_hits_payload()
+
+    by_id = {c["call_id"]: c for c in payload["tool_calls"]}
+    ok = by_id["c1"]
+    assert ok["status"] == "success" and ok["duration_ms"] is not None and ok["error_code"] is None
+
+    bad = by_id["c2"]
+    assert bad["status"] != "success"
+    assert bad["error_code"] in ("timeout", "tool_failure", "circuit_open", "unknown")
+    assert bad["public_message"] and "p@ss" not in bad["public_message"]
+    assert "10.0.0.1" not in bad["public_message"]  # 原始异常只在后端日志
+    # args 摘要经脱敏（本例 SQL 无敏感键，原样保留）
+    assert "SELECT 1" in ok["args"]

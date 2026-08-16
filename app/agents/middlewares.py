@@ -11,6 +11,7 @@ from langchain.agents.middleware import AgentMiddleware
 from langchain_core.messages import ToolMessage
 from loguru import logger
 
+from app.agents.context_trace import finish_tool_call, record_tool_start, use_active_tool_trace
 from app.agents.tool_runtime import safe_tool_execute
 
 
@@ -19,6 +20,10 @@ class ToolRuntimeMiddleware(AgentMiddleware):
 
     失败时不抛异常，而是把 TOOL_FALLBACK_MESSAGES 里的降级文案作为
     ToolMessage 返回给模型，让 Agent 降级续跑而不是崩溃。
+
+    同时是工具轨迹（context_trace）的记录点：所有工具（含门控本地与 MCP
+    override）必经此处；use_active_tool_trace 包住 handler，工具内的
+    record_*_hits 据此归位到本次调用。
     """
 
     async def awrap_tool_call(self, request, handler):
@@ -35,7 +40,14 @@ class ToolRuntimeMiddleware(AgentMiddleware):
             content = getattr(result, "content", None)
             return str(content) if content is not None else str(result)
 
-        execution = await safe_tool_execute(tool_name, invoke, {})
+        # 轨迹记录：start（含脱敏 args 摘要）→ 包住执行 → finish 补状态/耗时。
+        # MCP override 时 request.tool_call 仍是模型原始调用的 name/args（记模型视角）。
+        trace_call = record_tool_start(tool_call_id, tool_name, request.tool_call.get("args") or {})
+        try:
+            with use_active_tool_trace(trace_call):
+                execution = await safe_tool_execute(tool_name, invoke, {})
+        finally:
+            finish_tool_call(trace_call, status=execution.status, attempts=execution.attempts)
 
         if execution.success and "value" in result_cell:
             return result_cell["value"]
