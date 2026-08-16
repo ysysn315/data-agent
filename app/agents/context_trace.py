@@ -222,9 +222,10 @@ def summarize_args(tool_name: str, args: object) -> str:
 
 # status → 稳定错误枚举与安全公开文案（独立映射，不复用 ToolRuntime 的降级文案——
 # 那边拼接原始异常原文，不能下发浏览器）。键对齐 ToolRuntime 实际终态：
-# success / degraded（重试耗尽的普通失败）/ circuit_open；cancelled 与 interrupted
-# 是 middleware 捕获穿出异常时记录的（取消 / 其它 BaseException 如系统退出、
-# policy disabled 路径的裸异常）。
+# success / degraded（重试耗尽的普通失败）/ circuit_open；cancelled / interrupted
+# 是 middleware 捕获穿出异常时记录的——取消（CancelledError）与系统级中断
+# （KeyboardInterrupt 等 BaseException）；policy disabled 路径的普通异常走
+# except Exception 分支记 degraded（见 middlewares.py）。
 _ERROR_CODE_BY_STATUS = {
     "degraded": ("tool_failure", "工具执行失败，已降级处理"),
     "circuit_open": ("circuit_open", "工具熔断保护中，暂不可用"),
@@ -244,10 +245,10 @@ def _error_of(status: str) -> tuple[str, str]:
 def record_tool_start(call_id: str, name: str, args: object, tool: object = None) -> Optional[ToolCallTrace]:
     """middleware 在工具执行前调用；返回句柄（无请求级 recorder 时 None）。
 
-    可信来源判定用**实际工具实例**而非名字：SkillsMiddleware 允许 MCP 工具以
-    本地白名单同名登记并 override（request.tool 换成 MCP 实例），仅凭名字判断
-    会被重名绕过。白名单实例在构造时注册（register_local_tool），middleware 传
-    request.tool——实例在册才按本地工具脱敏，否则 keys-only。
+    可信来源判定用**实际工具实例**（`is` 比较）而非名字：SkillsMiddleware 允许
+    MCP 工具以本地白名单同名登记并 override（request.tool 换成 MCP 实例），仅凭
+    名字判断会被重名绕过。白名单持有强引用并按身份判定——只存 id() 的话，
+    注册实例被回收后新对象可能复用同一地址而被误信任。
     """
     trace = _trace.get()
     if trace is None:
@@ -256,21 +257,28 @@ def record_tool_start(call_id: str, name: str, args: object, tool: object = None
         if len(trace.tool_calls) >= MAX_TOOL_CALLS:
             trace.truncated = True
             return None
-        trusted = tool is not None and id(tool) in _local_tool_ids
+        trusted = tool is not None and any(t is tool for t in _local_tools)
         call = ToolCallTrace(call_id=call_id, name=name, args=summarize_args(name if trusted else "", args))
         trace.tool_calls.append(call)
     return call
 
 
-# 本地可信工具实例注册表（id 集合）：middleware 按实际执行实例判定来源。
-# 在 dependencies 装配本地工具后调用 register_local_tools 注册。
-_local_tool_ids: set[int] = set()
+# 本地可信工具实例注册表（强引用 + is 判定）：middleware 按实际执行实例判定来源。
+# 在 dependencies 装配本地工具后调用 register_local_tools 注册；测试可 reset 清空
+# （防跨用例残留——id-only 集合在对象回收后有地址复用误信任风险，故持引用）。
+_local_tools: list = []
 
 
 def register_local_tools(tools: Sequence[object]) -> None:
     """注册本地工具实例（构造期一次）。MCP 重名实例不在册 → keys-only 脱敏。"""
     for t in tools:
-        _local_tool_ids.add(id(t))
+        if not any(x is t for x in _local_tools):
+            _local_tools.append(t)
+
+
+def reset_local_tools() -> None:
+    """清空注册表（测试隔离用；生产单例生命周期内不调用）。"""
+    _local_tools.clear()
 
 
 def finish_tool_call(

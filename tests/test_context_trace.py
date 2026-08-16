@@ -21,6 +21,7 @@ from app.agents.context_trace import (
     record_term_hits,
     record_tool_start,
     register_local_tools,
+    reset_local_tools,
     summarize_args,
     use_active_tool_trace,
     use_context_trace,
@@ -285,6 +286,7 @@ async def test_middleware_records_success_and_degradation():
         """本地 execute_sql 测试实例。"""
         return "ok"
 
+    reset_local_tools()
     register_local_tools([local_execute_sql])
 
     class _Request:
@@ -532,10 +534,6 @@ async def test_skills_to_mcp_override_chain_records_once(tmp_path):
 
     base_result = None
 
-    async def base_handler(req):
-        # 链的末端：langchain ToolNode 等价物——按 request.tool 执行（未 override 时为 None 会报错）
-        return await req.tool.ainvoke(req.tool_call["args"])
-
     async def terminal_handler(req):
         nonlocal base_result
         base_result = await req.tool.ainvoke(req.tool_call["args"])
@@ -552,14 +550,18 @@ async def test_skills_to_mcp_override_chain_records_once(tmp_path):
             runtime=None,
         )
 
+    # 清空上一用例可能残留的注册（强引用注册表跨用例存活）
+    reset_local_tools()
     reset_tool_runtime_state()
     with use_context_trace():
-        # 真实链：Runtime(外层) → Skills(override) → 终端执行
-        async def skills_wrapped(req):
-            # 复刻 create_agent 的中间件编排：Skills.awrap_tool_call 包住终端 handler
-            return await skills_mw.awrap_tool_call(req, terminal_handler)
+        # 生产顺序（dependencies.py: [SkillsMiddleware, ToolRuntimeMiddleware]，
+        # langchain 第一个 middleware 是最外层）：Skills override 先发生，
+        # Runtime 内层读到的 request.tool 是 override 后的 MCP 实例——
+        # 实例白名单的真实考验点（顺序反了只会看到 None，测不到重名绕过）。
+        async def runtime_wrapped(req):
+            return await runtime_mw.awrap_tool_call(req, terminal_handler)
 
-        await runtime_mw.awrap_tool_call(make_request(), skills_wrapped)
+        await skills_mw.awrap_tool_call(make_request(), runtime_wrapped)
         payload = context_hits_payload()
 
     assert recorded_calls == ["SELECT tenant_secret"]  # 只执行一次
@@ -567,25 +569,39 @@ async def test_skills_to_mcp_override_chain_records_once(tmp_path):
     assert len(payload["tool_calls"]) == 1  # 轨迹只记录一次
     tc = payload["tool_calls"][0]
     assert tc["status"] == "success"
-    # 重名 MCP：request.tool 是 MCP 实例、不在本地注册表 → keys-only，凭据不泄漏
+    # 重名 MCP：Runtime 看到 override 后的 MCP 实例、不在本地注册表 → keys-only
     assert "tenant_secret" not in tc["args"]
     assert "sql" in tc["args"]
 
-    # 对照：本地真实例注册后，同名工具按本地规则脱敏（值可见）
+    # 对照：本地真实例注册后按本地规则脱敏（值可见）。名字换 get_current_datetime——
+    # 生产语义下同名会被 _mcp_tools 的 MCP 实例 override（上面已测），对照要绕开登记
     @lc_tool
-    def local_execute_sql(sql: str) -> str:
-        """本地 execute_sql。"""
+    def local_dt(sql: str) -> str:
+        """本地工具测试实例。"""
         return "local"
 
-    register_local_tools([local_execute_sql])
+    register_local_tools([local_dt])
     reset_tool_runtime_state()
     with use_context_trace():
         req2 = ToolCallRequest(
-            tool_call={"name": "execute_sql", "args": {"sql": "SELECT 1"}, "id": "c2", "type": "tool_call"},
-            tool=local_execute_sql,
+            tool_call={"name": "get_current_datetime", "args": {"sql": "SELECT 1"}, "id": "c2", "type": "tool_call"},
+            tool=local_dt,
             state={},
             runtime=None,
         )
-        await runtime_mw.awrap_tool_call(req2, terminal_handler)
+        await skills_mw.awrap_tool_call(req2, runtime_wrapped)
         payload2 = context_hits_payload()
     assert "SELECT 1" in payload2["tool_calls"][0]["args"]
+
+    # 地址复用防护（外部 CR）：注册实例被回收后，新对象即便复用同一 id() 也不被信任
+    reset_local_tools()
+    doomed = object()
+    register_local_tools([doomed])
+    before_id = id(doomed)
+    del doomed
+    replacement = object()  # CPython 可能立即复用 before_id
+    if id(replacement) == before_id:
+        with use_context_trace():
+            record_tool_start("c3", "execute_sql", {"sql": "SELECT recycle_secret"}, tool=replacement)
+            payload3 = context_hits_payload()
+        assert "recycle_secret" not in payload3["tool_calls"][0]["args"]  # 非注册对象 → keys-only
