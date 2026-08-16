@@ -22,6 +22,19 @@ def _pct(bucket: dict) -> str:
     return f"{bucket['accuracy'] * 100:.2f}%（{bucket['correct']}/{bucket['total']}）"
 
 
+def _run_desc(report: dict) -> str:
+    """把模型与消融配置压成一行，旧报告缺字段时保持兼容。"""
+    meta = report.get("meta", {})
+    parts = [f"model={meta.get('model', '?')}"]
+    if "skill_enabled" in meta:
+        parts.append(f"skill={'on' if meta['skill_enabled'] else 'off'}")
+    if meta.get("schema_mode"):
+        parts.append(f"schema={meta['schema_mode']}")
+    if meta.get("run_name"):
+        parts.append(f"run={meta['run_name']}")
+    return ", ".join(parts)
+
+
 def compare(baseline: dict, after: dict, base_name: str, after_name: str) -> str:
     """生成 Markdown 对比报告。"""
     lines: list[str] = []
@@ -29,8 +42,8 @@ def compare(baseline: dict, after: dict, base_name: str, after_name: str) -> str
 
     lines.append("# Text-to-SQL 评测报告对比")
     lines.append("")
-    lines.append(f"- 基线：`{base_name}`（model={baseline.get('meta', {}).get('model', '?')}）")
-    lines.append(f"- 对比：`{after_name}`（model={after.get('meta', {}).get('model', '?')}）")
+    lines.append(f"- 基线：`{base_name}`（{_run_desc(baseline)}）")
+    lines.append(f"- 对比：`{after_name}`（{_run_desc(after)}）")
     lines.append("")
 
     delta = a_sum.get("accuracy", 0) - b_sum.get("accuracy", 0)
@@ -59,6 +72,12 @@ def compare(baseline: dict, after: dict, base_name: str, after_name: str) -> str
             lines.append(f"对比报告移除 case：{', '.join(only_base)}")
         lines.append("")
 
+    b_fp = baseline.get("meta", {}).get("dataset_fingerprint")
+    a_fp = after.get("meta", {}).get("dataset_fingerprint")
+    if b_fp and a_fp and b_fp != a_fp:
+        lines.append("> ⚠️ 两份报告的数据集内容指纹不同，题面、golden SQL、标签或难度可能发生过变化。")
+        lines.append("")
+
     # 按题型标签分解（对比两边并集；只在一侧出现的标签也列出）
     b_tags, a_tags = baseline.get("by_tag", {}), after.get("by_tag", {})
     lines.append("## 按题型标签")
@@ -73,6 +92,23 @@ def compare(baseline: dict, after: dict, base_name: str, after_name: str) -> str
         d = a["accuracy"] - b["accuracy"]
         lines.append(f"| {tag} | {_pct(b)} | {_pct(a)} | {'+' if d >= 0 else ''}{d * 100:.2f}pp |")
     lines.append("")
+
+    # 难度是独立于 SQL 能力标签的第二统计轴，便于观察增强是否只改善简单题。
+    b_levels, a_levels = baseline.get("by_difficulty", {}), after.get("by_difficulty", {})
+    if b_levels or a_levels:
+        level_names = {"easy": "简单", "medium": "中等", "hard": "困难"}
+        lines.append("## 按难度")
+        lines.append("")
+        lines.append("| 难度 | 基线 | 对比 | 变化 |")
+        lines.append("|---|---|---|---|")
+        for level in ("easy", "medium", "hard"):
+            if level not in b_levels and level not in a_levels:
+                continue
+            b = b_levels.get(level, {"accuracy": 0.0, "correct": 0, "total": 0})
+            a = a_levels.get(level, {"accuracy": 0.0, "correct": 0, "total": 0})
+            d = a["accuracy"] - b["accuracy"]
+            lines.append(f"| {level_names[level]} | {_pct(b)} | {_pct(a)} | {'+' if d >= 0 else ''}{d * 100:.2f}pp |")
+        lines.append("")
 
     # case 级翻转：只统计两份报告都有的 case（交集），新增/移除的已在上方单独列出
     b_cases = {c["id"]: c for c in baseline.get("cases", [])}

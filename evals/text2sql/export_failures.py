@@ -50,6 +50,7 @@ def build_candidate(case: dict, report_path: Path, datasource_id: int | None, wo
         "meta": {
             "case_id": case.get("id"),
             "tags": case.get("tags", []),
+            "difficulty": case.get("difficulty"),
             "pred_sql": case.get("pred_sql"),
             "error": case.get("error"),
             "report": report_path.name,

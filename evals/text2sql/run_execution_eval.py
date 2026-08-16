@@ -1,6 +1,8 @@
 """Text-to-SQL 执行准确率评估入口（roadmap P1-2）。
 
     python -m evals.text2sql.run_execution_eval [--limit N] [--db PATH] [--model NAME]
+        [--tag TAG] [--difficulty LEVEL] [--no-skill]
+        [--schema-mode m-schema|columns] [--output REPORT.json]
 
 一句话流程：**M-Schema + sql-generation 技能正文 → LLM 生成 SQL → sql_guard 校验 →
 执行 → 与 golden 结果集按 execution accuracy 对比 → 出报告**。这正是把项目里
@@ -21,6 +23,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sqlite3
 import time
@@ -46,6 +49,41 @@ SKILL_MD_PATH = _HERE.parent.parent / "app" / "skills" / "buildin" / "sql-genera
 
 def load_dataset(path: Path = DATASET_PATH) -> list[dict]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def select_cases(
+    dataset: list[dict],
+    tags: list[str] | None = None,
+    difficulties: list[str] | None = None,
+    limit: int | None = None,
+) -> list[dict]:
+    """按标签交集、难度并集筛选；limit 最后生效，保证实验口径可预测。"""
+    selected = dataset
+    if tags:
+        requested_tags = set(tags)
+        selected = [case for case in selected if requested_tags <= set(case.get("tags", []))]
+    if difficulties:
+        requested_levels = set(difficulties)
+        selected = [case for case in selected if case.get("difficulty") in requested_levels]
+    if limit is not None:
+        selected = selected[:limit]
+    return selected
+
+
+def dataset_fingerprint(dataset: list[dict]) -> str:
+    """为本轮实际用例生成稳定指纹，避免同 ID 但题面/golden 已变时误做横向比较。"""
+    comparable = [
+        {
+            "id": case["id"],
+            "question": case["question"],
+            "golden_sql": case["golden_sql"],
+            "difficulty": case.get("difficulty"),
+            "tags": case.get("tags", []),
+        }
+        for case in dataset
+    ]
+    payload = json.dumps(comparable, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def read_skill_body(path: Path = SKILL_MD_PATH) -> str:
@@ -79,20 +117,23 @@ def run_query(db_path: str, sql: str) -> list[tuple]:
         conn.close()
 
 
-def build_prompt(skill_body: str, m_schema: str, question: str) -> list:
-    """组装 system（技能正文 + M-Schema）+ human（问题）消息。
+def build_prompt(skill_body: str, schema_context: str, question: str) -> list:
+    """组装 system（可选技能正文 + Schema 上下文）+ human（问题）消息。
 
-    评估阶段模型拿不到 schema_search 工具（不在 Agent 循环里），因此把整库 M-Schema
-    直接注入 system —— demo 表少，全量注入等价于"检索已命中全部表"。要求模型只输出
-    一条 SQL，便于抽取。
+    评估阶段模型拿不到 schema_search 工具（不在 Agent 循环里），因此把整库 Schema
+    直接注入 system；默认是带业务注释的 M-Schema，消融时可换成纯表/列/类型。demo 表少，
+    全量注入等价于"检索已命中全部表"。要求模型只输出一条 SQL，便于抽取。
     """
-    system = (
-        f"{skill_body}\n\n"
-        f"## 当前数据库结构（M-Schema）\n\n{m_schema}\n\n"
-        f"## 输出要求\n\n"
-        f"只输出一条 SQLite SELECT 语句，可用 ```sql 代码块包裹，"
-        f"不要输出任何解释文字。"
+    blocks = []
+    if skill_body:
+        blocks.append(skill_body)
+    blocks.extend(
+        [
+            f"## 当前数据库结构\n\n{schema_context}",
+            "## 输出要求\n\n只输出一条 SQLite SELECT 语句，可用 ```sql 代码块包裹，不要输出任何解释文字。",
+        ]
     )
+    system = "\n\n".join(blocks)
     return [SystemMessage(content=system), HumanMessage(content=question)]
 
 
@@ -137,6 +178,7 @@ def evaluate_case(
         "id": case["id"],
         "question": case["question"],
         "tags": case.get("tags", []),
+        "difficulty": case.get("difficulty"),
         "golden_sql": case["golden_sql"],
         "pred_sql": None,
         "correct": False,
@@ -175,18 +217,37 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--limit", type=int, default=None, help="只跑前 N 个用例（抽样）")
     parser.add_argument("--db", default=settings.sqlite_db_path, help="SQLite 演示库路径")
     parser.add_argument("--model", default=None, help="覆盖 LLM 模型名（默认取配置）")
+    parser.add_argument("--tag", action="append", default=[], help="只跑含该标签的题；可重复指定")
+    parser.add_argument(
+        "--difficulty",
+        action="append",
+        choices=("easy", "medium", "hard"),
+        default=[],
+        help="只跑指定难度；可重复指定",
+    )
+    parser.add_argument("--no-skill", action="store_true", help="不注入 sql-generation 技能正文，做消融对比")
+    parser.add_argument(
+        "--schema-mode",
+        choices=("m-schema", "columns"),
+        default="m-schema",
+        help="m-schema 注入业务注释；columns 仅注入表、列和类型",
+    )
+    parser.add_argument("--output", type=Path, default=None, help="报告输出路径（默认覆盖 execution_latest.json）")
+    parser.add_argument("--run-name", default=None, help="写入报告元信息的实验名称")
     args = parser.parse_args(argv)
 
     if not Path(args.db).exists():
         print(f"演示库不存在: {args.db}\n请先运行: python scripts/import_ecommerce.py --synthetic --db {args.db}")
         return 1
 
-    dataset = load_dataset()
-    if args.limit is not None:
-        dataset = dataset[: args.limit]
+    full_dataset = load_dataset()
+    dataset = select_cases(full_dataset, tags=args.tag, difficulties=args.difficulty, limit=args.limit)
+    if not dataset:
+        print("没有匹配当前标签/难度筛选条件的评测用例")
+        return 2
 
-    skill_body = read_skill_body()
-    m_schema = generate_m_schema(args.db)
+    skill_body = "" if args.no_skill else read_skill_body()
+    schema_context = generate_m_schema(args.db, comments={} if args.schema_mode == "columns" else None)
     schema = fetch_schema(args.db)
     llm = LLMFactory.create_llm(model=args.model, temperature=0.0, streaming=False)
 
@@ -194,7 +255,7 @@ def main(argv: list[str] | None = None) -> int:
     started = time.time()
     case_results = []
     for i, case in enumerate(dataset, start=1):
-        r = evaluate_case(case, args.db, schema, skill_body, m_schema, llm)
+        r = evaluate_case(case, args.db, schema, skill_body, schema_context, llm)
         flag = "✓" if r["correct"] else "✗"
         logger.info(f"[{i}/{len(dataset)}] {flag} {r['id']} {r.get('error') or ''}")
         case_results.append(r)
@@ -204,12 +265,18 @@ def main(argv: list[str] | None = None) -> int:
         "db": args.db,
         "model": args.model or settings.llm_model,
         "num_cases": len(dataset),
+        "dataset_total_cases": len(full_dataset),
+        "dataset_fingerprint": dataset_fingerprint(dataset),
         "elapsed_sec": round(time.time() - started, 1),
         "generated_at": datetime.now().isoformat(timespec="seconds"),
+        "run_name": args.run_name,
+        "skill_enabled": not args.no_skill,
+        "schema_mode": args.schema_mode,
+        "filters": {"tags": args.tag, "difficulties": args.difficulty},
     }
 
-    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    out = REPORTS_DIR / "execution_latest.json"
+    out = args.output or (REPORTS_DIR / "execution_latest.json")
+    out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
 
     print(f"\n报告已保存: {out}")
@@ -220,6 +287,9 @@ def main(argv: list[str] | None = None) -> int:
     print("按标签:")
     for tag, b in report["by_tag"].items():
         print(f"  {tag:<10} {b['accuracy']:.2%} ({b['correct']}/{b['total']})")
+    print("按难度:")
+    for level, b in report["by_difficulty"].items():
+        print(f"  {level:<10} {b['accuracy']:.2%} ({b['correct']}/{b['total']})")
     return 0
 
 
