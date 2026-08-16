@@ -22,6 +22,7 @@ from app.core.dependencies import (
     get_example_store,
     get_term_store,
 )
+from app.core.settings import settings
 from app.datasources.models import DataSourceNotFoundError
 from app.datasources.service import DataSourceService, normalize_workspace_id
 from app.text2sql.examples import ExampleStore
@@ -107,13 +108,18 @@ async def list_sql_examples(
     store: ExampleStore = Depends(get_example_store),
     user: dict | None = Depends(get_current_user_optional),
 ):
-    """列出当前 workspace 的全部 SQL 示例（跨租户不串；匿名只见演示作用域数据）"""
+    """列出当前 workspace 的全部 SQL 示例（跨租户不串）。
+
+    匿名限定的生效条件是 **鉴权开启**（auth_enabled）：此时无 key = 未认证访客，
+    只见演示作用域（datasource NULL）数据；demo 模式（auth 关闭）无 key 是"全开放
+    管理员"，继续显示本 workspace 全部知识——否则 Chat 沉淀的平台 SQL 在管理页消失。
+    """
     ws = _workspace_of(user)
+    anonymous_limited = settings.auth_enabled and user is None
     return [
         r
         for r in store.list()
-        if int(r.get("workspace_id") or 0) == ws
-        and (user is not None or r.get("datasource_id") is None)  # 匿名：仅演示作用域（datasource NULL）
+        if int(r.get("workspace_id") or 0) == ws and (not anonymous_limited or r.get("datasource_id") is None)
     ]
 
 
@@ -174,13 +180,13 @@ async def list_terms(
     store: TermStore = Depends(get_term_store),
     user: dict | None = Depends(get_current_user_optional),
 ):
-    """列出当前 workspace 的业务术语（跨租户不串；匿名只见演示作用域数据）"""
+    """列出当前 workspace 的业务术语（跨租户不串；匿名限定的生效条件同示例列表）"""
     ws = _workspace_of(user)
+    anonymous_limited = settings.auth_enabled and user is None
     return [
         t
         for t in store.list()
-        if int(t.get("workspace_id") or 0) == ws
-        and (user is not None or t.get("datasource_id") is None)  # 匿名：仅演示作用域
+        if int(t.get("workspace_id") or 0) == ws and (not anonymous_limited or t.get("datasource_id") is None)
     ]
 
 

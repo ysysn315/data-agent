@@ -292,3 +292,32 @@ def test_api_terminology_crud(client):
 
     assert client.delete("/api/terminology/转化率").status_code == 204
     assert client.delete("/api/terminology/转化率").status_code == 404
+
+
+def test_demo_mode_lists_platform_scoped_knowledge(tmp_path):
+    """demo（auth 关闭）下管理页可见平台数据源级知识（外部 CR 反例回归）。
+
+    demo 的无 key 是"全开放管理员"而非未认证访客——Chat 沉淀的平台 SQL 必须在
+    管理页可见可维护；匿名限定（仅演示作用域）只在 auth_enabled 时生效。
+    """
+    from app.core.settings import settings
+
+    ex = ExampleStore(tmp_path / "e.json", seed=False)
+    ex.add("平台问题", "SELECT 1 FROM ds_t", verified=True, datasource_id=9, workspace_id=0)
+    tm = TermStore(tmp_path / "t.json", seed=False)
+    tm.add("平台口径", ["口径"], "ds 定义", datasource_id=9, workspace_id=0)
+
+    from app.core.dependencies import get_example_store, get_term_store
+    from app.main import app
+
+    app.dependency_overrides[get_example_store] = lambda: ex
+    app.dependency_overrides[get_term_store] = lambda: tm
+    try:
+        assert settings.auth_enabled is False  # 测试环境默认 demo
+        client = TestClient(app)
+        examples = client.get("/api/sql-examples").json()
+        assert any(e["datasource_id"] == 9 for e in examples)  # 平台级可见
+        terms = client.get("/api/terminology").json()
+        assert any(t["datasource_id"] == 9 for t in terms)
+    finally:
+        app.dependency_overrides.clear()

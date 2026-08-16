@@ -84,16 +84,19 @@ def main() -> None:
     parser.add_argument(
         "--workspace-id",
         type=int,
-        default=0,
-        help="归属 workspace（默认 0=演示；演示作用域的候选按 workspace 隔离）",
+        default=None,
+        help="归属 workspace（未传且未选数据源时为 0=演示；显式传 0 合法=鉴权关闭的 demo 工作空间）",
     )
     parser.add_argument("--dry-run", action="store_true", help="只打印将导入的内容，不写库")
     args = parser.parse_args()
 
     # 平台数据源级候选必须显式声明 workspace：数据源归属某个 workspace，
-    # 混搭默认 ws=0 会把候选写进匿名可见的演示作用域（租户数据泄漏给匿名读）。
-    if args.datasource_id is not None and args.workspace_id == 0:
-        parser.error("--datasource-id 需要同时传 --workspace-id（该数据源所属 workspace）")
+    # 不声明就默认 ws=0 会把候选写进匿名可见的演示作用域（租户数据泄漏给匿名读）。
+    # 用「是否传参」判断而非值判断——workspace 0 是关闭鉴权时的合法 demo 工作空间。
+    if args.datasource_id is not None and args.workspace_id is None:
+        parser.error("--datasource-id 需要同时传 --workspace-id（该数据源所属 workspace；demo 模式可显式传 0）")
+    if args.workspace_id is None:
+        args.workspace_id = 0
 
     failed = load_failed_cases(args.report)
     if not failed:

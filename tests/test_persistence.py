@@ -537,3 +537,36 @@ async def test_terminology_demo_scope_uniqueness_no_null_hole(tmp_path):
                 await session.commit()
     finally:
         await engine.dispose()
+
+
+async def test_knowledge_migration_survives_duplicate_demo_terms(tmp_path):
+    """旧 NULL 漏洞版产生的重复演示词条：迁移去重保留最新一条，不因建索引失败（外部 CR 回归）。"""
+    db_file = tmp_path / "dup.db"
+
+    # 手工建"有作用域列但无 scope_key"的旧版表（NULL 唯一漏洞版），插入两条同 scope 重复 term
+    conn = sqlite3.connect(db_file)
+    try:
+        conn.execute(
+            "CREATE TABLE terminology ("
+            "id INTEGER NOT NULL PRIMARY KEY, term VARCHAR(256) NOT NULL, synonyms JSON NOT NULL, "
+            "definition TEXT NOT NULL, sql_hint TEXT, datasource_id INTEGER, "
+            "workspace_id INTEGER NOT NULL DEFAULT 0, created_at DATETIME NOT NULL)"
+        )
+        conn.execute("INSERT INTO terminology VALUES (1, 'GMV', '[]', '旧口径', NULL, NULL, 0, '2026-01-01 00:00:00')")
+        conn.execute("INSERT INTO terminology VALUES (2, 'GMV', '[]', '新口径', NULL, NULL, 0, '2026-06-01 00:00:00')")
+        conn.commit()
+    finally:
+        conn.close()
+
+    engine, sm = create_engine_and_sessionmaker(f"sqlite+aiosqlite:///{db_file}")
+    await init_db(engine)  # 修复前在此 IntegrityError
+    try:
+        rows = await TerminologyRepository(sm).list_all()
+        assert len(rows) == 1 and rows[0]["definition"] == "新口径"  # 保留最新
+    finally:
+        await engine.dispose()
+
+    # 二次 init_db 幂等
+    engine2, _ = create_engine_and_sessionmaker(f"sqlite+aiosqlite:///{db_file}")
+    await init_db(engine2)
+    await engine2.dispose()

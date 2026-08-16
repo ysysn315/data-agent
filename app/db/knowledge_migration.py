@@ -93,6 +93,7 @@ def _rebuild_terminology_sqlite(connection) -> None:
             ELSE 'workspace:' || workspace_id END
         """
     )
+    _dedup_terminology_by_scope(connection, "terminology_v2")
     connection.exec_driver_sql("DROP TABLE terminology")
     connection.exec_driver_sql("ALTER TABLE terminology_v2 RENAME TO terminology")
     _create_terminology_constraints(connection)
@@ -115,7 +116,28 @@ def _rebuild_terminology_pg(connection) -> None:
             "UPDATE terminology SET scope_key = CASE WHEN datasource_id IS NOT NULL "
             "THEN 'datasource:' || datasource_id ELSE 'workspace:' || workspace_id END"
         )
+    _dedup_terminology_by_scope(connection, "terminology")
     _create_terminology_constraints(connection)
+
+
+def _dedup_terminology_by_scope(connection, table: str) -> None:
+    """建唯一索引前清理同 (scope_key, term) 重复行，保留 id 最大（最新写入）的一条。
+
+    旧"NULL 唯一漏洞版"可能已产生演示作用域重复 term，直接建索引会 IntegrityError
+    启动失败；保留最新一条并记日志，被合并掉的旧条目口径视为已被覆盖。
+    """
+    from loguru import logger
+
+    removed = connection.exec_driver_sql(
+        f"""
+        DELETE FROM {table}
+        WHERE id NOT IN (
+            SELECT MAX(id) FROM {table} GROUP BY scope_key, term
+        )
+        """
+    )
+    if removed.rowcount:
+        logger.warning(f"术语表作用域迁移清理重复词条 {removed.rowcount} 条（保留最新一条）")
 
 
 def _create_terminology_constraints(connection) -> None:
