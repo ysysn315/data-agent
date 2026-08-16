@@ -101,8 +101,10 @@ flowchart TB
 # 安装依赖
 uv sync
 
-# 准备固定种子的演示数据
+# 准备固定种子的演示数据（合成版即评测基线，任何机器生成的库逐字节一致）
 .venv/bin/python scripts/import_ecommerce.py --synthetic --db ./data/ecommerce.db
+# 如需 Kaggle 原始数据（可选）：https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce
+# 下载后 --csv-dir <目录> 导入；评测与 demo 不依赖原始 CSV
 
 # 配置 LLM：编辑 .env，至少设置 LLM_API_KEY / LLM_BASE_URL / LLM_MODEL
 cp .env.example .env
