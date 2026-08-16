@@ -2,6 +2,7 @@ from typing import Any, Dict
 
 from langchain.tools import tool
 
+from app.agents.context_trace import record_doc_hits
 from app.rag.context import current_metadata_filters, record_sources
 from app.rag.document_utils import document_source
 
@@ -64,6 +65,19 @@ def create_docs_tool(retriever: Any):
         if not docs:
             return "未找到相关文档"
         record_sources([document_source(doc) for doc in docs])
+        # 可解释性轨迹：文档命中明细（source/title/片段摘要；无 recorder 空操作）。
+        # doc 结构是 {"content": ..., "metadata": {...}}，展平后交给记录器。
+        record_doc_hits(
+            [
+                {
+                    "source": document_source(doc),
+                    "title": doc.get("metadata", {}).get("title"),
+                    "chunk_index": doc.get("metadata", {}).get("chunk_index"),
+                    "content": doc.get("content", ""),
+                }
+                for doc in docs
+            ]
+        )
 
         result = []
         for i, doc in enumerate(docs, 1):

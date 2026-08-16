@@ -60,7 +60,12 @@ async def chat(
             datasource_id=request.datasource_id,
             workspace_id=workspace_id,
         )
-        return ChatResponse(answer=answer["answer"], sources=answer["sources"], sql_result=answer.get("sql_result"))
+        return ChatResponse(
+            answer=answer["answer"],
+            sources=answer["sources"],
+            sql_result=answer.get("sql_result"),
+            context_hits=answer.get("context_hits"),
+        )
     except HTTPException:
         raise
     except Exception as e:

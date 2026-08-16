@@ -290,6 +290,12 @@ async def get_chat_agent():
             create_graph_path_tool(get_graph_service()),
         ]
 
+        # 可解释性轨迹的可信来源注册：本地工具实例在册（按实例判定），
+        # MCP 重名工具 override 后不在册 → 参数只展示键名（防重名绕过脱敏）
+        from app.agents.context_trace import register_local_tools
+
+        register_local_tools([*base_tools, *gated_tools])
+
         _chat_agent = ChatAgent(
             llm=chat_llm,
             tools=base_tools,

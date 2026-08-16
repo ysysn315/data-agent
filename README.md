@@ -19,6 +19,7 @@
 - **轻量知识图谱**：图谱按 workspace/datasource 隔离，SQLite 持久化实体/三元组，支持已审核 Schema 同步、别名/属性合并、可选实体 Embedding 召回和 `graph_path_search` 路径工具；NetworkX 负责千级规模邻域/路径查询。它不是 GraphRAG，也不面向大规模图计算。
 - **多步分析与异步任务**：Analysis Agent 按 Planner → Operation → Reflection 运行；ARQ 承载长任务，Redis Hash/Streams 保存状态与事件，SSE 推送进度并支持迟到订阅回放历史事件。
 - **运行安全与降级**：工具调用支持超时、重试、三态熔断和错误回喂；技能脚本可切换到一次性 Docker 容器，以断网、只读挂载、资源限额和超时回收收敛执行风险。
+- **Chat 过程可解释（Chat 页专项）**：每条回答的折叠面板展示本轮工具调用轨迹（脱敏参数摘要/状态/耗时）与检索命中明细（SQL 示例、术语、文档片段、图谱查询，按命中键去重计数）。参数与异常先脱敏再下发，错误只传稳定枚举与安全文案；不覆盖 analysis 端点、Redis Streams 与会话回放，不是全平台统一可观测。
 - **可选平台能力**：SQLAlchemy 2.0 async 持久化、API Key 鉴权与 workspace-lite、推理模型思考/答案分流、Langfuse callbacks 均已实现，但默认配置不等于生产级多租户或全链路可观测平台。
 
 ## 系统架构
