@@ -136,3 +136,44 @@ def test_execute_sql_join_across_tables(synthetic_db):
     payload = json.loads(result)
     assert payload["row_count"] > 0
     assert payload["columns"] == ["order_status", "gmv"]
+
+
+def test_download_script_is_idempotent_and_validates(tmp_path, monkeypatch):
+    """download_ecommerce：目录已完整时跳过下载（幂等）；缺文件时校验报错。
+
+    不做真实网络请求——下载路径以 monkeypatch 桩掉，只锁脚本自身的编排逻辑。
+    """
+    import scripts.download_ecommerce as dl
+
+    # 1) 完整目录 → 直接跳过（不走网络）
+    complete = tmp_path / "complete"
+    complete.mkdir()
+    for f in dl.EXPECTED_FILES:
+        (complete / f).write_text("x", encoding="utf-8")
+    called = {"n": 0}
+
+    def _no_network(target):
+        called["n"] += 1  # 不应被调用
+
+    monkeypatch.setattr(dl, "download_via_kagglehub", _no_network)
+    monkeypatch.setattr(dl, "download_via_public", _no_network)
+    assert dl.main(["--dir", str(complete)]) == 0
+    assert called["n"] == 0  # 幂等：未触发任何下载
+
+    # 2) 不完整目录（模拟下载中断）→ 校验报错
+    partial = tmp_path / "partial"
+    partial.mkdir()
+    (partial / dl.EXPECTED_FILES[0]).write_text("x", encoding="utf-8")
+
+    def _partial_download(target):
+        # 桩：只"下载"一个文件（模拟中断）
+        (target / dl.EXPECTED_FILES[1]).write_text("x", encoding="utf-8")
+
+    monkeypatch.setattr(dl, "download_via_kagglehub", lambda t: True)
+    monkeypatch.setattr(dl, "download_via_public", _partial_download)
+    try:
+        dl.main(["--dir", str(partial)])
+        raised = False
+    except FileNotFoundError as e:
+        raised = "下载不完整" in str(e)
+    assert raised, "缺文件应报 FileNotFoundError 且含'下载不完整'"
