@@ -65,8 +65,8 @@ SSE 流末事件顺序：`content* → sources → sql_result（条件）→ con
   丢弃，BM25/rerank/fake 口径不可比——展示语义不明的分数比不展示更误导。
 - **args 只记脱敏后摘要**：SQL/日志查询/MCP 参数可能很长（SSE 流量放大 + 暴露面）；
   示例命中里的 SQL 反而全记——它本来就是注入模型的 few-shot，无额外暴露。
-- **docs 的 hit_key** 用 `source:chunk_index`（chunk_index 缺失退化为 `source:rank`），
-  与 `app/rag/document_utils.document_key` 同语义，保证重复检索可被摘要去重。
+- **docs 的 hit_key** 用 `source:chunk_index`（chunk_index 缺失退化为 `source:内容哈希`，
+  rank 随检索排序变化且同来源不同片段会碰撞，不能当稳定键），保证重复检索可被摘要去重。
 - **图谱只记查询摘要+规模**：复现只要 query + depth；全量边在工具结果里已有。
 - **截断长度用模块常量不进 Settings**：展示细节而非部署开关（feedback.py 同款）。
 

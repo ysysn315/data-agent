@@ -34,9 +34,9 @@ SNIPPET_MAX_CHARS = 120  # 文档片段摘要截断
 MAX_TOOL_CALLS = 30  # 请求级上限：单请求最多记录的调用数
 MAX_HITS_PER_TYPE = 20  # 请求级上限：每类命中按整个请求累计（非每调用各一份）
 
-# 本地工具白名单：参数 schema 受本仓库控制（脱敏规则覆盖它们的参数形态）。
-# 白名单之外的工具（动态 MCP 等）只展示参数名列表，不展示值。
-# query_log / query_prometheus_alerts 只在 TOOL_POLICIES 预留（外部接入），不在白名单。
+# 本地工具白名单：**仅作 summarize_args 单测/direct 调用的名字参考**。运行时
+# 可信判定用实例注册表（register_local_tools + record_tool_start(tool=...)）——
+# SkillsMiddleware 允许 MCP 工具以本地同名 override，名字判断会被绕过。
 _LOCAL_TOOL_NAMES = frozenset(
     {
         "read_skill",
@@ -67,7 +67,10 @@ _SENSITIVE_KEY_MARKS = (
 # 字符串级脱敏：值本身含敏感形态（DSN 密码段 / Bearer / Authorization 头）
 _DSN_PASSWORD_RE = re.compile(r"(://[^:/@\s]+:)[^@/\s]+(@)")
 _BEARER_RE = re.compile(r"(?i)\b(bearer)\s+\S+")
-_AUTH_HEADER_RE = re.compile(r"(?i)\b(authorization)\s*[:=]\s*\S+")
+# Authorization 整段值脱敏：Basic/Digest 等认证值是"方案 + 多段参数"（Digest 带
+# qop/nc/cnonce 引号串），吞第一个词会残留后半段凭据——消费到行尾（参数引号
+# 也是值的一部分，不能当边界）
+_AUTH_HEADER_RE = re.compile(r"(?i)\b(authorization)\s*[:=]\s*[^\n\r]*")
 
 
 @dataclass(frozen=True)
@@ -238,8 +241,14 @@ def _error_of(status: str) -> tuple[str, str]:
 # ========== 记录 API（无 recorder / 无 active trace 一律空操作） ==========
 
 
-def record_tool_start(call_id: str, name: str, args: object) -> Optional[ToolCallTrace]:
-    """middleware 在工具执行前调用；返回句柄（无请求级 recorder 时 None）。"""
+def record_tool_start(call_id: str, name: str, args: object, tool: object = None) -> Optional[ToolCallTrace]:
+    """middleware 在工具执行前调用；返回句柄（无请求级 recorder 时 None）。
+
+    可信来源判定用**实际工具实例**而非名字：SkillsMiddleware 允许 MCP 工具以
+    本地白名单同名登记并 override（request.tool 换成 MCP 实例），仅凭名字判断
+    会被重名绕过。白名单实例在构造时注册（register_local_tool），middleware 传
+    request.tool——实例在册才按本地工具脱敏，否则 keys-only。
+    """
     trace = _trace.get()
     if trace is None:
         return None
@@ -247,9 +256,21 @@ def record_tool_start(call_id: str, name: str, args: object) -> Optional[ToolCal
         if len(trace.tool_calls) >= MAX_TOOL_CALLS:
             trace.truncated = True
             return None
-        call = ToolCallTrace(call_id=call_id, name=name, args=summarize_args(name, args))
+        trusted = tool is not None and id(tool) in _local_tool_ids
+        call = ToolCallTrace(call_id=call_id, name=name, args=summarize_args(name if trusted else "", args))
         trace.tool_calls.append(call)
     return call
+
+
+# 本地可信工具实例注册表（id 集合）：middleware 按实际执行实例判定来源。
+# 在 dependencies 装配本地工具后调用 register_local_tools 注册。
+_local_tool_ids: set[int] = set()
+
+
+def register_local_tools(tools: Sequence[object]) -> None:
+    """注册本地工具实例（构造期一次）。MCP 重名实例不在册 → keys-only 脱敏。"""
+    for t in tools:
+        _local_tool_ids.add(id(t))
 
 
 def finish_tool_call(
@@ -320,7 +341,8 @@ def record_doc_hits(docs: Sequence[dict]) -> None:
     """知识库检索命中文档明细（source/title/片段摘要；无 score——RRF 融合后口径不可比）。
 
     hit_key 复用 app/rag/document_utils.document_key 的语义：优先 source+chunk_index，
-    缺失时退化为 source 序号——保证同一文档重复检索可被摘要去重。
+    缺失时用 source+内容摘要哈希（rank 随检索排序变化且同来源不同片段会碰撞，
+    不能当稳定键）——保证同一文档重复检索可被摘要去重。
     """
     call = _active_call()
     if call is None:

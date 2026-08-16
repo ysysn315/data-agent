@@ -43,18 +43,25 @@ class ToolRuntimeMiddleware(AgentMiddleware):
             return str(content) if content is not None else str(result)
 
         # 轨迹记录：start（含脱敏 args 摘要）→ 包住执行 → finish 补状态/耗时。
-        # MCP override 时 request.tool_call 仍是模型原始调用的 name/args（记模型视角）。
-        # safe_tool_execute 只捕 Exception：客户端断流的 CancelledError 与 policy
-        # disabled 路径的裸异常都会穿出（execution 可能未赋值）——区分记录后原样上抛：
-        # CancelledError 记 cancelled（取消是正常生命周期）；其它 BaseException
-        # 记 interrupted（ KeyboardInterrupt/系统退出/disabled 裸异常等），不吞任何异常。
-        trace_call = record_tool_start(tool_call_id, tool_name, request.tool_call.get("args") or {})
+        # MCP override 时 request.tool_call 仍是模型原始调用的 name/args（记模型视角）；
+        # request.tool 是实际执行实例（重名 MCP override 后即为 MCP 实例），
+        # 白名单按实例判定，名字不可信。
+        # safe_tool_execute 只捕 Exception，两类异常会穿出（execution 可能未赋值）：
+        # - CancelledError：取消是正常生命周期，记 cancelled 后原样上抛（不吞）
+        # - 普通异常（policy disabled 路径不经过 runtime 的兜底）：记 degraded（tool_failure）
+        # - 其它 BaseException（KeyboardInterrupt/系统退出）：记 interrupted
+        trace_call = record_tool_start(
+            tool_call_id, tool_name, request.tool_call.get("args") or {}, tool=getattr(request, "tool", None)
+        )
         execution = None
         try:
             with use_active_tool_trace(trace_call):
                 execution = await safe_tool_execute(tool_name, invoke, {})
         except asyncio.CancelledError:
             finish_tool_call(trace_call, status="cancelled")
+            raise
+        except Exception:
+            finish_tool_call(trace_call, status="degraded")
             raise
         except BaseException:
             finish_tool_call(trace_call, status="interrupted")

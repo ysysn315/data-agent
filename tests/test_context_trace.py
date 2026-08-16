@@ -20,6 +20,7 @@ from app.agents.context_trace import (
     record_example_hits,
     record_term_hits,
     record_tool_start,
+    register_local_tools,
     summarize_args,
     use_active_tool_trace,
     use_context_trace,
@@ -273,12 +274,23 @@ async def test_concurrent_same_name_tools_do_not_cross():
 
 async def test_middleware_records_success_and_degradation():
     """middleware 轨迹：成功记 status/duration；失败记 error_code/public_message，原文不泄漏。"""
+    # 本地真实例（注册后 args 按本地规则脱敏——值可见）
+    from langchain_core.tools import tool as lc_tool
+
     from app.agents.middlewares import ToolRuntimeMiddleware
     from app.agents.tool_runtime import reset_tool_runtime_state
 
+    @lc_tool
+    def local_execute_sql(sql: str) -> str:
+        """本地 execute_sql 测试实例。"""
+        return "ok"
+
+    register_local_tools([local_execute_sql])
+
     class _Request:
-        def __init__(self, name, args, call_id):
+        def __init__(self, name, args, call_id, tool=None):
             self.tool_call = {"name": name, "args": args, "id": call_id}
+            self.tool = tool
 
     async def ok_handler(request):
         return type("M", (), {"content": "结果"})()
@@ -289,8 +301,10 @@ async def test_middleware_records_success_and_degradation():
     mw = ToolRuntimeMiddleware()
     reset_tool_runtime_state()
     with use_context_trace():
-        await mw.awrap_tool_call(_Request("execute_sql", {"sql": "SELECT 1"}, "c1"), ok_handler)
-        await mw.awrap_tool_call(_Request("execute_sql", {"sql": "SELECT 1"}, "c2"), bad_handler)
+        await mw.awrap_tool_call(_Request("execute_sql", {"sql": "SELECT 1"}, "c1", tool=local_execute_sql), ok_handler)
+        await mw.awrap_tool_call(
+            _Request("execute_sql", {"sql": "SELECT 1"}, "c2", tool=local_execute_sql), bad_handler
+        )
         payload = context_hits_payload()
 
     by_id = {c["call_id"]: c for c in payload["tool_calls"]}
@@ -427,8 +441,15 @@ def test_unknown_mcp_tool_shows_keys_only():
     finally:
         ct.json.dumps = original_dumps
 
-    # 非 Bearer 的裸 Authorization 头（字符串级规则兜底）
-    assert "Basic dXNlcjpwYXNz" not in summarize_args("execute_sql", {"note": "Authorization: Basic dXNlcjpwYXNz"})
+    # 非 Bearer 的裸 Authorization 头（字符串级规则兜底）：断言凭据本体不存在——
+    # 只查整串会漏"正则吞第一个词、残留后半段"的情况（外部 CR 抓到过）
+    text = summarize_args("execute_sql", {"note": "Authorization: Basic dXNlcjpwYXNz"})
+    assert "dXNlcjpwYXNz" not in text and "Basic" not in text
+
+    # Digest 多段形式（用户名/nonce/response 引号串）同样整段清除
+    digest = 'Authorization: Digest username="admin", realm="x", nonce="abc", response="deadbeef"'
+    text = summarize_args("execute_sql", {"note": digest})
+    assert "deadbeef" not in text and "admin" not in text and "abc" not in text
 
 
 async def test_middleware_cancellation_records_and_reraises():
@@ -476,50 +497,95 @@ def test_doc_hit_key_uses_content_hash_not_rank():
     assert payload["summary"]["docs"] == 2  # 摘要不被错误去重为 1
 
 
-async def test_skills_to_mcp_override_chain_records_once():
-    """真实 middleware 组合链：SkillsMiddleware 动态接管（request.override）后，
-    ToolRuntimeMiddleware 仍只记录一次轨迹，且 MCP 工具名走 keys-only 脱敏。"""
+async def test_skills_to_mcp_override_chain_records_once(tmp_path):
+    """真实 SkillsMiddleware → ToolRuntimeMiddleware 串链（外部 CR：原测试是模拟）。
+
+    场景：MCP 工具以本地白名单同名 execute_sql 登记（SkillsMiddleware._mcp_tools），
+    awrap_tool_call override(tool=MCP 实例) 后执行。断言：
+    - 工具只执行一次、轨迹只记录一次；
+    - 实例不在本地注册表 → keys-only 脱敏（重名不绕过）；
+    - 本地真实例注册后 → 按本地工具脱敏。
+    """
     from langchain_core.tools import tool as lc_tool
 
+    from app.agents.context_trace import register_local_tools
     from app.agents.middlewares import ToolRuntimeMiddleware
     from app.agents.tool_runtime import reset_tool_runtime_state
+    from app.skills.middleware import SkillsMiddleware
+    from app.skills.service import SkillService
 
     recorded_calls: list[str] = []
 
     @lc_tool
-    def mcp_fake_query(query: str, tenant: str = "") -> str:
-        """fake MCP 工具：记录被调用的参数。"""
-        recorded_calls.append(f"{query}|{tenant}")
+    def mcp_execute_sql(sql: str) -> str:
+        """fake MCP 工具：与本地 execute_sql 重名。"""
+        recorded_calls.append(sql)
         return "mcp 结果"
 
-    class _FakeSkillsService:
-        pass
-
-    class _Request:
-        def __init__(self, name, args, call_id):
-            self.tool_call = {"name": name, "args": args, "id": call_id}
-
-    # 构造 Skills 动态接管的 handler：模拟 override 后执行 MCP 工具
+    # 真实 SkillsMiddleware（最小装配）+ 真实 ToolRuntimeMiddleware
+    skill_service = SkillService(str(tmp_path / "skills"))
+    skills_mw = SkillsMiddleware(skill_service=skill_service, gated_tools=[])
+    # 模拟 awrap_model_call 的懒加载登记：模型按"execute_sql"调用（重名场景），
+    # 注册表按调用名登记 → override(tool=MCP 实例) 接管执行
+    skills_mw._mcp_tools["execute_sql"] = mcp_execute_sql
     runtime_mw = ToolRuntimeMiddleware()
 
-    async def base_handler(request):
-        return type("M", (), {"content": "fallback"})()
+    base_result = None
 
-    async def mcp_handler(request):
-        # 模拟 wrap_tool_call 中 override(tool=...) 的接管效果：真实执行 MCP 工具
-        out = await mcp_fake_query.ainvoke(request.tool_call["args"])
-        return type("M", (), {"content": out})()
+    async def base_handler(req):
+        # 链的末端：langchain ToolNode 等价物——按 request.tool 执行（未 override 时为 None 会报错）
+        return await req.tool.ainvoke(req.tool_call["args"])
+
+    async def terminal_handler(req):
+        nonlocal base_result
+        base_result = await req.tool.ainvoke(req.tool_call["args"])
+        return type("M", (), {"content": base_result})()
+
+    # 真实 ToolCallRequest（langchain 同款构造）：tool=None（构建期不存在 MCP 工具）
+    from langchain.agents.middleware.types import ToolCallRequest
+
+    def make_request():
+        return ToolCallRequest(
+            tool_call={"name": "execute_sql", "args": {"sql": "SELECT tenant_secret"}, "id": "c1", "type": "tool_call"},
+            tool=None,
+            state={},
+            runtime=None,
+        )
 
     reset_tool_runtime_state()
-    request = _Request("mcp_fake_query", {"query": "secret-q", "tenant": "acme"}, "call_mcp_1")
     with use_context_trace():
-        # 模拟真实链：Runtime 外层 → 内层是 override 后的 handler
-        await runtime_mw.awrap_tool_call(request, mcp_handler)
+        # 真实链：Runtime(外层) → Skills(override) → 终端执行
+        async def skills_wrapped(req):
+            # 复刻 create_agent 的中间件编排：Skills.awrap_tool_call 包住终端 handler
+            return await skills_mw.awrap_tool_call(req, terminal_handler)
+
+        await runtime_mw.awrap_tool_call(make_request(), skills_wrapped)
         payload = context_hits_payload()
 
-    assert recorded_calls == ["secret-q|acme"]  # 工具只执行一次
+    assert recorded_calls == ["SELECT tenant_secret"]  # 只执行一次
+    assert base_result == "mcp 结果"
     assert len(payload["tool_calls"]) == 1  # 轨迹只记录一次
     tc = payload["tool_calls"][0]
     assert tc["status"] == "success"
-    assert "secret-q" not in tc["args"] and "acme" not in tc["args"]  # keys-only
-    assert "query" in tc["args"] and "tenant" in tc["args"]
+    # 重名 MCP：request.tool 是 MCP 实例、不在本地注册表 → keys-only，凭据不泄漏
+    assert "tenant_secret" not in tc["args"]
+    assert "sql" in tc["args"]
+
+    # 对照：本地真实例注册后，同名工具按本地规则脱敏（值可见）
+    @lc_tool
+    def local_execute_sql(sql: str) -> str:
+        """本地 execute_sql。"""
+        return "local"
+
+    register_local_tools([local_execute_sql])
+    reset_tool_runtime_state()
+    with use_context_trace():
+        req2 = ToolCallRequest(
+            tool_call={"name": "execute_sql", "args": {"sql": "SELECT 1"}, "id": "c2", "type": "tool_call"},
+            tool=local_execute_sql,
+            state={},
+            runtime=None,
+        )
+        await runtime_mw.awrap_tool_call(req2, terminal_handler)
+        payload2 = context_hits_payload()
+    assert "SELECT 1" in payload2["tool_calls"][0]["args"]
