@@ -44,7 +44,7 @@ hit_key：terms=term、examples=question、**docs 复用 `app/rag/document_utils
   ③之后才截断到 160 字。未知 MCP 工具默认只展示参数名列表。
 - 错误：`ToolExecutionResult` 只有原始 error 字符串（异常类名捕获后已丢失，fallback
   文案拼接原文）——**不改 tool_runtime.py**，响应只传稳定枚举 `error_code`
-  （timeout / tool_failure / circuit_open / unknown，按 status 映射）+ 本模块独立
+  （tool_failure / circuit_open / cancelled / unknown，对齐 ToolRuntime 实际终态 degraded/circuit_open 与 middleware 捕获的取消）+ 本模块独立
   安全映射的中文 `public_message`。原始异常只留后端日志/Langfuse。
 
 ### 2.3 上限：请求级全局

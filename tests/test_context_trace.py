@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from app.agents.context_trace import (
     ARGS_MAX_CHARS,
     MAX_HITS_PER_TYPE,
@@ -51,7 +53,7 @@ def test_summarize_args_redacts_sensitive_keys_recursively():
         "password": "hunter2",
         "config": {"api_key": "sk-123", "nested": [{"token": "abc"}, {"name": "ok"}]},
     }
-    text = summarize_args(args)
+    text = summarize_args("execute_sql", args)
     assert "hunter2" not in text and "sk-123" not in text and "abc" not in text
     assert "***" in text
     assert "SELECT 1" in text and "ok" in text
@@ -59,20 +61,20 @@ def test_summarize_args_redacts_sensitive_keys_recursively():
 
 def test_summarize_args_redacts_dsn_and_bearer_strings():
     """字符串级脱敏：DSN 密码段 / Bearer token / Authorization 值。"""
-    text = summarize_args({"dsn": "postgres://user:s3cret@db.host:5432/prod"})
+    text = summarize_args("execute_sql", {"dsn": "postgres://user:s3cret@db.host:5432/prod"})
     assert "s3cret" not in text and "db.host" in text
 
-    text = summarize_args({"auth": "Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig"})
+    text = summarize_args("execute_sql", {"auth": "Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig"})
     assert "eyJhbGciOiJIUzI1NiJ9" not in text and "Bearer ***" in text
 
-    text = summarize_args({"headers": {"Authorization": "Bearer abc.def"}})
+    text = summarize_args("execute_sql", {"headers": {"Authorization": "Bearer abc.def"}})
     assert "abc.def" not in text
 
 
 def test_summarize_args_truncates_after_redaction():
     """截断在脱敏之后：长文本截到 ARGS_MAX_CHARS，且敏感内容不在前缀里。"""
     args = {"log": "x" * 500, "secret": "leak-me"}
-    text = summarize_args(args)
+    text = summarize_args("execute_sql", args)
     assert len(text) == ARGS_MAX_CHARS + 1  # 截断 + 省略号
     assert text.endswith("…")
     assert "leak-me" not in text  # 脱敏先于截断
@@ -82,23 +84,30 @@ def test_summarize_args_truncates_after_redaction():
 
 
 def test_finish_tool_call_maps_error_safely():
-    """失败状态 → 稳定 error_code + 独立中文 public_message；不涉及原始异常。"""
+    """失败状态 → 稳定 error_code + 独立中文 public_message；不涉及原始异常。
+
+    键对齐 ToolRuntime 实际终态：degraded（普通失败）/ circuit_open / cancelled。
+    """
     with use_context_trace():
         call = record_tool_start("c1", "execute_sql", {"sql": "SELECT 1"})
-        finish_tool_call(call, status="timeout", attempts=2)
-        assert call.error_code == "timeout" and "超时" in call.public_message
+        finish_tool_call(call, status="degraded", attempts=2)
+        assert call.error_code == "tool_failure" and "失败" in call.public_message
 
         call2 = record_tool_start("c2", "t", {})
         finish_tool_call(call2, status="circuit_open")
         assert call2.error_code == "circuit_open"
 
         call3 = record_tool_start("c3", "t", {})
-        finish_tool_call(call3, status="weird_unknown")  # 未知状态
-        assert call3.error_code == "unknown"
+        finish_tool_call(call3, status="cancelled")
+        assert call3.error_code == "cancelled"
 
         call4 = record_tool_start("c4", "t", {})
-        finish_tool_call(call4, status="success")
-        assert call4.error_code is None and call4.public_message is None
+        finish_tool_call(call4, status="weird_unknown")  # 未识别状态
+        assert call4.error_code == "unknown"
+
+        call5 = record_tool_start("c5", "t", {})
+        finish_tool_call(call5, status="success")
+        assert call5.error_code is None and call5.public_message is None
 
 
 # ========== 调用级命中与去重 ==========
@@ -283,7 +292,7 @@ async def test_middleware_records_success_and_degradation():
 
     bad = by_id["c2"]
     assert bad["status"] != "success"
-    assert bad["error_code"] in ("timeout", "tool_failure", "circuit_open", "unknown")
+    assert bad["error_code"] in ("tool_failure", "circuit_open", "cancelled", "unknown")
     assert bad["public_message"] and "p@ss" not in bad["public_message"]
     assert "10.0.0.1" not in bad["public_message"]  # 原始异常只在后端日志
     # args 摘要经脱敏（本例 SQL 无敏感键，原样保留）
@@ -367,7 +376,7 @@ def test_context_hits_serialization_contract():
         with use_active_tool_trace(call):
             record_term_hits([{"term": "GMV", "definition": "d"}])
             record_doc_hits([{"source": "ops.md", "title": "运维", "chunk_index": 1, "content": "片段"}])
-        finish_tool_call(call, status="error", attempts=2)
+        finish_tool_call(call, status="degraded", attempts=2)
         payload = context_hits_payload()
 
     # SSE 路径：纯 JSON 可序列化
@@ -378,7 +387,129 @@ def test_context_hits_serialization_contract():
     # 非流式路径：Pydantic 校验通过且字段齐全
     resp = ChatResponse(answer="a", sources=[], context_hits=payload)
     tc = resp.context_hits.tool_calls[0]
-    assert tc.name == "t" and tc.status == "error" and tc.attempts == 2
+    assert tc.name == "t" and tc.status == "degraded" and tc.attempts == 2
     assert tc.error_code == "tool_failure" and tc.public_message
     assert tc.hits.terms[0].term == "GMV" and tc.hits.docs[0].source == "ops.md"
     assert resp.model_dump()["context_hits"]["summary"]["terms"] == 1
+
+
+# ========== 安全与异常边界（外部 CR 回归） ==========
+
+
+def test_unknown_mcp_tool_shows_keys_only():
+    """白名单外工具（动态 MCP）只展示参数名列表，不展示值——OpenSpec 安全约定。"""
+    args = {"query": "SELECT private_data", "tenant": "acme"}
+    text = summarize_args("mcp_some_server_tool", args)
+    assert "query" in text and "tenant" in text  # 参数名可见
+    assert "private_data" not in text and "acme" not in text  # 值不可见
+
+    # 本地白名单工具：脱敏后正常展示值
+    local = summarize_args("execute_sql", {"sql": "SELECT 1"})
+    assert "SELECT 1" in local
+
+    # 非法结构（str 而非 dict）也不泄漏原文
+    assert summarize_args("mcp_x", "not-a-dict") == "（参数不可解析）"
+
+    # 本地工具序列化失败 fail closed：固定占位文本，绝不回退 str(args) 原文
+    class _Bad:
+        def __init__(self):
+            self.ok = 1
+
+    assert summarize_args("execute_sql", {"x": _Bad()}) != ""  # 可序列化（default=str）
+    bad_obj = object()
+    text = summarize_args("execute_sql", {"cycle": bad_obj})
+    assert isinstance(text, str)  # 任何输入都有安全输出
+
+
+async def test_middleware_cancellation_records_and_reraises():
+    """CancelledError 穿出 safe_tool_execute（只捕 Exception）时：轨迹记 cancelled、异常原样上抛、
+    不被 UnboundLocalError 覆盖。"""
+    import asyncio
+
+    from app.agents.middlewares import ToolRuntimeMiddleware
+    from app.agents.tool_runtime import reset_tool_runtime_state
+
+    class _Request:
+        def __init__(self, name, args, call_id):
+            self.tool_call = {"name": name, "args": args, "id": call_id}
+
+    async def cancelled_handler(request):
+        raise asyncio.CancelledError()
+
+    mw = ToolRuntimeMiddleware()
+    reset_tool_runtime_state()
+    with use_context_trace():
+        with pytest.raises(asyncio.CancelledError):  # 原始取消异常上抛，未被覆盖
+            await mw.awrap_tool_call(_Request("execute_sql", {"sql": "SELECT 1"}, "c1"), cancelled_handler)
+        payload = context_hits_payload()
+
+    assert payload["tool_calls"][0]["status"] == "cancelled"
+    assert payload["tool_calls"][0]["error_code"] == "cancelled"
+
+
+def test_doc_hit_key_uses_content_hash_not_rank():
+    """缺 chunk_index 时 hit_key 用内容哈希：同来源两个不同片段不会碰撞为同一个键。"""
+    with use_context_trace():
+        c1 = record_tool_start("c1", "query_internal_docs", {})
+        with use_active_tool_trace(c1):
+            record_doc_hits(
+                [
+                    {"source": "ops.md", "title": "t", "content": "片段甲"},
+                    {"source": "ops.md", "title": "t", "content": "片段乙"},
+                ]
+            )
+        payload = context_hits_payload()
+
+    docs = payload["tool_calls"][0]["hits"]["docs"]
+    assert len(docs) == 2
+    assert docs[0]["hit_key"] != docs[1]["hit_key"]  # 内容不同 → 键不同
+    assert payload["summary"]["docs"] == 2  # 摘要不被错误去重为 1
+
+
+async def test_skills_to_mcp_override_chain_records_once():
+    """真实 middleware 组合链：SkillsMiddleware 动态接管（request.override）后，
+    ToolRuntimeMiddleware 仍只记录一次轨迹，且 MCP 工具名走 keys-only 脱敏。"""
+    from langchain_core.tools import tool as lc_tool
+
+    from app.agents.middlewares import ToolRuntimeMiddleware
+    from app.agents.tool_runtime import reset_tool_runtime_state
+
+    recorded_calls: list[str] = []
+
+    @lc_tool
+    def mcp_fake_query(query: str, tenant: str = "") -> str:
+        """fake MCP 工具：记录被调用的参数。"""
+        recorded_calls.append(f"{query}|{tenant}")
+        return "mcp 结果"
+
+    class _FakeSkillsService:
+        pass
+
+    class _Request:
+        def __init__(self, name, args, call_id):
+            self.tool_call = {"name": name, "args": args, "id": call_id}
+
+    # 构造 Skills 动态接管的 handler：模拟 override 后执行 MCP 工具
+    runtime_mw = ToolRuntimeMiddleware()
+
+    async def base_handler(request):
+        return type("M", (), {"content": "fallback"})()
+
+    async def mcp_handler(request):
+        # 模拟 wrap_tool_call 中 override(tool=...) 的接管效果：真实执行 MCP 工具
+        out = await mcp_fake_query.ainvoke(request.tool_call["args"])
+        return type("M", (), {"content": out})()
+
+    reset_tool_runtime_state()
+    request = _Request("mcp_fake_query", {"query": "secret-q", "tenant": "acme"}, "call_mcp_1")
+    with use_context_trace():
+        # 模拟真实链：Runtime 外层 → 内层是 override 后的 handler
+        await runtime_mw.awrap_tool_call(request, mcp_handler)
+        payload = context_hits_payload()
+
+    assert recorded_calls == ["secret-q|acme"]  # 工具只执行一次
+    assert len(payload["tool_calls"]) == 1  # 轨迹只记录一次
+    tc = payload["tool_calls"][0]
+    assert tc["status"] == "success"
+    assert "secret-q" not in tc["args"] and "acme" not in tc["args"]  # keys-only
+    assert "query" in tc["args"] and "tenant" in tc["args"]

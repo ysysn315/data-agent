@@ -17,8 +17,10 @@ public_message，原始 str(exc) 只留后端日志/Langfuse。
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
+import threading
 import time
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -30,6 +32,24 @@ ARGS_MAX_CHARS = 160  # 工具参数摘要截断（脱敏之后）
 SNIPPET_MAX_CHARS = 120  # 文档片段摘要截断
 MAX_TOOL_CALLS = 30  # 请求级上限：单请求最多记录的调用数
 MAX_HITS_PER_TYPE = 20  # 请求级上限：每类命中按整个请求累计（非每调用各一份）
+
+# 本地工具白名单：参数 schema 受本仓库控制（脱敏规则覆盖它们的参数形态）。
+# 白名单之外的工具（动态 MCP 等）只展示参数名列表，不展示值。
+# query_log / query_prometheus_alerts 只在 TOOL_POLICIES 预留（外部接入），不在白名单。
+_LOCAL_TOOL_NAMES = frozenset(
+    {
+        "read_skill",
+        "run_skill_script",
+        "schema_search",
+        "sql_context_search",
+        "execute_sql",
+        "query_internal_docs",
+        "graph_search",
+        "graph_path_search",
+        "get_current_datetime",
+        "tavily_search",
+    }
+)
 
 # 键名脱敏：命中即整值替换（含嵌套 dict/list 递归）
 _SENSITIVE_KEY_MARKS = (
@@ -111,10 +131,15 @@ class ToolCallTrace:
 
 @dataclass
 class ContextTrace:
-    """一次对话请求的完整轨迹。上限按整个请求累计，触发置 truncated。"""
+    """一次对话请求的完整轨迹。上限按整个请求累计，触发置 truncated。
+
+    计数器加锁：sync 工具在线程池并发执行时 read-modify-write 必须原子，
+    否则并发追加可能突破全局上限。
+    """
 
     tool_calls: list[ToolCallTrace] = field(default_factory=list)
     truncated: bool = False
+    lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
     # 请求级累计计数（含被上限丢弃的，保证计数口径）
     _term_count: int = 0
     _example_count: int = 0
@@ -170,24 +195,35 @@ def _redact_value(value, key_hint: str = "") -> object:
     return _BEARER_RE.sub(r"\1 ***", _DSN_PASSWORD_RE.sub(r"\1***\2", value))
 
 
-def summarize_args(args: object) -> str:
-    """工具参数 → 脱敏后 JSON 摘要，再截断到 ARGS_MAX_CHARS（顺序：先脱敏后截断）。"""
+def summarize_args(tool_name: str, args: object) -> str:
+    """工具参数 → 脱敏后 JSON 摘要，再截断到 ARGS_MAX_CHARS（顺序：先脱敏后截断）。
+
+    白名单之外的工具（动态 MCP 等，参数 schema 不受本仓库控制）**只展示参数名列表**，
+    不展示值——OpenSpec 的安全约定。序列化失败时返回固定占位文本（fail closed，
+    绝不回退到 str(args) 原文下发）。
+    """
+    if tool_name not in _LOCAL_TOOL_NAMES:
+        if not isinstance(args, dict):
+            return "（参数不可解析）"
+        keys = sorted(str(k) for k in args)
+        return f"参数：{', '.join(keys)}" if keys else "（无参数）"
     try:
         redacted = _redact_value(args)
         text = json.dumps(redacted, ensure_ascii=False, default=str)
     except (TypeError, ValueError):
-        text = str(args)
+        return "（参数不可解析）"
     if len(text) > ARGS_MAX_CHARS:
         return text[:ARGS_MAX_CHARS] + "…"
     return text
 
 
 # status → 稳定错误枚举与安全公开文案（独立映射，不复用 ToolRuntime 的降级文案——
-# 那边拼接原始异常原文，不能下发浏览器）
+# 那边拼接原始异常原文，不能下发浏览器）。键对齐 ToolRuntime 实际终态：
+# success / degraded（重试耗尽的普通失败）/ circuit_open / cancelled（middleware 捕取消）。
 _ERROR_CODE_BY_STATUS = {
-    "timeout": ("timeout", "工具执行超时，已跳过"),
-    "error": ("tool_failure", "工具执行失败，已降级处理"),
+    "degraded": ("tool_failure", "工具执行失败，已降级处理"),
     "circuit_open": ("circuit_open", "工具熔断保护中，暂不可用"),
+    "cancelled": ("cancelled", "请求已取消"),
 }
 _UNKNOWN_ERROR = ("unknown", "工具执行异常，已降级处理")
 
@@ -204,11 +240,12 @@ def record_tool_start(call_id: str, name: str, args: object) -> Optional[ToolCal
     trace = _trace.get()
     if trace is None:
         return None
-    if len(trace.tool_calls) >= MAX_TOOL_CALLS:
-        trace.truncated = True
-        return None
-    call = ToolCallTrace(call_id=call_id, name=name, args=summarize_args(args))
-    trace.tool_calls.append(call)
+    with trace.lock:  # 并发工具调用下上限判定与 append 原子
+        if len(trace.tool_calls) >= MAX_TOOL_CALLS:
+            trace.truncated = True
+            return None
+        call = ToolCallTrace(call_id=call_id, name=name, args=summarize_args(name, args))
+        trace.tool_calls.append(call)
     return call
 
 
@@ -233,16 +270,20 @@ def _active_call() -> Optional[ToolCallTrace]:
 
 
 def _over_limit(kind: str) -> bool:
-    """请求级每类累计上限；超限丢弃该条并置 truncated。"""
+    """请求级每类累计上限；超限丢弃该条并置 truncated。
+
+    持锁 read-modify-write：sync 工具在线程池并发记录时保证原子（否则可突破上限）。
+    """
     trace = _trace.get()
     if trace is None:
         return True
-    count = getattr(trace, f"_{kind}_count")
-    if count >= MAX_HITS_PER_TYPE:
-        trace.truncated = True
-        return True
-    setattr(trace, f"_{kind}_count", count + 1)
-    return False
+    with trace.lock:
+        count = getattr(trace, f"_{kind}_count")
+        if count >= MAX_HITS_PER_TYPE:
+            trace.truncated = True
+            return True
+        setattr(trace, f"_{kind}_count", count + 1)
+        return False
 
 
 def record_term_hits(hits: Sequence[dict]) -> None:
@@ -287,8 +328,13 @@ def record_doc_hits(docs: Sequence[dict]) -> None:
             return
         source = str(doc.get("source") or "")
         chunk_index = doc.get("chunk_index")
-        hit_key = f"{source}:{chunk_index}" if chunk_index is not None else f"{source}:{rank}"
         content = str(doc.get("content") or doc.get("text") or "")
+        # hit_key 与 document_key 同语义：优先 source+chunk_index；缺失时用内容摘要哈希
+        # （rank 随每次检索变化、同来源不同片段会碰撞，不能当稳定键）
+        if chunk_index is not None:
+            hit_key = f"{source}:{chunk_index}"
+        else:
+            hit_key = f"{source}:{hashlib.sha1(content.encode('utf-8')).hexdigest()[:10]}"
         call.hits.docs.append(
             DocHit(
                 hit_key=hit_key,

@@ -42,12 +42,19 @@ class ToolRuntimeMiddleware(AgentMiddleware):
 
         # 轨迹记录：start（含脱敏 args 摘要）→ 包住执行 → finish 补状态/耗时。
         # MCP override 时 request.tool_call 仍是模型原始调用的 name/args（记模型视角）。
+        # 注意：safe_tool_execute 只捕 Exception——客户端断流的 CancelledError 会穿出，
+        # execution 可能未赋值；此时轨迹记 cancelled 后原样上抛（不能吞取消）。
         trace_call = record_tool_start(tool_call_id, tool_name, request.tool_call.get("args") or {})
+        execution = None
         try:
             with use_active_tool_trace(trace_call):
                 execution = await safe_tool_execute(tool_name, invoke, {})
+        except BaseException:
+            finish_tool_call(trace_call, status="cancelled")
+            raise
         finally:
-            finish_tool_call(trace_call, status=execution.status, attempts=execution.attempts)
+            if execution is not None:
+                finish_tool_call(trace_call, status=execution.status, attempts=execution.attempts)
 
         if execution.success and "value" in result_cell:
             return result_cell["value"]
