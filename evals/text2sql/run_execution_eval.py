@@ -217,6 +217,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--limit", type=int, default=None, help="只跑前 N 个用例（抽样）")
     parser.add_argument("--db", default=settings.sqlite_db_path, help="SQLite 演示库路径")
     parser.add_argument("--model", default=None, help="覆盖 LLM 模型名（默认取配置）")
+    parser.add_argument(
+        "--interval",
+        type=float,
+        default=0.0,
+        help="每例之间的间隔秒数（对低 RPM 配额的模型限速，避免 429 污染结果）",
+    )
     parser.add_argument("--tag", action="append", default=[], help="只跑含该标签的题；可重复指定")
     parser.add_argument(
         "--difficulty",
@@ -255,10 +261,19 @@ def main(argv: list[str] | None = None) -> int:
     started = time.time()
     case_results = []
     for i, case in enumerate(dataset, start=1):
-        r = evaluate_case(case, args.db, schema, skill_body, schema_context, llm)
+        # 限流退避：429 属于"还没测到"，重试拿到真实结果（最多 5 次，指数退避）
+        for attempt in range(5):
+            r = evaluate_case(case, args.db, schema, skill_body, schema_context, llm)
+            if "429" not in str(r.get("error") or ""):
+                break
+            wait = min(30, 5 * (attempt + 1))
+            logger.warning(f"[{i}/{len(dataset)}] {r['id']} 触发限流，等 {wait}s 重试（第 {attempt + 1}/5 次）")
+            time.sleep(wait)
         flag = "✓" if r["correct"] else "✗"
         logger.info(f"[{i}/{len(dataset)}] {flag} {r['id']} {r.get('error') or ''}")
         case_results.append(r)
+        if args.interval:
+            time.sleep(args.interval)
 
     report = build_report(case_results)
     report["meta"] = {
