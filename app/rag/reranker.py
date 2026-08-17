@@ -2,8 +2,6 @@ import os
 from pathlib import Path
 from typing import Dict, List
 
-import torch
-from FlagEmbedding import FlagReranker
 from loguru import logger
 
 from app.core.settings import settings
@@ -15,9 +13,22 @@ os.environ.setdefault("TRANSFORMERS_CACHE", str(MODEL_CACHE_DIR))
 
 
 class BGEReranker:
-    """Local BGE reranker with CUDA-aware defaults."""
+    """Local BGE reranker with CUDA-aware defaults.
+
+    torch/FlagEmbedding 在 __init__ 内才导入（重依赖惰性化）——未安装时
+    import 本模块不再炸，构造时抛 RuntimeError 由调用方回退 LLM 重排。
+    """
 
     def __init__(self, model_name: str = "BAAI/bge-reranker-base"):
+        try:
+            import torch
+            from FlagEmbedding import FlagReranker
+        except ImportError as e:
+            raise RuntimeError(
+                "BGE reranker 需要 torch/FlagEmbedding（可选重依赖，未安装）——"
+                "uv pip install torch FlagEmbedding 后重试，或回退 LLM 重排"
+            ) from e
+
         MODEL_CACHE_DIR.mkdir(parents=True, exist_ok=True)
         self.model_name = model_name
         self.use_fp16 = torch.cuda.is_available()
