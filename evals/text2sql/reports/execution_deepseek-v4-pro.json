@@ -1,19 +1,19 @@
 {
   "summary": {
     "total": 50,
-    "correct": 31,
-    "accuracy": 0.62
+    "correct": 28,
+    "accuracy": 0.56
   },
   "by_tag": {
     "CASE表达式": {
       "total": 1,
-      "correct": 1,
-      "accuracy": 1.0
+      "correct": 0,
+      "accuracy": 0.0
     },
     "CTE": {
       "total": 11,
-      "correct": 5,
-      "accuracy": 0.4545
+      "correct": 1,
+      "accuracy": 0.0909
     },
     "HAVING": {
       "total": 3,
@@ -27,23 +27,23 @@
     },
     "TopN": {
       "total": 10,
-      "correct": 6,
-      "accuracy": 0.6
+      "correct": 5,
+      "accuracy": 0.5
     },
     "业务口径": {
       "total": 9,
-      "correct": 3,
-      "accuracy": 0.3333
+      "correct": 2,
+      "accuracy": 0.2222
     },
     "单表聚合": {
       "total": 17,
-      "correct": 14,
-      "accuracy": 0.8235
+      "correct": 16,
+      "accuracy": 0.9412
     },
     "去重计数": {
       "total": 3,
-      "correct": 1,
-      "accuracy": 0.3333
+      "correct": 2,
+      "accuracy": 0.6667
     },
     "反连接": {
       "total": 2,
@@ -52,8 +52,8 @@
     },
     "多表JOIN": {
       "total": 21,
-      "correct": 10,
-      "accuracy": 0.4762
+      "correct": 9,
+      "accuracy": 0.4286
     },
     "子查询": {
       "total": 6,
@@ -67,13 +67,13 @@
     },
     "时间过滤": {
       "total": 8,
-      "correct": 7,
-      "accuracy": 0.875
+      "correct": 4,
+      "accuracy": 0.5
     },
     "条件聚合": {
       "total": 5,
-      "correct": 3,
-      "accuracy": 0.6
+      "correct": 2,
+      "accuracy": 0.4
     },
     "相关子查询": {
       "total": 1,
@@ -82,8 +82,8 @@
     },
     "窗口函数": {
       "total": 4,
-      "correct": 2,
-      "accuracy": 0.5
+      "correct": 0,
+      "accuracy": 0.0
     },
     "防重复聚合": {
       "total": 3,
@@ -104,13 +104,13 @@
     },
     "medium": {
       "total": 20,
-      "correct": 12,
-      "accuracy": 0.6
+      "correct": 14,
+      "accuracy": 0.7
     },
     "hard": {
       "total": 20,
-      "correct": 9,
-      "accuracy": 0.45
+      "correct": 4,
+      "accuracy": 0.2
     }
   },
   "cases": [
@@ -134,7 +134,7 @@
       ],
       "difficulty": "easy",
       "golden_sql": "SELECT order_status, COUNT(*) AS order_count FROM orders GROUP BY order_status",
-      "pred_sql": "SELECT order_status, COUNT(*) AS order_count\nFROM orders\nGROUP BY order_status\nLIMIT 1000",
+      "pred_sql": "SELECT order_status, COUNT(*) AS order_count\nFROM orders\nGROUP BY order_status\nORDER BY order_status\nLIMIT 1000",
       "correct": true,
       "error": null
     },
@@ -146,7 +146,7 @@
       ],
       "difficulty": "easy",
       "golden_sql": "SELECT payment_type, ROUND(SUM(payment_value), 2) AS total_value FROM payments GROUP BY payment_type",
-      "pred_sql": "SELECT payment_type, SUM(payment_value) AS total_payment_value\nFROM payments\nGROUP BY payment_type\nLIMIT 1000",
+      "pred_sql": "SELECT payment_type, SUM(payment_value) AS total_amount\nFROM payments\nGROUP BY payment_type\nORDER BY total_amount DESC\nLIMIT 1000",
       "correct": true,
       "error": null
     },
@@ -170,7 +170,7 @@
       ],
       "difficulty": "easy",
       "golden_sql": "SELECT customer_state, COUNT(*) AS customer_count FROM customers GROUP BY customer_state",
-      "pred_sql": "SELECT customer_state, COUNT(DISTINCT customer_unique_id) AS customer_count\nFROM customers\nGROUP BY customer_state\nLIMIT 1000",
+      "pred_sql": "SELECT customer_state, COUNT(DISTINCT customer_unique_id) AS customer_count\nFROM customers\nGROUP BY customer_state\nORDER BY customer_count DESC\nLIMIT 1000",
       "correct": true,
       "error": null
     },
@@ -209,7 +209,7 @@
       ],
       "difficulty": "easy",
       "golden_sql": "SELECT product_category_name, COUNT(*) AS product_count FROM products GROUP BY product_category_name ORDER BY product_count DESC, product_category_name LIMIT 5",
-      "pred_sql": "SELECT product_category_name, COUNT(product_id) AS product_count\nFROM products\nGROUP BY product_category_name\nORDER BY product_count DESC\nLIMIT 5",
+      "pred_sql": "SELECT product_category_name, COUNT(product_id) AS product_count\nFROM products\nWHERE product_category_name IS NOT NULL\nGROUP BY product_category_name\nORDER BY product_count DESC\nLIMIT 5",
       "correct": true,
       "error": null
     },
@@ -221,7 +221,7 @@
       ],
       "difficulty": "easy",
       "golden_sql": "SELECT COUNT(*) AS installment_count FROM payments WHERE payment_type = 'credit_card' AND payment_installments > 1",
-      "pred_sql": "SELECT COUNT(*) AS cnt\nFROM payments\nWHERE payment_type = 'credit_card'\n  AND payment_installments > 1\nLIMIT 1000",
+      "pred_sql": "SELECT COUNT(*) AS payment_count\nFROM payments\nWHERE payment_type = 'credit_card'\n  AND payment_installments > 1\nLIMIT 1000",
       "correct": true,
       "error": null
     },
@@ -233,9 +233,9 @@
       ],
       "difficulty": "medium",
       "golden_sql": "SELECT c.customer_state, ROUND(SUM(oi.price), 2) AS gmv FROM customers c JOIN orders o ON c.customer_id = o.customer_id JOIN order_items oi ON o.order_id = oi.order_id GROUP BY c.customer_state",
-      "pred_sql": "",
-      "correct": false,
-      "error": "模型未产出可解析的 SQL"
+      "pred_sql": "SELECT c.customer_state AS state,\n       SUM(oi.price) AS total_sales\nFROM customers c\nJOIN orders o ON o.customer_id = c.customer_id\nJOIN order_items oi ON oi.order_id = o.order_id\nGROUP BY c.customer_state\nORDER BY total_sales DESC\nLIMIT 1000",
+      "correct": true,
+      "error": null
     },
     {
       "id": "t2s_011",
@@ -245,7 +245,7 @@
       ],
       "difficulty": "medium",
       "golden_sql": "SELECT s.seller_state, COUNT(*) AS item_count FROM order_items oi JOIN sellers s ON oi.seller_id = s.seller_id GROUP BY s.seller_state",
-      "pred_sql": "SELECT s.seller_state,\n       COUNT(*) AS order_item_count\nFROM sellers AS s\nJOIN order_items AS oi ON s.seller_id = oi.seller_id\nGROUP BY s.seller_state\nORDER BY order_item_count DESC\nLIMIT 1000",
+      "pred_sql": "SELECT s.seller_state, COUNT(oi.order_item_id) AS order_item_count\nFROM order_items oi\nJOIN sellers s ON oi.seller_id = s.seller_id\nGROUP BY s.seller_state\nORDER BY order_item_count DESC\nLIMIT 1000",
       "correct": true,
       "error": null
     },
@@ -269,7 +269,7 @@
       ],
       "difficulty": "medium",
       "golden_sql": "SELECT COUNT(*) AS item_count FROM orders o JOIN order_items oi ON o.order_id = oi.order_id WHERE o.order_status = 'delivered'",
-      "pred_sql": "SELECT COUNT(*) AS delivered_item_count\nFROM order_items oi\nJOIN orders o ON oi.order_id = o.order_id\nWHERE o.order_status = 'delivered'\nLIMIT 1000",
+      "pred_sql": "SELECT COUNT(*) AS delivered_item_count\nFROM orders o\nJOIN order_items oi ON o.order_id = oi.order_id\nWHERE o.order_status = 'delivered'\nLIMIT 1000",
       "correct": true,
       "error": null
     },
@@ -293,7 +293,7 @@
       ],
       "difficulty": "easy",
       "golden_sql": "SELECT COUNT(*) AS order_count FROM orders WHERE order_purchase_timestamp >= '2017-01-01' AND order_purchase_timestamp < '2018-01-01'",
-      "pred_sql": "SELECT COUNT(*) AS total_orders\nFROM orders\nWHERE order_purchase_timestamp >= '2017-01-01'\n  AND order_purchase_timestamp < '2018-01-01'\nLIMIT 1000",
+      "pred_sql": "SELECT COUNT(*) AS order_count\nFROM orders\nWHERE order_purchase_timestamp >= '2017-01-01'\n  AND order_purchase_timestamp < '2018-01-01'\nLIMIT 1000",
       "correct": true,
       "error": null
     },
@@ -306,7 +306,7 @@
       ],
       "difficulty": "medium",
       "golden_sql": "SELECT strftime('%Y-%m', order_purchase_timestamp) AS month, COUNT(*) AS order_count FROM orders WHERE order_purchase_timestamp >= '2018-01-01' AND order_purchase_timestamp < '2019-01-01' GROUP BY month",
-      "pred_sql": "SELECT strftime('%Y-%m', order_purchase_timestamp) AS month,\n       COUNT(order_id) AS order_count\nFROM orders\nWHERE order_purchase_timestamp >= '2018-01-01'\n  AND order_purchase_timestamp < '2019-01-01'\nGROUP BY strftime('%Y-%m', order_purchase_timestamp)\nORDER BY month\nLIMIT 1000",
+      "pred_sql": "SELECT strftime('%Y-%m', order_purchase_timestamp) AS month,\n       COUNT(order_id) AS order_count\nFROM orders\nWHERE order_purchase_timestamp >= '2018-01-01'\n  AND order_purchase_timestamp < '2019-01-01'\nGROUP BY month\nORDER BY month\nLIMIT 1000",
       "correct": true,
       "error": null
     },
@@ -319,9 +319,9 @@
       ],
       "difficulty": "medium",
       "golden_sql": "SELECT ROUND(SUM(oi.price), 2) AS gmv FROM orders o JOIN order_items oi ON o.order_id = oi.order_id WHERE o.order_purchase_timestamp >= '2017-07-01' AND o.order_purchase_timestamp < '2018-01-01'",
-      "pred_sql": "SELECT SUM(oi.price) AS total_sales\nFROM order_items oi\nJOIN orders o ON oi.order_id = o.order_id\nWHERE o.order_purchase_timestamp >= '2017-07-01'\n  AND o.order_purchase_timestamp < '2018-01-01'\nLIMIT 1000",
-      "correct": true,
-      "error": null
+      "pred_sql": "",
+      "correct": false,
+      "error": "模型未产出可解析的 SQL"
     },
     {
       "id": "t2s_018",
@@ -332,7 +332,7 @@
       ],
       "difficulty": "medium",
       "golden_sql": "SELECT pay.payment_type, ROUND(SUM(pay.payment_value), 2) AS total_value FROM orders o JOIN payments pay ON o.order_id = pay.order_id WHERE o.order_purchase_timestamp >= '2017-01-01' AND o.order_purchase_timestamp < '2018-01-01' GROUP BY pay.payment_type",
-      "pred_sql": "SELECT p.payment_type,\n       SUM(p.payment_value) AS total_payment_value\nFROM payments p\nJOIN orders o ON o.order_id = p.order_id\nWHERE o.order_purchase_timestamp >= '2017-01-01'\n  AND o.order_purchase_timestamp < '2018-01-01'\nGROUP BY p.payment_type\nLIMIT 1000",
+      "pred_sql": "SELECT p.payment_type,\n       SUM(p.payment_value) AS total_payment_value\nFROM payments AS p\nJOIN orders AS o\n  ON o.order_id = p.order_id\nWHERE o.order_purchase_timestamp >= '2017-01-01'\n  AND o.order_purchase_timestamp < '2018-01-01'\nGROUP BY p.payment_type\nORDER BY total_payment_value DESC\nLIMIT 1000",
       "correct": true,
       "error": null
     },
@@ -371,7 +371,7 @@
       ],
       "difficulty": "medium",
       "golden_sql": "SELECT c.customer_unique_id, COUNT(*) AS order_count FROM customers c JOIN orders o ON c.customer_id = o.customer_id GROUP BY c.customer_unique_id ORDER BY order_count DESC, c.customer_unique_id LIMIT 10",
-      "pred_sql": "SELECT c.customer_unique_id, COUNT(o.order_id) AS order_count\nFROM customers AS c\nJOIN orders AS o ON o.customer_id = c.customer_id\nGROUP BY c.customer_unique_id\nORDER BY COUNT(o.order_id) DESC\nLIMIT 10",
+      "pred_sql": "SELECT c.customer_unique_id,\n       COUNT(o.order_id) AS order_count\nFROM orders AS o\nJOIN customers AS c ON o.customer_id = c.customer_id\nGROUP BY c.customer_unique_id\nORDER BY order_count DESC\nLIMIT 10",
       "correct": false,
       "error": null
     },
@@ -398,7 +398,7 @@
       ],
       "difficulty": "hard",
       "golden_sql": "WITH avg_pay AS (SELECT AVG(payment_value) AS m FROM payments) SELECT COUNT(*) AS above_avg_count FROM payments, avg_pay WHERE payments.payment_value > avg_pay.m",
-      "pred_sql": "SELECT COUNT(*) AS payment_count\nFROM payments\nWHERE payment_value > (SELECT AVG(payment_value) FROM payments)\nLIMIT 1000",
+      "pred_sql": "SELECT COUNT(*) AS payment_count\nFROM payments AS p\nWHERE p.payment_value > (\n    SELECT AVG(pp.payment_value)\n    FROM payments AS pp\n)\nLIMIT 1000",
       "correct": true,
       "error": null
     },
@@ -411,9 +411,9 @@
       ],
       "difficulty": "hard",
       "golden_sql": "WITH order_per_customer AS (SELECT c.customer_unique_id AS uid, COUNT(*) AS cnt FROM customers c JOIN orders o ON c.customer_id = o.customer_id GROUP BY c.customer_unique_id) SELECT COUNT(*) AS repeat_customers FROM order_per_customer WHERE cnt >= 2",
-      "pred_sql": "SELECT COUNT(*) AS repeat_customer_count\nFROM (\n    SELECT c.customer_unique_id\n    FROM customers AS c\n    JOIN orders AS o ON c.customer_id = o.customer_id\n    GROUP BY c.customer_unique_id\n    HAVING COUNT(o.order_id) >= 2\n) AS repeat_customers\nLIMIT 1000",
-      "correct": true,
-      "error": null
+      "pred_sql": "",
+      "correct": false,
+      "error": "模型未产出可解析的 SQL"
     },
     {
       "id": "t2s_025",
@@ -423,9 +423,9 @@
       ],
       "difficulty": "medium",
       "golden_sql": "SELECT item_count, COUNT(*) AS order_count FROM (SELECT order_id, COUNT(*) AS item_count FROM order_items GROUP BY order_id) t GROUP BY item_count",
-      "pred_sql": "",
-      "correct": false,
-      "error": "模型未产出可解析的 SQL"
+      "pred_sql": "SELECT t.item_count, COUNT(*) AS order_count\nFROM (\n    SELECT oi.order_id, COUNT(*) AS item_count\n    FROM order_items AS oi\n    GROUP BY oi.order_id\n) AS t\nGROUP BY t.item_count\nORDER BY t.item_count\nLIMIT 1000",
+      "correct": true,
+      "error": null
     },
     {
       "id": "t2s_026",
@@ -449,9 +449,9 @@
       ],
       "difficulty": "hard",
       "golden_sql": "WITH monthly AS (SELECT strftime('%Y-%m', order_purchase_timestamp) AS month, COUNT(*) AS cnt FROM orders WHERE order_purchase_timestamp >= '2017-01-01' AND order_purchase_timestamp < '2018-01-01' GROUP BY month) SELECT month, cnt, ROUND(cnt * 100.0 / (SELECT SUM(cnt) FROM monthly), 2) AS pct FROM monthly ORDER BY month",
-      "pred_sql": "WITH monthly_orders AS (\n  SELECT\n    strftime('%Y-%m', order_purchase_timestamp) AS month,\n    COUNT(*) AS order_count\n  FROM orders\n  WHERE strftime('%Y', order_purchase_timestamp) = '2017'\n  GROUP BY strftime('%Y-%m', order_purchase_timestamp)\n),\nyear_total AS (\n  SELECT SUM(order_count) AS total_count\n  FROM monthly_orders\n)\nSELECT\n  mo.month,\n  mo.order_count,\n  ROUND(100.0 * mo.order_count / yt.total_count, 2) AS pct\nFROM monthly_orders mo\nCROSS JOIN year_total yt\nORDER BY mo.month\nLIMIT 1000",
-      "correct": true,
-      "error": null
+      "pred_sql": "",
+      "correct": false,
+      "error": "模型未产出可解析的 SQL"
     },
     {
       "id": "t2s_028",
@@ -461,7 +461,7 @@
       ],
       "difficulty": "medium",
       "golden_sql": "SELECT payment_type, ROUND(AVG(payment_installments), 2) AS avg_installments FROM payments WHERE payment_type IN ('credit_card', 'boleto') GROUP BY payment_type",
-      "pred_sql": "SELECT payment_type, AVG(payment_installments) AS avg_installments\nFROM payments\nWHERE payment_type IN ('credit_card', 'boleto')\nGROUP BY payment_type\nLIMIT 1000",
+      "pred_sql": "SELECT payment_type,\n       AVG(payment_installments) AS avg_installments\nFROM payments\nWHERE payment_type IN ('credit_card', 'boleto')\nGROUP BY payment_type\nLIMIT 1000",
       "correct": true,
       "error": null
     },
@@ -474,9 +474,9 @@
       ],
       "difficulty": "medium",
       "golden_sql": "SELECT SUM(CASE WHEN order_status = 'delivered' THEN 1 ELSE 0 END) AS delivered_count, SUM(CASE WHEN order_status = 'canceled' THEN 1 ELSE 0 END) AS canceled_count, SUM(CASE WHEN order_status NOT IN ('delivered', 'canceled') THEN 1 ELSE 0 END) AS other_count FROM orders",
-      "pred_sql": "",
-      "correct": false,
-      "error": "模型未产出可解析的 SQL"
+      "pred_sql": "SELECT \n  SUM(CASE WHEN order_status = 'delivered' THEN 1 ELSE 0 END) AS delivered_orders,\n  SUM(CASE WHEN order_status = 'canceled' THEN 1 ELSE 0 END) AS canceled_orders,\n  SUM(CASE WHEN order_status NOT IN ('delivered', 'canceled') THEN 1 ELSE 0 END) AS other_orders\nFROM orders\nLIMIT 1000",
+      "correct": true,
+      "error": null
     },
     {
       "id": "t2s_030",
@@ -487,9 +487,9 @@
       ],
       "difficulty": "medium",
       "golden_sql": "SELECT customer_state, customer_city, COUNT(*) AS customer_count FROM customers GROUP BY customer_state, customer_city HAVING COUNT(*) >= 10 ORDER BY customer_count DESC, customer_state, customer_city",
-      "pred_sql": "",
+      "pred_sql": "SELECT customer_state AS state,\n       customer_city AS city,\n       COUNT(DISTINCT customer_unique_id) AS customer_count\nFROM customers\nGROUP BY customer_state, customer_city\nHAVING COUNT(DISTINCT customer_unique_id) >= 10\nORDER BY customer_state, customer_city\nLIMIT 1000",
       "correct": false,
-      "error": "模型未产出可解析的 SQL"
+      "error": null
     },
     {
       "id": "t2s_031",
@@ -501,7 +501,7 @@
       ],
       "difficulty": "medium",
       "golden_sql": "SELECT COUNT(DISTINCT c.customer_unique_id) AS active_customers FROM customers c JOIN orders o ON c.customer_id = o.customer_id WHERE o.order_purchase_timestamp >= '2017-01-01' AND o.order_purchase_timestamp < '2018-01-01'",
-      "pred_sql": "SELECT COUNT(DISTINCT c.customer_unique_id) AS unique_customer_count\nFROM orders o\nJOIN customers c ON o.customer_id = c.customer_id\nWHERE o.order_purchase_timestamp >= '2017-01-01'\n  AND o.order_purchase_timestamp < '2018-01-01'\nLIMIT 1000",
+      "pred_sql": "SELECT COUNT(DISTINCT c.customer_unique_id) AS unique_customers\nFROM orders o\nJOIN customers c ON o.customer_id = c.customer_id\nWHERE o.order_purchase_timestamp >= '2017-01-01'\n  AND o.order_purchase_timestamp < '2018-01-01'\nLIMIT 1000",
       "correct": true,
       "error": null
     },
@@ -543,7 +543,7 @@
       ],
       "difficulty": "medium",
       "golden_sql": "SELECT order_status, COUNT(*) AS order_count, SUM(CASE WHEN order_delivered_customer_date IS NULL THEN 1 ELSE 0 END) AS missing_delivery_count FROM orders GROUP BY order_status",
-      "pred_sql": "SELECT \n    order_status,\n    COUNT(*) AS total_orders,\n    SUM(CASE \n            WHEN order_delivered_customer_date IS NULL \n              OR order_delivered_customer_date = '' \n            THEN 1 \n            ELSE 0 \n        END) AS no_delivery_date_orders\nFROM orders\nGROUP BY order_status\nORDER BY order_status\nLIMIT 1000",
+      "pred_sql": "SELECT \n    order_status,\n    COUNT(*) AS total_orders,\n    SUM(CASE WHEN order_delivered_customer_date IS NULL OR order_delivered_customer_date = '' THEN 1 ELSE 0 END) AS undelivered_orders\nFROM orders\nGROUP BY order_status\nLIMIT 1000",
       "correct": true,
       "error": null
     },
@@ -556,9 +556,9 @@
       ],
       "difficulty": "hard",
       "golden_sql": "SELECT ROUND(SUM(CASE WHEN order_status = 'delivered' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS delivered_rate_pct FROM orders",
-      "pred_sql": "SELECT ROUND(100.0 * SUM(CASE WHEN order_status = 'delivered' THEN 1 ELSE 0 END) / COUNT(*), 2) AS delivered_pct\nFROM orders\nLIMIT 1000",
-      "correct": true,
-      "error": null
+      "pred_sql": "",
+      "correct": false,
+      "error": "模型未产出可解析的 SQL"
     },
     {
       "id": "t2s_036",
@@ -570,7 +570,7 @@
       ],
       "difficulty": "hard",
       "golden_sql": "SELECT ROUND(AVG(julianday(order_delivered_customer_date) - julianday(order_purchase_timestamp)), 2) AS avg_delivery_days FROM orders WHERE order_status = 'delivered' AND order_delivered_customer_date IS NOT NULL",
-      "pred_sql": "SELECT ROUND(AVG(JULIANDAY(o.order_delivered_customer_date) - JULIANDAY(o.order_purchase_timestamp)), 2) AS avg_delivery_days\nFROM orders o\nWHERE o.order_status = 'delivered'\n  AND o.order_delivered_customer_date IS NOT NULL\n  AND o.order_purchase_timestamp IS NOT NULL\nLIMIT 1000",
+      "pred_sql": "SELECT ROUND(AVG(JULIANDAY(order_delivered_customer_date) - JULIANDAY(order_purchase_timestamp)), 2) AS avg_delivery_days\nFROM orders\nWHERE order_status = 'delivered'\n  AND order_delivered_customer_date IS NOT NULL\n  AND order_purchase_timestamp IS NOT NULL\nLIMIT 1000",
       "correct": true,
       "error": null
     },
@@ -641,9 +641,9 @@
       ],
       "difficulty": "hard",
       "golden_sql": "SELECT COUNT(DISTINCT o.order_id) AS same_state_orders FROM orders o JOIN customers c ON o.customer_id = c.customer_id JOIN order_items oi ON o.order_id = oi.order_id JOIN sellers s ON oi.seller_id = s.seller_id WHERE c.customer_state = s.seller_state",
-      "pred_sql": "",
-      "correct": false,
-      "error": "模型未产出可解析的 SQL"
+      "pred_sql": "SELECT COUNT(DISTINCT o.order_id) AS order_count\nFROM orders o\nJOIN customers c ON o.customer_id = c.customer_id\nJOIN order_items oi ON oi.order_id = o.order_id\nJOIN sellers s ON s.seller_id = oi.seller_id\nWHERE c.customer_state = s.seller_state\nLIMIT 1000",
+      "correct": true,
+      "error": null
     },
     {
       "id": "t2s_042",
@@ -698,9 +698,9 @@
       ],
       "difficulty": "hard",
       "golden_sql": "WITH monthly AS (SELECT strftime('%Y-%m', order_purchase_timestamp) AS month, COUNT(*) AS order_count FROM orders WHERE order_purchase_timestamp >= '2017-01-01' AND order_purchase_timestamp < '2018-01-01' GROUP BY month) SELECT month, order_count, SUM(order_count) OVER (ORDER BY month ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS cumulative_orders FROM monthly ORDER BY month",
-      "pred_sql": "WITH monthly AS (\n  SELECT\n    strftime('%Y-%m', order_purchase_timestamp) AS month,\n    COUNT(*) AS monthly_orders\n  FROM orders\n  WHERE order_purchase_timestamp >= '2017-01-01'\n    AND order_purchase_timestamp < '2018-01-01'\n  GROUP BY month\n)\nSELECT\n  month,\n  monthly_orders,\n  SUM(monthly_orders) OVER (ORDER BY month) AS cumulative_orders\nFROM monthly\nORDER BY month\nLIMIT 1000",
-      "correct": true,
-      "error": null
+      "pred_sql": "",
+      "correct": false,
+      "error": "模型未产出可解析的 SQL"
     },
     {
       "id": "t2s_046",
@@ -728,9 +728,9 @@
       ],
       "difficulty": "hard",
       "golden_sql": "WITH seller_gmv AS (SELECT s.seller_state AS state, s.seller_id, SUM(oi.price) AS gmv FROM sellers s JOIN order_items oi ON s.seller_id = oi.seller_id GROUP BY s.seller_state, s.seller_id), ranked AS (SELECT state, seller_id, gmv, ROW_NUMBER() OVER (PARTITION BY state ORDER BY gmv DESC, seller_id) AS rn FROM seller_gmv) SELECT state, seller_id, ROUND(gmv, 2) AS gmv FROM ranked WHERE rn = 1 ORDER BY state",
-      "pred_sql": "WITH seller_sales AS (\n  SELECT\n    s.seller_state,\n    s.seller_id,\n    SUM(oi.price) AS total_sales\n  FROM sellers AS s\n  JOIN order_items AS oi\n    ON oi.seller_id = s.seller_id\n  GROUP BY s.seller_state, s.seller_id\n),\nranked AS (\n  SELECT\n    ss.seller_state,\n    ss.seller_id,\n    ss.total_sales,\n    ROW_NUMBER() OVER (\n      PARTITION BY ss.seller_state\n      ORDER BY ss.total_sales DESC, ss.seller_id ASC\n    ) AS rn\n  FROM seller_sales AS ss\n)\nSELECT\n  rs.seller_state,\n  rs.seller_id,\n  rs.total_sales\nFROM ranked AS rs\nWHERE rs.rn = 1\nORDER BY rs.seller_state\nLIMIT 1000",
-      "correct": true,
-      "error": null
+      "pred_sql": "",
+      "correct": false,
+      "error": "模型未产出可解析的 SQL"
     },
     {
       "id": "t2s_048",
@@ -756,9 +756,9 @@
       ],
       "difficulty": "hard",
       "golden_sql": "SELECT CASE WHEN payment_value < 50 THEN '低于50' WHEN payment_value < 200 THEN '50到199.99' ELSE '200及以上' END AS amount_band, COUNT(*) AS payment_count FROM payments GROUP BY amount_band",
-      "pred_sql": "SELECT\n  CASE\n    WHEN payment_value < 50 THEN '低于50'\n    WHEN payment_value >= 50 AND payment_value < 200 THEN '50到199.99'\n    ELSE '200及以上'\n  END AS payment_bucket,\n  COUNT(*) AS record_count\nFROM payments\nGROUP BY\n  CASE\n    WHEN payment_value < 50 THEN '低于50'\n    WHEN payment_value >= 50 AND payment_value < 200 THEN '50到199.99'\n    ELSE '200及以上'\n  END\nLIMIT 1000",
-      "correct": true,
-      "error": null
+      "pred_sql": "",
+      "correct": false,
+      "error": "模型未产出可解析的 SQL"
     },
     {
       "id": "t2s_050",
@@ -782,8 +782,8 @@
     "num_cases": 50,
     "dataset_total_cases": 50,
     "dataset_fingerprint": "c98b497f24f31573a11b32abbc2a7be12e2098ea7836781cf4ab1c0b618c96b6",
-    "elapsed_sec": 549.6,
-    "generated_at": "2026-08-16T21:28:43",
+    "elapsed_sec": 611.5,
+    "generated_at": "2026-08-17T17:18:23",
     "run_name": null,
     "skill_enabled": true,
     "schema_mode": "m-schema",

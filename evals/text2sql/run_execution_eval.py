@@ -223,6 +223,13 @@ def main(argv: list[str] | None = None) -> int:
         default=0.0,
         help="每例之间的间隔秒数（对低 RPM 配额的模型限速，避免 429 污染结果）",
     )
+    parser.add_argument(
+        "--max-tokens",
+        type=int,
+        default=None,
+        help="覆盖 completion 上限（推理模型如 deepseek-v4-pro 思考即可耗尽默认 4000，"
+        "content 为空被记为'未产出可解析的 SQL'；给 16000 可显著减少此类假失败）",
+    )
     parser.add_argument("--tag", action="append", default=[], help="只跑含该标签的题；可重复指定")
     parser.add_argument(
         "--difficulty",
@@ -255,7 +262,10 @@ def main(argv: list[str] | None = None) -> int:
     skill_body = "" if args.no_skill else read_skill_body()
     schema_context = generate_m_schema(args.db, comments={} if args.schema_mode == "columns" else None)
     schema = fetch_schema(args.db)
-    llm = LLMFactory.create_llm(model=args.model, temperature=0.0, streaming=False)
+    llm_kwargs = {"model": args.model, "temperature": 0.0, "streaming": False}
+    if args.max_tokens:
+        llm_kwargs["max_tokens"] = args.max_tokens
+    llm = LLMFactory.create_llm(**llm_kwargs)
 
     logger.info(f"开始评估：{len(dataset)} 个用例，库={args.db}")
     started = time.time()
