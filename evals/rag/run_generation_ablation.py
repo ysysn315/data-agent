@@ -2,10 +2,11 @@
 
     python -m evals.rag.run_generation_ablation [--cases N]
 
-三组（生成模型与 prompt 完全一致，只变检索输入）：
-  A. dense-only 检索    hybrid=False, rerank=False   （差检索喂给 LLM）
-  D. 全开检索           hybrid=True,  rerank=True    （主链路默认）
-  N. 无检索（no-RAG）    不做检索，仅凭模型自身知识回答（对照组，考幻觉）
+四组（生成模型 glm-5.3 与 prompt 完全一致，只变检索输入）：
+  A. dense-only 检索        hybrid=F, rerank=F                （差检索喂给 LLM）
+  D. 全开检索（LLM 重排）    hybrid=T, rerank=T(prefer=llm)     （主链路默认）
+  E. 全开检索（BGE 重排）    hybrid=T, rerank=T(prefer=bge)     （本地交叉编码器对照）
+  N. 无检索（no-RAG）        不做检索，仅凭模型自身知识回答（对照组，考幻觉）
 
 数据集：60 条正式模板（关键词召回 / 来源命中 / 禁引来源违规率）。
 报告落 evals/rag/reports/ablation_generation.json。
@@ -26,13 +27,14 @@ REPORT_PATH = "evals/rag/reports/ablation_generation.json"
 NO_CONTEXT_PROMPT = "你是运维知识助手。请根据你的已有知识简要回答问题；不确定时明确说明。问题：{question}"
 
 
-async def eval_group(cases, mode: str) -> dict:
-    """mode: dense / full / none（none=无检索对照）。"""
+async def eval_group(cases, mode: str, prefer: str = "llm") -> dict:
+    """mode: dense / full / none（none=无检索对照）；prefer 显式控制重排类型不静默回退。"""
     if mode != "none":
         rag_service, _ = await build_rag(
             enable_hybrid=(mode == "full"),
             enable_rerank=(mode == "full"),
             dense_top_k=10,
+            rerank_prefer=prefer,
         )
         if mode == "full":
             restored = await rag_service.vector_store.restore_bm25_index()
@@ -86,6 +88,7 @@ async def eval_group(cases, mode: str) -> dict:
 
     return {
         "summary": {
+            "retrieval_rerank_type": "none" if mode != "full" else ("bge" if prefer == "bge" else "llm"),
             "keyword_recall": round(mean(kw_list), 4),
             "source_hit": round(mean(src_hit_list), 4),
             "forbidden_violation_rate": round(mean(forbidden_violation_list), 4),
@@ -103,11 +106,16 @@ async def main():
     if args.cases:
         cases = cases[: args.cases]
 
-    modes = [("A_dense_retrieval", "dense"), ("D_full_retrieval", "full"), ("N_no_rag", "none")]
+    modes = [
+        ("A_dense_retrieval", "dense", "llm"),
+        ("D_full_llm_rerank", "full", "llm"),
+        ("E_full_bge_rerank", "full", "bge"),
+        ("N_no_rag", "none", "llm"),
+    ]
     results = {}
-    for name, mode in modes:
-        print(f"\n=== {name} (mode={mode}) ===")
-        results[name] = await eval_group(cases, mode)
+    for name, mode, prefer in modes:
+        print(f"\n=== {name} (mode={mode}, prefer={prefer}) ===")
+        results[name] = await eval_group(cases, mode, prefer=prefer)
         print(results[name]["summary"])
 
     save_json(REPORT_PATH, {"groups": results, "num_cases": len(cases)})
