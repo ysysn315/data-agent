@@ -2,6 +2,7 @@
   "groups": {
     "A_dense_only": {
       "summary": {
+        "rerank_type": "none",
         "hit@1": 0.55,
         "hit@3": 0.725,
         "recall@3": 0.6875,
@@ -415,6 +416,7 @@
     },
     "B_hybrid": {
       "summary": {
+        "rerank_type": "none",
         "hit@1": 0.55,
         "hit@3": 0.8,
         "recall@3": 0.775,
@@ -826,15 +828,16 @@
         }
       ]
     },
-    "C_dense_rerank": {
+    "C_dense_llm_rerank": {
       "summary": {
+        "rerank_type": "llm",
         "hit@1": 0.75,
-        "hit@3": 0.925,
+        "hit@3": 0.9,
         "recall@3": 0.875,
-        "mrr": 0.8333,
-        "precision@3": 0.325,
+        "mrr": 0.8208,
+        "precision@3": 0.3333,
         "ndcg@3": 0.8256,
-        "map": 0.7958
+        "map": 0.8021
       },
       "cases": [
         {
@@ -872,7 +875,7 @@
           "pred": [
             "service_unavailable.md",
             "service_unavailable.md",
-            "disk_high_usage.md"
+            "service_unavailable.md"
           ],
           "hit@3": 1.0,
           "mrr": 1.0
@@ -882,7 +885,7 @@
           "pred": [
             "slow_response.md",
             "cpu_high_usage.md",
-            "service_unavailable.md"
+            "cache_tuning_playbook.md"
           ],
           "hit@3": 1.0,
           "mrr": 1.0
@@ -890,12 +893,12 @@
         {
           "id": "ret_006",
           "pred": [
-            "perf_capacity_planning_false_friend.md",
             "cpu_high_usage.md",
+            "slow_response.md",
             "cpu_high_usage.md"
           ],
           "hit@3": 1.0,
-          "mrr": 0.5
+          "mrr": 1.0
         },
         {
           "id": "ret_007",
@@ -911,8 +914,8 @@
           "id": "ret_008",
           "pred": [
             "slow_response.md",
-            "cpu_high_usage.md",
-            "service_unavailable.md"
+            "service_unavailable.md",
+            "cpu_high_usage.md"
           ],
           "hit@3": 1.0,
           "mrr": 1.0
@@ -951,7 +954,7 @@
           "id": "ret_012",
           "pred": [
             "service_unavailable.md",
-            "slow_response.md",
+            "service_unavailable.md",
             "service_unavailable.md"
           ],
           "hit@3": 1.0,
@@ -970,12 +973,12 @@
         {
           "id": "ret_hard_002",
           "pred": [
-            "memory_high_usage.md",
-            "memory_high_usage.md",
-            "memory_high_usage.md"
+            "slow_response.md",
+            "disk_high_usage.md",
+            "cpu_high_usage.md"
           ],
-          "hit@3": 1.0,
-          "mrr": 1.0
+          "hit@3": 0.0,
+          "mrr": 0.0
         },
         {
           "id": "ret_hard_003",
@@ -1001,11 +1004,11 @@
           "id": "ret_hard_005",
           "pred": [
             "service_unavailable.md",
-            "slow_response.md",
+            "cache_tuning_playbook.md",
             "slow_response.md"
           ],
           "hit@3": 1.0,
-          "mrr": 0.5
+          "mrr": 0.3333333333333333
         },
         {
           "id": "ret_hard_006",
@@ -1050,19 +1053,19 @@
         {
           "id": "ret_hard_010",
           "pred": [
-            "mysql_backup_restore.md",
-            "service_unavailable.md",
-            "disk_high_usage.md"
+            "disk_high_usage.md",
+            "disk_high_usage.md",
+            "service_unavailable.md"
           ],
           "hit@3": 1.0,
-          "mrr": 0.3333333333333333
+          "mrr": 1.0
         },
         {
           "id": "ret_hard_011",
           "pred": [
             "cpu_high_usage.md",
-            "cpu_high_usage.md",
-            "perf_capacity_planning_false_friend.md"
+            "slow_response.md",
+            "cpu_high_usage.md"
           ],
           "hit@3": 1.0,
           "mrr": 1.0
@@ -1092,7 +1095,7 @@
           "pred": [
             "memory_high_usage.md",
             "memory_high_usage.md",
-            "slow_response.md"
+            "perf_capacity_planning_false_friend.md"
           ],
           "hit@3": 1.0,
           "mrr": 1.0
@@ -1122,7 +1125,7 @@
           "pred": [
             "mock_incident_drill_script.md",
             "mock_incident_drill_script.md",
-            "service_unavailable.md"
+            "mock_incident_drill_script.md"
           ],
           "hit@3": 0.0,
           "mrr": 0.0
@@ -1130,19 +1133,19 @@
         {
           "id": "ret_adv_006",
           "pred": [
+            "k8s_ingress_tls_guide.md",
             "service_unavailable.md",
-            "service_unavailable.md",
-            "slow_response.md"
+            "mock_incident_drill_script.md"
           ],
           "hit@3": 1.0,
-          "mrr": 1.0
+          "mrr": 0.5
         },
         {
           "id": "ret_adv_007",
           "pred": [
             "disk_high_usage.md",
             "disk_high_usage.md",
-            "service_unavailable.md"
+            "perf_capacity_planning_false_friend.md"
           ],
           "hit@3": 1.0,
           "mrr": 1.0
@@ -1201,7 +1204,7 @@
           "id": "ret_adv_013",
           "pred": [
             "memory_high_usage.md",
-            "memory_high_usage.md",
+            "mock_incident_drill_script.md",
             "memory_high_usage.md"
           ],
           "hit@3": 1.0,
@@ -1221,8 +1224,8 @@
           "id": "ret_adv_015",
           "pred": [
             "disk_high_usage.md",
-            "disk_high_usage.md",
-            "disk_high_usage.md"
+            "memory_high_usage.md",
+            "perf_capacity_planning_false_friend.md"
           ],
           "hit@3": 1.0,
           "mrr": 1.0
@@ -1239,15 +1242,16 @@
         }
       ]
     },
-    "D_hybrid_rerank": {
+    "D_hybrid_llm_rerank": {
       "summary": {
-        "hit@1": 0.8,
-        "hit@3": 0.925,
-        "recall@3": 0.925,
-        "mrr": 0.8542,
-        "precision@3": 0.35,
-        "ndcg@3": 0.8736,
-        "map": 0.8542
+        "rerank_type": "llm",
+        "hit@1": 0.775,
+        "hit@3": 0.95,
+        "recall@3": 0.9375,
+        "mrr": 0.8417,
+        "precision@3": 0.3583,
+        "ndcg@3": 0.8642,
+        "map": 0.8354
       },
       "cases": [
         {
@@ -1274,8 +1278,8 @@
           "id": "ret_003",
           "pred": [
             "disk_high_usage.md",
-            "cpu_high_usage.md",
-            "service_unavailable.md"
+            "service_unavailable.md",
+            "cpu_high_usage.md"
           ],
           "hit@3": 1.0,
           "mrr": 1.0
@@ -1284,7 +1288,7 @@
           "id": "ret_004",
           "pred": [
             "service_unavailable.md",
-            "service_unavailable.md",
+            "slow_response.md",
             "service_unavailable.md"
           ],
           "hit@3": 1.0,
@@ -1354,11 +1358,11 @@
           "id": "ret_011",
           "pred": [
             "service_unavailable.md",
-            "mock_incident_drill_script.md",
+            "cpu_high_usage.md",
             "memory_high_usage.md"
           ],
-          "hit@3": 0.0,
-          "mrr": 0.0
+          "hit@3": 1.0,
+          "mrr": 0.5
         },
         {
           "id": "ret_012",
@@ -1413,12 +1417,12 @@
         {
           "id": "ret_hard_005",
           "pred": [
+            "service_unavailable.md",
             "cache_tuning_playbook.md",
-            "slow_response.md",
-            "monitoring_glossary_noise.md"
+            "slow_response.md"
           ],
           "hit@3": 1.0,
-          "mrr": 0.5
+          "mrr": 0.3333333333333333
         },
         {
           "id": "ret_hard_006",
@@ -1464,8 +1468,8 @@
           "id": "ret_hard_010",
           "pred": [
             "disk_high_usage.md",
-            "mysql_backup_restore.md",
-            "service_unavailable.md"
+            "service_unavailable.md",
+            "cpu_high_usage.md"
           ],
           "hit@3": 1.0,
           "mrr": 1.0
@@ -1493,12 +1497,12 @@
         {
           "id": "ret_adv_001",
           "pred": [
-            "cpu_high_usage.md",
-            "service_unavailable.md",
+            "mock_incident_drill_script.md",
+            "monitoring_glossary_noise.md",
             "service_unavailable.md"
           ],
           "hit@3": 1.0,
-          "mrr": 0.5
+          "mrr": 0.3333333333333333
         },
         {
           "id": "ret_adv_002",
@@ -1534,8 +1538,8 @@
           "id": "ret_adv_005",
           "pred": [
             "mock_incident_drill_script.md",
-            "service_unavailable.md",
-            "mysql_backup_restore.md"
+            "mock_incident_drill_script.md",
+            "mock_incident_drill_script.md"
           ],
           "hit@3": 0.0,
           "mrr": 0.0
@@ -1563,19 +1567,19 @@
         {
           "id": "ret_adv_008",
           "pred": [
-            "cpu_high_usage.md",
-            "cpu_high_usage.md",
-            "service_unavailable.md"
+            "mock_incident_drill_script.md",
+            "service_unavailable.md",
+            "cpu_high_usage.md"
           ],
           "hit@3": 1.0,
-          "mrr": 1.0
+          "mrr": 0.3333333333333333
         },
         {
           "id": "ret_adv_009",
           "pred": [
             "service_unavailable.md",
-            "service_unavailable.md",
-            "service_unavailable.md"
+            "mock_incident_drill_script.md",
+            "monitoring_glossary_noise.md"
           ],
           "hit@3": 1.0,
           "mrr": 1.0
@@ -1625,7 +1629,7 @@
           "pred": [
             "slow_response.md",
             "service_unavailable.md",
-            "cpu_high_usage.md"
+            "slow_response.md"
           ],
           "hit@3": 1.0,
           "mrr": 1.0
@@ -1651,6 +1655,834 @@
           "mrr": 1.0
         }
       ]
+    },
+    "E_dense_bge_rerank": {
+      "summary": {
+        "rerank_type": "bge",
+        "hit@1": 0.35,
+        "hit@3": 0.7,
+        "recall@3": 0.6875,
+        "mrr": 0.5042,
+        "precision@3": 0.2583,
+        "ndcg@3": 0.558,
+        "map": 0.5104
+      },
+      "cases": [
+        {
+          "id": "ret_001",
+          "pred": [
+            "perf_capacity_planning_false_friend.md",
+            "memory_high_usage.md",
+            "cpu_high_usage.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.3333333333333333
+        },
+        {
+          "id": "ret_002",
+          "pred": [
+            "service_unavailable.md",
+            "memory_high_usage.md",
+            "memory_high_usage.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.5
+        },
+        {
+          "id": "ret_003",
+          "pred": [
+            "disk_high_usage.md",
+            "memory_high_usage.md",
+            "cpu_high_usage.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "id": "ret_004",
+          "pred": [
+            "service_unavailable.md",
+            "service_unavailable.md",
+            "mock_incident_drill_script.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "id": "ret_005",
+          "pred": [
+            "cpu_high_usage.md",
+            "perf_capacity_planning_false_friend.md",
+            "slow_response.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.3333333333333333
+        },
+        {
+          "id": "ret_006",
+          "pred": [
+            "perf_capacity_planning_false_friend.md",
+            "cpu_high_usage.md",
+            "slow_response.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.5
+        },
+        {
+          "id": "ret_007",
+          "pred": [
+            "memory_high_usage.md",
+            "service_unavailable.md",
+            "memory_high_usage.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "id": "ret_008",
+          "pred": [
+            "slow_response.md",
+            "service_unavailable.md",
+            "cache_tuning_playbook.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "id": "ret_009",
+          "pred": [
+            "service_unavailable.md",
+            "disk_high_usage.md",
+            "disk_high_usage.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "id": "ret_010",
+          "pred": [
+            "slow_response.md",
+            "service_unavailable.md",
+            "cache_tuning_playbook.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.5
+        },
+        {
+          "id": "ret_011",
+          "pred": [
+            "service_unavailable.md",
+            "mock_incident_drill_script.md",
+            "monitoring_glossary_noise.md"
+          ],
+          "hit@3": 0.0,
+          "mrr": 0.0
+        },
+        {
+          "id": "ret_012",
+          "pred": [
+            "service_unavailable.md",
+            "slow_response.md",
+            "mock_incident_drill_script.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "id": "ret_hard_001",
+          "pred": [
+            "mock_incident_drill_script.md",
+            "mock_incident_drill_script.md",
+            "cpu_high_usage.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.3333333333333333
+        },
+        {
+          "id": "ret_hard_002",
+          "pred": [
+            "memory_high_usage.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "id": "ret_hard_003",
+          "pred": [
+            "perf_capacity_planning_false_friend.md",
+            "service_unavailable.md",
+            "memory_high_usage.md"
+          ],
+          "hit@3": 0.0,
+          "mrr": 0.0
+        },
+        {
+          "id": "ret_hard_004",
+          "pred": [
+            "service_unavailable.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "id": "ret_hard_005",
+          "pred": [
+            "service_unavailable.md",
+            "cache_tuning_playbook.md",
+            "slow_response.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.3333333333333333
+        },
+        {
+          "id": "ret_hard_006",
+          "pred": [
+            "perf_capacity_planning_false_friend.md",
+            "cpu_high_usage.md",
+            "monitoring_glossary_noise.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.5
+        },
+        {
+          "id": "ret_hard_007",
+          "pred": [
+            "service_unavailable.md",
+            "slow_response.md",
+            "memory_high_usage.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.5
+        },
+        {
+          "id": "ret_hard_008",
+          "pred": [
+            "service_unavailable.md",
+            "mock_incident_drill_script.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "id": "ret_hard_009",
+          "pred": [
+            "service_unavailable.md",
+            "slow_response.md",
+            "service_unavailable.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.5
+        },
+        {
+          "id": "ret_hard_010",
+          "pred": [
+            "mock_incident_drill_script.md",
+            "service_unavailable.md",
+            "mysql_backup_restore.md"
+          ],
+          "hit@3": 0.0,
+          "mrr": 0.0
+        },
+        {
+          "id": "ret_hard_011",
+          "pred": [
+            "perf_capacity_planning_false_friend.md",
+            "cpu_high_usage.md",
+            "cache_tuning_playbook.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.5
+        },
+        {
+          "id": "ret_hard_012",
+          "pred": [
+            "memory_high_usage.md",
+            "slow_response.md",
+            "slow_response.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "id": "ret_adv_001",
+          "pred": [
+            "mock_incident_drill_script.md",
+            "service_unavailable.md",
+            "monitoring_glossary_noise.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.5
+        },
+        {
+          "id": "ret_adv_002",
+          "pred": [
+            "memory_high_usage.md",
+            "slow_response.md",
+            "service_unavailable.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "id": "ret_adv_003",
+          "pred": [
+            "cache_tuning_playbook.md",
+            "cache_tuning_playbook.md",
+            "slow_response.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.3333333333333333
+        },
+        {
+          "id": "ret_adv_004",
+          "pred": [
+            "perf_capacity_planning_false_friend.md",
+            "memory_high_usage.md",
+            "mock_incident_drill_script.md"
+          ],
+          "hit@3": 0.0,
+          "mrr": 0.0
+        },
+        {
+          "id": "ret_adv_005",
+          "pred": [
+            "mock_incident_drill_script.md",
+            "service_unavailable.md",
+            "cache_tuning_playbook.md"
+          ],
+          "hit@3": 0.0,
+          "mrr": 0.0
+        },
+        {
+          "id": "ret_adv_006",
+          "pred": [
+            "service_unavailable.md",
+            "perf_capacity_planning_false_friend.md",
+            "slow_response.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "id": "ret_adv_007",
+          "pred": [
+            "memory_high_usage.md",
+            "perf_capacity_planning_false_friend.md",
+            "mock_incident_drill_script.md"
+          ],
+          "hit@3": 0.0,
+          "mrr": 0.0
+        },
+        {
+          "id": "ret_adv_008",
+          "pred": [
+            "service_unavailable.md",
+            "mock_incident_drill_script.md",
+            "mock_incident_drill_script.md"
+          ],
+          "hit@3": 0.0,
+          "mrr": 0.0
+        },
+        {
+          "id": "ret_adv_009",
+          "pred": [
+            "mock_incident_drill_script.md",
+            "service_unavailable.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.5
+        },
+        {
+          "id": "ret_adv_010",
+          "pred": [
+            "mock_incident_drill_script.md",
+            "service_unavailable.md",
+            "cache_tuning_playbook.md"
+          ],
+          "hit@3": 0.0,
+          "mrr": 0.0
+        },
+        {
+          "id": "ret_adv_011",
+          "pred": [
+            "mock_incident_drill_script.md",
+            "perf_capacity_planning_false_friend.md",
+            "service_unavailable.md"
+          ],
+          "hit@3": 0.0,
+          "mrr": 0.0
+        },
+        {
+          "id": "ret_adv_012",
+          "pred": [
+            "service_unavailable.md",
+            "memory_high_usage.md",
+            "monitoring_glossary_noise.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "id": "ret_adv_013",
+          "pred": [
+            "memory_high_usage.md",
+            "memory_high_usage.md",
+            "mock_incident_drill_script.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "id": "ret_adv_014",
+          "pred": [
+            "cache_tuning_playbook.md",
+            "service_unavailable.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "hit@3": 0.0,
+          "mrr": 0.0
+        },
+        {
+          "id": "ret_adv_015",
+          "pred": [
+            "perf_capacity_planning_false_friend.md",
+            "mock_incident_drill_script.md",
+            "memory_high_usage.md"
+          ],
+          "hit@3": 0.0,
+          "mrr": 0.0
+        },
+        {
+          "id": "ret_adv_016",
+          "pred": [
+            "service_unavailable.md",
+            "mock_incident_drill_script.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "hit@3": 0.0,
+          "mrr": 0.0
+        }
+      ]
+    },
+    "F_hybrid_bge_rerank": {
+      "summary": {
+        "rerank_type": "bge",
+        "hit@1": 0.3,
+        "hit@3": 0.725,
+        "recall@3": 0.7,
+        "mrr": 0.4833,
+        "precision@3": 0.2583,
+        "ndcg@3": 0.5391,
+        "map": 0.4792
+      },
+      "cases": [
+        {
+          "id": "ret_001",
+          "pred": [
+            "perf_capacity_planning_false_friend.md",
+            "monitoring_glossary_noise.md",
+            "memory_high_usage.md"
+          ],
+          "hit@3": 0.0,
+          "mrr": 0.0
+        },
+        {
+          "id": "ret_002",
+          "pred": [
+            "service_unavailable.md",
+            "memory_high_usage.md",
+            "memory_high_usage.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.5
+        },
+        {
+          "id": "ret_003",
+          "pred": [
+            "disk_high_usage.md",
+            "memory_high_usage.md",
+            "cpu_high_usage.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "id": "ret_004",
+          "pred": [
+            "disk_high_usage.md",
+            "service_unavailable.md",
+            "service_unavailable.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.5
+        },
+        {
+          "id": "ret_005",
+          "pred": [
+            "cpu_high_usage.md",
+            "perf_capacity_planning_false_friend.md",
+            "slow_response.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.3333333333333333
+        },
+        {
+          "id": "ret_006",
+          "pred": [
+            "perf_capacity_planning_false_friend.md",
+            "cpu_high_usage.md",
+            "slow_response.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.5
+        },
+        {
+          "id": "ret_007",
+          "pred": [
+            "memory_high_usage.md",
+            "service_unavailable.md",
+            "memory_high_usage.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "id": "ret_008",
+          "pred": [
+            "slow_response.md",
+            "service_unavailable.md",
+            "cache_tuning_playbook.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "id": "ret_009",
+          "pred": [
+            "service_unavailable.md",
+            "disk_high_usage.md",
+            "disk_high_usage.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "id": "ret_010",
+          "pred": [
+            "slow_response.md",
+            "service_unavailable.md",
+            "cache_tuning_playbook.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.5
+        },
+        {
+          "id": "ret_011",
+          "pred": [
+            "service_unavailable.md",
+            "mock_incident_drill_script.md",
+            "monitoring_glossary_noise.md"
+          ],
+          "hit@3": 0.0,
+          "mrr": 0.0
+        },
+        {
+          "id": "ret_012",
+          "pred": [
+            "service_unavailable.md",
+            "slow_response.md",
+            "mock_incident_drill_script.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "id": "ret_hard_001",
+          "pred": [
+            "mock_incident_drill_script.md",
+            "slow_response.md",
+            "mock_incident_drill_script.md"
+          ],
+          "hit@3": 0.0,
+          "mrr": 0.0
+        },
+        {
+          "id": "ret_hard_002",
+          "pred": [
+            "slow_response.md",
+            "memory_high_usage.md",
+            "slow_response.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.5
+        },
+        {
+          "id": "ret_hard_003",
+          "pred": [
+            "perf_capacity_planning_false_friend.md",
+            "service_unavailable.md",
+            "disk_high_usage.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.3333333333333333
+        },
+        {
+          "id": "ret_hard_004",
+          "pred": [
+            "service_unavailable.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "id": "ret_hard_005",
+          "pred": [
+            "service_unavailable.md",
+            "cache_tuning_playbook.md",
+            "slow_response.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.3333333333333333
+        },
+        {
+          "id": "ret_hard_006",
+          "pred": [
+            "perf_capacity_planning_false_friend.md",
+            "cpu_high_usage.md",
+            "slow_response.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.5
+        },
+        {
+          "id": "ret_hard_007",
+          "pred": [
+            "service_unavailable.md",
+            "slow_response.md",
+            "cpu_high_usage.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.5
+        },
+        {
+          "id": "ret_hard_008",
+          "pred": [
+            "service_unavailable.md",
+            "mock_incident_drill_script.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "id": "ret_hard_009",
+          "pred": [
+            "service_unavailable.md",
+            "slow_response.md",
+            "service_unavailable.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.5
+        },
+        {
+          "id": "ret_hard_010",
+          "pred": [
+            "mock_incident_drill_script.md",
+            "service_unavailable.md",
+            "mysql_backup_restore.md"
+          ],
+          "hit@3": 0.0,
+          "mrr": 0.0
+        },
+        {
+          "id": "ret_hard_011",
+          "pred": [
+            "service_unavailable.md",
+            "perf_capacity_planning_false_friend.md",
+            "cpu_high_usage.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.3333333333333333
+        },
+        {
+          "id": "ret_hard_012",
+          "pred": [
+            "memory_high_usage.md",
+            "slow_response.md",
+            "slow_response.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "id": "ret_adv_001",
+          "pred": [
+            "mock_incident_drill_script.md",
+            "service_unavailable.md",
+            "monitoring_glossary_noise.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.5
+        },
+        {
+          "id": "ret_adv_002",
+          "pred": [
+            "memory_high_usage.md",
+            "slow_response.md",
+            "monitoring_glossary_noise.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "id": "ret_adv_003",
+          "pred": [
+            "cache_tuning_playbook.md",
+            "cache_tuning_playbook.md",
+            "slow_response.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.3333333333333333
+        },
+        {
+          "id": "ret_adv_004",
+          "pred": [
+            "perf_capacity_planning_false_friend.md",
+            "memory_high_usage.md",
+            "mock_incident_drill_script.md"
+          ],
+          "hit@3": 0.0,
+          "mrr": 0.0
+        },
+        {
+          "id": "ret_adv_005",
+          "pred": [
+            "mock_incident_drill_script.md",
+            "service_unavailable.md",
+            "service_unavailable.md"
+          ],
+          "hit@3": 0.0,
+          "mrr": 0.0
+        },
+        {
+          "id": "ret_adv_006",
+          "pred": [
+            "service_unavailable.md",
+            "disk_high_usage.md",
+            "slow_response.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "id": "ret_adv_007",
+          "pred": [
+            "memory_high_usage.md",
+            "perf_capacity_planning_false_friend.md",
+            "disk_high_usage.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.3333333333333333
+        },
+        {
+          "id": "ret_adv_008",
+          "pred": [
+            "service_unavailable.md",
+            "mock_incident_drill_script.md",
+            "mock_incident_drill_script.md"
+          ],
+          "hit@3": 0.0,
+          "mrr": 0.0
+        },
+        {
+          "id": "ret_adv_009",
+          "pred": [
+            "mock_incident_drill_script.md",
+            "service_unavailable.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.5
+        },
+        {
+          "id": "ret_adv_010",
+          "pred": [
+            "mock_incident_drill_script.md",
+            "service_unavailable.md",
+            "cache_tuning_playbook.md"
+          ],
+          "hit@3": 0.0,
+          "mrr": 0.0
+        },
+        {
+          "id": "ret_adv_011",
+          "pred": [
+            "mock_incident_drill_script.md",
+            "perf_capacity_planning_false_friend.md",
+            "service_unavailable.md"
+          ],
+          "hit@3": 0.0,
+          "mrr": 0.0
+        },
+        {
+          "id": "ret_adv_012",
+          "pred": [
+            "service_unavailable.md",
+            "disk_high_usage.md",
+            "memory_high_usage.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "id": "ret_adv_013",
+          "pred": [
+            "memory_high_usage.md",
+            "memory_high_usage.md",
+            "mock_incident_drill_script.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 1.0
+        },
+        {
+          "id": "ret_adv_014",
+          "pred": [
+            "cache_tuning_playbook.md",
+            "service_unavailable.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "hit@3": 0.0,
+          "mrr": 0.0
+        },
+        {
+          "id": "ret_adv_015",
+          "pred": [
+            "perf_capacity_planning_false_friend.md",
+            "memory_high_usage.md",
+            "disk_high_usage.md"
+          ],
+          "hit@3": 1.0,
+          "mrr": 0.3333333333333333
+        },
+        {
+          "id": "ret_adv_016",
+          "pred": [
+            "service_unavailable.md",
+            "mock_incident_drill_script.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "hit@3": 0.0,
+          "mrr": 0.0
+        }
+      ]
     }
   },
   "delta_vs_dense": {
@@ -1672,23 +2504,41 @@
       "ndcg@3": 0.0518,
       "map": 0.0416
     },
-    "C_dense_rerank": {
+    "C_dense_llm_rerank": {
       "hit@1": 0.2,
-      "hit@3": 0.2,
+      "hit@3": 0.175,
       "recall@3": 0.1875,
-      "mrr": 0.2125,
-      "precision@3": 0.075,
+      "mrr": 0.2,
+      "precision@3": 0.0833,
       "ndcg@3": 0.2005,
-      "map": 0.202
+      "map": 0.2083
     },
-    "D_hybrid_rerank": {
-      "hit@1": 0.25,
-      "hit@3": 0.2,
-      "recall@3": 0.2375,
-      "mrr": 0.2334,
-      "precision@3": 0.1,
-      "ndcg@3": 0.2485,
-      "map": 0.2604
+    "D_hybrid_llm_rerank": {
+      "hit@1": 0.225,
+      "hit@3": 0.225,
+      "recall@3": 0.25,
+      "mrr": 0.2209,
+      "precision@3": 0.1083,
+      "ndcg@3": 0.2391,
+      "map": 0.2416
+    },
+    "E_dense_bge_rerank": {
+      "hit@1": -0.2,
+      "hit@3": -0.025,
+      "recall@3": 0.0,
+      "mrr": -0.1166,
+      "precision@3": 0.0083,
+      "ndcg@3": -0.0671,
+      "map": -0.0834
+    },
+    "F_hybrid_bge_rerank": {
+      "hit@1": -0.25,
+      "hit@3": 0.0,
+      "recall@3": 0.0125,
+      "mrr": -0.1375,
+      "precision@3": 0.0083,
+      "ndcg@3": -0.086,
+      "map": -0.1146
     }
   },
   "num_cases": 40

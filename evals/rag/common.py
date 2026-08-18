@@ -24,27 +24,37 @@ def save_json(path: str, data: Dict[str, Any]):
     p.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def _build_eval_rerankers(settings, reranker_model: str | None = None):
+def _build_eval_rerankers(settings, reranker_model: str | None = None, prefer: str = "auto"):
+    """构造重排器。prefer: auto（BGE 优先，失败回退 LLM）/ bge（强制 BGE，失败抛错）/
+    llm（强制 LLM——消融实验需要显式控制变量，不能静默回退混组）。"""
     reranker = None
-    try:
-        reranker = BGEReranker("BAAI/bge-reranker-base")
-        logger.info("[evals] Using BGE reranker for retrieval eval.")
-    except Exception as e:  # noqa: BLE001
-        logger.warning(f"[evals] BGE reranker unavailable, falling back to LLM rerank: {e}")
+    if prefer in ("auto", "bge"):
+        try:
+            reranker = BGEReranker("BAAI/bge-reranker-base")
+            logger.info("[evals] Using BGE reranker for retrieval eval.")
+        except Exception as e:  # noqa: BLE001
+            if prefer == "bge":
+                raise
+            logger.warning(f"[evals] BGE reranker unavailable, falling back to LLM rerank: {e}")
 
     # reranker_model 为 None 时走当前配置的 LLM（aigc 网关无 qwen 系，硬编码会 400）
     reranker_llm = LLMFactory.create_llm(model=reranker_model, temperature=0.0, streaming=False)
     return reranker, reranker_llm
 
 
-async def build_rag(enable_hybrid: bool, enable_rerank: bool, dense_top_k: int = 10):
+async def build_rag(
+    enable_hybrid: bool,
+    enable_rerank: bool,
+    dense_top_k: int = 10,
+    rerank_prefer: str = "auto",
+):
     settings = get_settings()
     milvus_client = MilvusClient(settings)
     await milvus_client.connect()
     await milvus_client.ensure_collection()
 
     embedding_service = EmbeddingService(settings)
-    reranker, reranker_llm = _build_eval_rerankers(settings, reranker_model=None)
+    reranker, reranker_llm = _build_eval_rerankers(settings, reranker_model=None, prefer=rerank_prefer)
 
     vector_store = VectorStore(
         milvus_client=milvus_client,

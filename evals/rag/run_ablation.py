@@ -2,11 +2,13 @@
 
     python -m evals.rag.run_ablation [--cases N]
 
-四组配置（同一语料库、同一 embedding、同一评测集）：
-  A. dense-only        enable_hybrid=False, enable_rerank=False  （纯向量基线）
-  B. hybrid            enable_hybrid=True,  enable_rerank=False  （+BM25 RRF 融合）
-  C. dense+rerank      enable_hybrid=False, enable_rerank=True   （+LLM 重排）
-  D. hybrid+rerank     enable_hybrid=True,  enable_rerank=True   （全开，即主链路默认）
+六组配置（同一语料库、同一 embedding、同一评测集；重排类型显式控制不静默回退）：
+  A. dense-only          hybrid=F, rerank=F               （纯向量基线）
+  B. hybrid              hybrid=T, rerank=F               （+BM25 RRF 融合）
+  C. dense+LLM重排       hybrid=F, rerank=T(prefer=llm)
+  D. hybrid+LLM重排      hybrid=T, rerank=T(prefer=llm)
+  E. dense+BGE重排       hybrid=F, rerank=T(prefer=bge)   （本地交叉编码器）
+  F. hybrid+BGE重排      hybrid=T, rerank=T(prefer=bge)
 
 指标：Hit@1 / Hit@3 / Recall@3 / MRR / Precision@3 / NDCG@3 / MAP。
 报告落 evals/rag/reports/ablation_retrieval.json，含逐组 summary 与组间差值。
@@ -32,19 +34,22 @@ DATASET_PATH = "evals/rag/datasets/rag_retrieval_cases.json"
 REPORT_PATH = "evals/rag/reports/ablation_retrieval.json"
 
 GROUPS = [
-    {"name": "A_dense_only", "enable_hybrid": False, "enable_rerank": False},
-    {"name": "B_hybrid", "enable_hybrid": True, "enable_rerank": False},
-    {"name": "C_dense_rerank", "enable_hybrid": False, "enable_rerank": True},
-    {"name": "D_hybrid_rerank", "enable_hybrid": True, "enable_rerank": True},
+    {"name": "A_dense_only", "enable_hybrid": False, "enable_rerank": False, "prefer": "llm"},
+    {"name": "B_hybrid", "enable_hybrid": True, "enable_rerank": False, "prefer": "llm"},
+    {"name": "C_dense_llm_rerank", "enable_hybrid": False, "enable_rerank": True, "prefer": "llm"},
+    {"name": "D_hybrid_llm_rerank", "enable_hybrid": True, "enable_rerank": True, "prefer": "llm"},
+    {"name": "E_dense_bge_rerank", "enable_hybrid": False, "enable_rerank": True, "prefer": "bge"},
+    {"name": "F_hybrid_bge_rerank", "enable_hybrid": True, "enable_rerank": True, "prefer": "bge"},
 ]
 
 
-async def eval_group(cases, enable_hybrid: bool, enable_rerank: bool) -> dict:
+async def eval_group(cases, enable_hybrid: bool, enable_rerank: bool, prefer: str = "llm") -> dict:
     """一组配置的检索指标（每次重建 VectorStore 保证开关干净生效）。"""
     _, vector_store = await build_rag(
         enable_hybrid=enable_hybrid,
         enable_rerank=enable_rerank,
         dense_top_k=10,
+        rerank_prefer=prefer,
     )
     # BM25 是进程内派生索引（重启即失）——hybrid 组必须先从 Milvus 恢复，
     # 否则 hybrid 名存实亡（RRF 融合空列表，等价 dense-only）。
@@ -72,6 +77,7 @@ async def eval_group(cases, enable_hybrid: bool, enable_rerank: bool) -> dict:
         per_case.append({"id": c["id"], "pred": pred, "hit@3": h3, "mrr": m})
     return {
         "summary": {
+            "rerank_type": "none" if not enable_rerank else ("bge" if prefer == "bge" else "llm"),
             "hit@1": round(mean(h1s), 4),
             "hit@3": round(mean(h3s), 4),
             "recall@3": round(mean(r3s), 4),
@@ -95,16 +101,17 @@ async def main():
 
     results = {}
     for g in GROUPS:
-        print(f"\n=== {g['name']} (hybrid={g['enable_hybrid']}, rerank={g['enable_rerank']}) ===")
-        r = await eval_group(cases, g["enable_hybrid"], g["enable_rerank"])
+        print(f"\n=== {g['name']} (hybrid={g['enable_hybrid']}, rerank={g['enable_rerank']}, prefer={g['prefer']}) ===")
+        r = await eval_group(cases, g["enable_hybrid"], g["enable_rerank"], prefer=g["prefer"])
         results[g["name"]] = r
         print(r["summary"])
 
     # 组间差值：相对 dense 基线的提升
-    base = results["A_dense_only"]["summary"]
+    base = {k: v for k, v in results["A_dense_only"]["summary"].items() if isinstance(v, (int, float))}
     deltas = {}
     for name, r in results.items():
-        deltas[name] = {k: round(r["summary"][k] - base[k], 4) for k in base}
+        summary = {k: v for k, v in r["summary"].items() if isinstance(v, (int, float))}
+        deltas[name] = {k: round(summary[k] - base[k], 4) for k in base}
 
     save_json(REPORT_PATH, {"groups": results, "delta_vs_dense": deltas, "num_cases": len(cases)})
     print(f"\nsaved: {REPORT_PATH}")
