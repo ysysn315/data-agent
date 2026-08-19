@@ -46,8 +46,8 @@ DATASET_PATH = _HERE / "dataset.json"
 REPORTS_DIR = _HERE / "reports"
 SKILL_MD_PATH = _HERE.parent.parent / "app" / "skills" / "buildin" / "sql-generation" / "SKILL.md"
 
-# 限流退避参数：429 重试上限 / 基础等待 / 封顶等待（秒）
-RATE_LIMIT_MAX_RETRIES = 5
+# 限流退避参数：总尝试次数（首跑+重试）/ 基础等待 / 封顶等待（秒），指数递增
+RATE_LIMIT_MAX_ATTEMPTS = 5
 RATE_LIMIT_BASE_WAIT = 5
 RATE_LIMIT_MAX_WAIT = 30
 
@@ -55,6 +55,11 @@ RATE_LIMIT_MAX_WAIT = 30
 def _is_rate_limited(result: dict) -> bool:
     """按 error 文本判定限流（上游以字符串返回状态码，无结构化标记）。"""
     return "429" in str(result.get("error") or "")
+
+
+def _rate_limit_wait(attempt: int) -> float:
+    """第 attempt 次失败后的指数退避等待（5→10→20→30 封顶），attempt 从 0 起。"""
+    return min(RATE_LIMIT_MAX_WAIT, RATE_LIMIT_BASE_WAIT * 2**attempt)
 
 
 def load_dataset(path: Path = DATASET_PATH) -> list[dict]:
@@ -284,15 +289,15 @@ def main(argv: list[str] | None = None) -> int:
     for i, case in enumerate(dataset, start=1):
         # 限流退避：429 属于"还没测到"，指数退避重试拿到真实结果；
         # 耗尽后保留 error 并打 rate_limited 标记（区别于真实失败，汇总可分离）
-        for attempt in range(RATE_LIMIT_MAX_RETRIES):
+        for attempt in range(RATE_LIMIT_MAX_ATTEMPTS):
             r = evaluate_case(case, args.db, schema, skill_body, schema_context, llm)
             if not _is_rate_limited(r):
                 break
-            if attempt < RATE_LIMIT_MAX_RETRIES - 1:  # 最后一次不再白等
-                wait = min(RATE_LIMIT_MAX_WAIT, RATE_LIMIT_BASE_WAIT * (attempt + 1))
+            if attempt < RATE_LIMIT_MAX_ATTEMPTS - 1:  # 最后一次不再白等
+                wait = _rate_limit_wait(attempt)
                 logger.warning(
                     f"[{i}/{len(dataset)}] {r['id']} 触发限流，等 {wait}s 重试"
-                    f"（第 {attempt + 1}/{RATE_LIMIT_MAX_RETRIES} 次）"
+                    f"（第 {attempt + 1}/{RATE_LIMIT_MAX_ATTEMPTS} 次）"
                 )
                 time.sleep(wait)
         if _is_rate_limited(r):

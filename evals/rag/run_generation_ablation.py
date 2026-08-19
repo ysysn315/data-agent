@@ -24,7 +24,7 @@ from loguru import logger
 
 from app.core.settings import get_settings
 from evals.rag.common import build_rag, load_json, save_json
-from evals.rag.metrics import keyword_recall
+from evals.rag.metrics import keyword_recall, source_recall_strict
 
 DATASET_PATH = "evals/rag/datasets/rag_generation_cases_formal_template.json"
 REPORT_STEM = "evals/rag/reports/ablation_generation"  # 带戳版 + latest 两份，不覆盖历史
@@ -69,9 +69,8 @@ async def eval_group(cases, mode: str, prefer: RerankPrefer = "llm") -> dict:
     for c in cases:
         question = c["question"]
         expected_keywords = c.get("expected_keywords") or []
-        expected_sources = (
-            c.get("expected_sources_all") or c.get("expected_sources_any") or c.get("expected_sources") or []
-        )
+        expected_all = c.get("expected_sources_all") or []
+        expected_any = c.get("expected_sources_any") or c.get("expected_sources") or []
         forbidden_sources = c.get("forbidden_sources") or []
 
         if mode == "none":
@@ -83,7 +82,9 @@ async def eval_group(cases, mode: str, prefer: RerankPrefer = "llm") -> dict:
             sources = out.get("sources", [])
 
         kw = keyword_recall(answer, expected_keywords)
-        sh = 1.0 if (not expected_sources or any(s in sources for s in expected_sources)) else 0.0
+        # 严格口径（metrics.source_recall_strict）：all=必须全部命中、any=任一即得分——
+        # 原实现把 all 压平成 any，多源题（9 例）被放宽、all/any 并存（6 例）语义丢失
+        sh = source_recall_strict(sources, expected_sources_all=expected_all, expected_sources_any=expected_any)
         fv = 1.0 if any(f in sources for f in forbidden_sources) else 0.0
 
         kw_list.append(kw)
@@ -94,8 +95,9 @@ async def eval_group(cases, mode: str, prefer: RerankPrefer = "llm") -> dict:
                 "id": c["id"],
                 "question_type": c.get("question_type"),
                 "keyword_recall": round(kw, 4),
-                "source_hit": sh,
+                "source_recall_strict": round(sh, 4),
                 "forbidden_violation": fv,
+                "pred_sources": sources,  # 离线审计用：可重算任意来源指标
                 "answer_preview": answer[:200],
             }
         )
@@ -104,7 +106,8 @@ async def eval_group(cases, mode: str, prefer: RerankPrefer = "llm") -> dict:
         "summary": {
             "retrieval_rerank_type": "none" if mode != "full" else ("bge" if prefer == "bge" else "llm"),
             "keyword_recall": round(mean(kw_list), 4),
-            "source_hit": round(mean(src_hit_list), 4),
+            # 严格来源召回（all 全中 + any 任一，数据集声明口径）；原 source_hit 为宽松 any 版本
+            "source_recall_strict": round(mean(src_hit_list), 4),
             "forbidden_violation_rate": round(mean(forbidden_violation_list), 4),
         },
         "cases": per_case,

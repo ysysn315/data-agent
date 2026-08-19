@@ -224,20 +224,27 @@ def test_rerank_prefer_bge_raises_without_bge(monkeypatch):
     with pytest.raises(RuntimeError, match="torch"):
         common._build_eval_rerankers(None, prefer="bge")  # 强制 bge 不可用时抛错
 
-    # prefer=llm 则不碰 BGE（不抛）
+    # prefer=llm 则不碰 BGE；LLM 工厂 mock 掉（CI 无 LLM_API_KEY，不能让单测依赖真实配置）
+    class _FakeLLM:
+        pass
+
+    monkeypatch.setattr(common.LLMFactory, "create_llm", staticmethod(lambda **kw: _FakeLLM()))
     reranker, llm = common._build_eval_rerankers(None, prefer="llm")
-    assert reranker is None
+    assert reranker is None and isinstance(llm, _FakeLLM)
 
 
 def test_execution_eval_rate_limit_helpers():
     """限流退避判定回归：_is_rate_limited 按 error 文本识别 429。"""
     from evals.text2sql.run_execution_eval import (
         RATE_LIMIT_BASE_WAIT,
-        RATE_LIMIT_MAX_RETRIES,
+        RATE_LIMIT_MAX_ATTEMPTS,
         _is_rate_limited,
+        _rate_limit_wait,
     )
 
     assert _is_rate_limited({"error": "执行异常: Error code: 429 - 限流"}) is True
     assert _is_rate_limited({"error": "校验失败: 表不存在"}) is False
     assert _is_rate_limited({"error": None}) is False
-    assert RATE_LIMIT_MAX_RETRIES >= 3 and RATE_LIMIT_BASE_WAIT >= 1  # 常量在合理范围
+    assert RATE_LIMIT_MAX_ATTEMPTS >= 3 and RATE_LIMIT_BASE_WAIT >= 1  # 常量在合理范围
+    # 指数退避序列：5→10→20→40 封顶 30（修复前是线性 5/10/15/20——评审指出名实不符）
+    assert [_rate_limit_wait(a) for a in range(5)] == [5, 10, 20, 30, 30]
