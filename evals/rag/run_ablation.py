@@ -18,8 +18,13 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from datetime import datetime
 from statistics import mean
+from typing import Literal
 
+from loguru import logger
+
+from app.core.settings import get_settings
 from evals.rag.common import build_rag, load_json, save_json
 from evals.rag.metrics import (
     hit_at_k,
@@ -31,7 +36,9 @@ from evals.rag.metrics import (
 )
 
 DATASET_PATH = "evals/rag/datasets/rag_retrieval_cases.json"
-REPORT_PATH = "evals/rag/reports/ablation_retrieval.json"
+REPORT_STEM = "evals/rag/reports/ablation_retrieval"  # 带戳版 + latest 两份，不覆盖历史
+
+RerankPrefer = Literal["auto", "bge", "llm"]
 
 GROUPS = [
     {"name": "A_dense_only", "enable_hybrid": False, "enable_rerank": False, "prefer": "llm"},
@@ -43,7 +50,7 @@ GROUPS = [
 ]
 
 
-async def eval_group(cases, enable_hybrid: bool, enable_rerank: bool, prefer: str = "llm") -> dict:
+async def eval_group(cases, enable_hybrid: bool, enable_rerank: bool, prefer: RerankPrefer = "llm") -> dict:
     """一组配置的检索指标（每次重建 VectorStore 保证开关干净生效）。"""
     _, vector_store = await build_rag(
         enable_hybrid=enable_hybrid,
@@ -54,7 +61,7 @@ async def eval_group(cases, enable_hybrid: bool, enable_rerank: bool, prefer: st
     # BM25 是进程内派生索引（重启即失）——hybrid 组必须先从 Milvus 恢复，
     # 否则 hybrid 名存实亡（RRF 融合空列表，等价 dense-only）。
     restored = await vector_store.restore_bm25_index()
-    print(f"  BM25 恢复 {restored} 篇")
+    logger.info(f"BM25 恢复 {restored} 篇")
     h1s, h3s, r3s, mrrs, p3s, ndcgs, preds, golds = [], [], [], [], [], [], [], []
     per_case = []
     for c in cases:
@@ -101,10 +108,10 @@ async def main():
 
     results = {}
     for g in GROUPS:
-        print(f"\n=== {g['name']} (hybrid={g['enable_hybrid']}, rerank={g['enable_rerank']}, prefer={g['prefer']}) ===")
+        logger.info(f"=== {g['name']} (hybrid={g['enable_hybrid']}, rerank={g['enable_rerank']}, prefer={g['prefer']})")
         r = await eval_group(cases, g["enable_hybrid"], g["enable_rerank"], prefer=g["prefer"])
         results[g["name"]] = r
-        print(r["summary"])
+        logger.info(str(r["summary"]))
 
     # 组间差值：相对 dense 基线的提升
     base = {k: v for k, v in results["A_dense_only"]["summary"].items() if isinstance(v, (int, float))}
@@ -113,11 +120,23 @@ async def main():
         summary = {k: v for k, v in r["summary"].items() if isinstance(v, (int, float))}
         deltas[name] = {k: round(summary[k] - base[k], 4) for k in base}
 
-    save_json(REPORT_PATH, {"groups": results, "delta_vs_dense": deltas, "num_cases": len(cases)})
-    print(f"\nsaved: {REPORT_PATH}")
-    print("\n=== 相对 dense 基线的提升（Hit@3 / MRR） ===")
+    report = {
+        "meta": {
+            "generated_at": datetime.now().isoformat(timespec="seconds"),
+            "num_cases": len(cases),
+            "embedding": f"{get_settings().embedding_provider}/{get_settings().embedding_model}",
+            "rerank_llm": get_settings().llm_model,
+        },
+        "groups": results,
+        "delta_vs_dense": deltas,
+    }
+    stamped = f"{REPORT_STEM}_{datetime.now().strftime('%Y%m%d_%H%M')}.json"
+    save_json(stamped, report)
+    save_json(f"{REPORT_STEM}_latest.json", report)  # latest 是戳版副本，历史在带戳文件
+    logger.info(f"saved: {stamped} (+latest 副本)")
+    logger.info("相对 dense 基线的提升（Hit@3 / MRR）")
     for name, d in deltas.items():
-        print(f"  {name:<18} Hit@3 {d['hit@3']:+.4f} | MRR {d['mrr']:+.4f}")
+        logger.info(f"  {name:<18} Hit@3 {d['hit@3']:+.4f} | MRR {d['mrr']:+.4f}")
 
 
 if __name__ == "__main__":

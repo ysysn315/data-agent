@@ -46,6 +46,16 @@ DATASET_PATH = _HERE / "dataset.json"
 REPORTS_DIR = _HERE / "reports"
 SKILL_MD_PATH = _HERE.parent.parent / "app" / "skills" / "buildin" / "sql-generation" / "SKILL.md"
 
+# 限流退避参数：429 重试上限 / 基础等待 / 封顶等待（秒）
+RATE_LIMIT_MAX_RETRIES = 5
+RATE_LIMIT_BASE_WAIT = 5
+RATE_LIMIT_MAX_WAIT = 30
+
+
+def _is_rate_limited(result: dict) -> bool:
+    """按 error 文本判定限流（上游以字符串返回状态码，无结构化标记）。"""
+    return "429" in str(result.get("error") or "")
+
 
 def load_dataset(path: Path = DATASET_PATH) -> list[dict]:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -270,15 +280,25 @@ def main(argv: list[str] | None = None) -> int:
     logger.info(f"开始评估：{len(dataset)} 个用例，库={args.db}")
     started = time.time()
     case_results = []
+    rate_limited_count = 0
     for i, case in enumerate(dataset, start=1):
-        # 限流退避：429 属于"还没测到"，重试拿到真实结果（最多 5 次，指数退避）
-        for attempt in range(5):
+        # 限流退避：429 属于"还没测到"，指数退避重试拿到真实结果；
+        # 耗尽后保留 error 并打 rate_limited 标记（区别于真实失败，汇总可分离）
+        for attempt in range(RATE_LIMIT_MAX_RETRIES):
             r = evaluate_case(case, args.db, schema, skill_body, schema_context, llm)
-            if "429" not in str(r.get("error") or ""):
+            if not _is_rate_limited(r):
                 break
-            wait = min(30, 5 * (attempt + 1))
-            logger.warning(f"[{i}/{len(dataset)}] {r['id']} 触发限流，等 {wait}s 重试（第 {attempt + 1}/5 次）")
-            time.sleep(wait)
+            if attempt < RATE_LIMIT_MAX_RETRIES - 1:  # 最后一次不再白等
+                wait = min(RATE_LIMIT_MAX_WAIT, RATE_LIMIT_BASE_WAIT * (attempt + 1))
+                logger.warning(
+                    f"[{i}/{len(dataset)}] {r['id']} 触发限流，等 {wait}s 重试"
+                    f"（第 {attempt + 1}/{RATE_LIMIT_MAX_RETRIES} 次）"
+                )
+                time.sleep(wait)
+        if _is_rate_limited(r):
+            r = {**r, "rate_limited": True}
+            rate_limited_count += 1
+            logger.warning(f"[{i}/{len(dataset)}] {r['id']} 限流重试耗尽，标记 rate_limited")
         flag = "✓" if r["correct"] else "✗"
         logger.info(f"[{i}/{len(dataset)}] {flag} {r['id']} {r.get('error') or ''}")
         case_results.append(r)
@@ -298,6 +318,9 @@ def main(argv: list[str] | None = None) -> int:
         "skill_enabled": not args.no_skill,
         "schema_mode": args.schema_mode,
         "filters": {"tags": args.tag, "difficulties": args.difficulty},
+        "interval_sec": args.interval,
+        "max_tokens": args.max_tokens,
+        "rate_limited_cases": rate_limited_count,
     }
 
     out = args.output or (REPORTS_DIR / "execution_latest.json")

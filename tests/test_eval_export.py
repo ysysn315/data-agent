@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from app.text2sql.examples import ExampleStore
 from evals.text2sql.compare_reports import compare
 from evals.text2sql.export_failures import build_candidate, load_failed_cases, should_skip
@@ -193,3 +195,49 @@ def test_compare_reports_flags_dataset_content_change(tmp_path):
 
     md = compare(base_data, after_data, "base.json", "after.json")
     assert "数据集内容指纹不同" in md
+
+
+def test_reranker_lazy_import_without_torch(monkeypatch):
+    """reranker 惰性导入回归：未装 torch 时 import 模块不炸，构造才报错（评审修复）。
+
+    修复前 torch/FlagEmbedding 是顶层 import——未安装时整个 evals.rag 不可 import。
+    """
+    import sys
+
+    import app.rag.reranker as mod
+
+    # 模拟 torch 缺失：从 sys.modules 移除并让 import 抛 ImportError
+    monkeypatch.setitem(sys.modules, "torch", None)
+    monkeypatch.setitem(sys.modules, "FlagEmbedding", None)
+    with pytest.raises(RuntimeError, match="torch/FlagEmbedding"):
+        mod.BGEReranker("x")  # 构造时才报错，且是 RuntimeError 带回退指引
+
+
+def test_rerank_prefer_bge_raises_without_bge(monkeypatch):
+    """rerank_prefer 显式控制回归：prefer=bge 失败必须抛错而非静默回退 LLM（防消融混组）。"""
+    import sys
+
+    import evals.rag.common as common
+
+    monkeypatch.setitem(sys.modules, "torch", None)
+    monkeypatch.setitem(sys.modules, "FlagEmbedding", None)
+    with pytest.raises(RuntimeError, match="torch"):
+        common._build_eval_rerankers(None, prefer="bge")  # 强制 bge 不可用时抛错
+
+    # prefer=llm 则不碰 BGE（不抛）
+    reranker, llm = common._build_eval_rerankers(None, prefer="llm")
+    assert reranker is None
+
+
+def test_execution_eval_rate_limit_helpers():
+    """限流退避判定回归：_is_rate_limited 按 error 文本识别 429。"""
+    from evals.text2sql.run_execution_eval import (
+        RATE_LIMIT_BASE_WAIT,
+        RATE_LIMIT_MAX_RETRIES,
+        _is_rate_limited,
+    )
+
+    assert _is_rate_limited({"error": "执行异常: Error code: 429 - 限流"}) is True
+    assert _is_rate_limited({"error": "校验失败: 表不存在"}) is False
+    assert _is_rate_limited({"error": None}) is False
+    assert RATE_LIMIT_MAX_RETRIES >= 3 and RATE_LIMIT_BASE_WAIT >= 1  # 常量在合理范围

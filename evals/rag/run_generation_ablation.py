@@ -16,18 +16,32 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from datetime import datetime
 from statistics import mean
+from typing import Literal
 
+from loguru import logger
+
+from app.core.settings import get_settings
 from evals.rag.common import build_rag, load_json, save_json
 from evals.rag.metrics import keyword_recall
 
 DATASET_PATH = "evals/rag/datasets/rag_generation_cases_formal_template.json"
-REPORT_PATH = "evals/rag/reports/ablation_generation.json"
+REPORT_STEM = "evals/rag/reports/ablation_generation"  # 带戳版 + latest 两份，不覆盖历史
 
-NO_CONTEXT_PROMPT = "你是运维知识助手。请根据你的已有知识简要回答问题；不确定时明确说明。问题：{question}"
+RerankPrefer = Literal["auto", "bge", "llm"]
+# 生成模型显式钉死（不依赖 .env 隐式约定），no-RAG 组与 RAG 组共用同一模型
+GENERATION_MODEL = "glm-5.3"
+
+# 与 RAG 组（rag_service.generate_answer 内部 prompt）对齐的回答要求——
+# no-RAG 对照组的差异只在"没有检索上下文"，不在 prompt 风格（评审指出简要/完整措辞会混淆 keyword_recall）
+NO_CONTEXT_PROMPT = (
+    "你是运维知识助手。请基于上下文回答问题；如果上下文没有提供答案，"
+    "明确说明无法从已有资料确定，不要编造。\n\n上下文：无（未检索）\n\n问题：{question}"
+)
 
 
-async def eval_group(cases, mode: str, prefer: str = "llm") -> dict:
+async def eval_group(cases, mode: str, prefer: RerankPrefer = "llm") -> dict:
     """mode: dense / full / none（none=无检索对照）；prefer 显式控制重排类型不静默回退。"""
     if mode != "none":
         rag_service, _ = await build_rag(
@@ -38,7 +52,7 @@ async def eval_group(cases, mode: str, prefer: str = "llm") -> dict:
         )
         if mode == "full":
             restored = await rag_service.vector_store.restore_bm25_index()
-            print(f"  BM25 恢复 {restored} 篇")
+            logger.info(f"BM25 恢复 {restored} 篇")
     else:
         rag_service, _ = None, None
 
@@ -47,7 +61,7 @@ async def eval_group(cases, mode: str, prefer: str = "llm") -> dict:
 
     from app.core.llm import LLMFactory
 
-    llm = LLMFactory.create_llm(model="glm-5.3", temperature=0.0, streaming=False)
+    llm = LLMFactory.create_llm(model=GENERATION_MODEL, temperature=0.0, streaming=False)
     bare_chain = ChatPromptTemplate.from_template(NO_CONTEXT_PROMPT) | llm | StrOutputParser()
 
     kw_list, src_hit_list, forbidden_violation_list = [], [], []
@@ -114,12 +128,23 @@ async def main():
     ]
     results = {}
     for name, mode, prefer in modes:
-        print(f"\n=== {name} (mode={mode}, prefer={prefer}) ===")
+        logger.info(f"=== {name} (mode={mode}, prefer={prefer}) ===")
         results[name] = await eval_group(cases, mode, prefer=prefer)
-        print(results[name]["summary"])
+        logger.info(str(results[name]["summary"]))
 
-    save_json(REPORT_PATH, {"groups": results, "num_cases": len(cases)})
-    print(f"\nsaved: {REPORT_PATH}")
+    report = {
+        "meta": {
+            "generated_at": datetime.now().isoformat(timespec="seconds"),
+            "num_cases": len(cases),
+            "generation_model": GENERATION_MODEL,
+            "embedding": f"{get_settings().embedding_provider}/{get_settings().embedding_model}",
+        },
+        "groups": results,
+    }
+    stamped = f"{REPORT_STEM}_{datetime.now().strftime('%Y%m%d_%H%M')}.json"
+    save_json(stamped, report)
+    save_json(f"{REPORT_STEM}_latest.json", report)  # latest 是戳版副本，历史在带戳文件
+    logger.info(f"saved: {stamped} (+latest 副本)")
 
 
 if __name__ == "__main__":
