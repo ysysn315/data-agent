@@ -50,3 +50,22 @@ async def list_session(session_store: SessionStore = Depends(get_session_store))
     except Exception as e:
         logger.error(f"获取会话列表失败: {str(e)}")
         return {"status": "error", "message": f"获取失败: {str(e)}"}
+
+
+@router.get("/chat/history/{session_id}")
+async def get_session_history(session_id: str, session_store: SessionStore = Depends(get_session_store)):
+    """返回会话的历史消息窗口（role/content），供前端切页/刷新后恢复对话。
+
+    注意只存 assistant 最终答案（content），sql_result/context_hits 等结构化
+    元数据不入历史——恢复后这些面板不回填，属已知边界（与会话 TTL 一致）。
+    """
+    try:
+        history = session_store.get_history(session_id)
+        return {
+            "status": "success",
+            "session_id": session_id,
+            "messages": [{"role": m.get("role"), "content": m.get("content")} for m in history],
+        }
+    except Exception as e:
+        logger.error(f"获取会话历史失败: {str(e)}")
+        return {"status": "error", "message": f"获取失败: {str(e)}"}
