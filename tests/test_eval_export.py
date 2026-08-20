@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from app.text2sql.examples import ExampleStore
 from evals.text2sql.compare_reports import compare
 from evals.text2sql.export_failures import build_candidate, load_failed_cases, should_skip
@@ -193,3 +195,108 @@ def test_compare_reports_flags_dataset_content_change(tmp_path):
 
     md = compare(base_data, after_data, "base.json", "after.json")
     assert "数据集内容指纹不同" in md
+
+
+def test_reranker_lazy_import_without_torch(monkeypatch):
+    """reranker 惰性导入回归：未装 torch 时 import 模块不炸，构造才报错（评审修复）。
+
+    修复前 torch/FlagEmbedding 是顶层 import——未安装时整个 evals.rag 不可 import。
+    """
+    import sys
+
+    import app.rag.reranker as mod
+
+    # 模拟 torch 缺失：从 sys.modules 移除并让 import 抛 ImportError
+    monkeypatch.setitem(sys.modules, "torch", None)
+    monkeypatch.setitem(sys.modules, "FlagEmbedding", None)
+    with pytest.raises(RuntimeError, match="torch/FlagEmbedding"):
+        mod.BGEReranker("x")  # 构造时才报错，且是 RuntimeError 带回退指引
+
+
+def test_rerank_prefer_bge_raises_without_bge(monkeypatch):
+    """rerank_prefer 显式控制回归：prefer=bge 失败必须抛错而非静默回退 LLM（防消融混组）。"""
+    import sys
+
+    import evals.rag.common as common
+
+    monkeypatch.setitem(sys.modules, "torch", None)
+    monkeypatch.setitem(sys.modules, "FlagEmbedding", None)
+    with pytest.raises(RuntimeError, match="torch"):
+        common._build_eval_rerankers(None, prefer="bge")  # 强制 bge 不可用时抛错
+
+    # prefer=llm 则不碰 BGE；LLM 工厂 mock 掉（CI 无 LLM_API_KEY，不能让单测依赖真实配置）
+    class _FakeLLM:
+        pass
+
+    monkeypatch.setattr(common.LLMFactory, "create_llm", staticmethod(lambda **kw: _FakeLLM()))
+    reranker, llm = common._build_eval_rerankers(None, prefer="llm")
+    assert reranker is None and isinstance(llm, _FakeLLM)
+
+
+def test_execution_eval_rate_limit_helpers():
+    """限流退避判定回归：_is_rate_limited 按 error 文本识别 429。"""
+    from evals.text2sql.run_execution_eval import (
+        RATE_LIMIT_BASE_WAIT,
+        RATE_LIMIT_MAX_ATTEMPTS,
+        _is_rate_limited,
+        _rate_limit_wait,
+    )
+
+    assert _is_rate_limited({"error": "执行异常: Error code: 429 - 限流"}) is True
+    assert _is_rate_limited({"error": "校验失败: 表不存在"}) is False
+    assert _is_rate_limited({"error": None}) is False
+    assert RATE_LIMIT_MAX_ATTEMPTS >= 3 and RATE_LIMIT_BASE_WAIT >= 1  # 常量在合理范围
+    # 指数退避序列：5→10→20→40 封顶 30（修复前是线性 5/10/15/20——评审指出名实不符）
+    assert [_rate_limit_wait(a) for a in range(5)] == [5, 10, 20, 30, 30]
+
+
+def test_source_recall_strict_hard_and_semantics():
+    """严格来源召回的 hard-AND 语义（第三轮评审修复）：
+
+    - all 缺一即 0（原实现按部分召回给 0.5）
+    - any 任一得 1
+    - 显式空 any（键存在、值为 []）= 无 any 条件，不回退旧字段
+    """
+    from evals.rag.metrics import source_recall_strict
+
+    # all 全中 → 1；缺一 → 0（不是 0.5）
+    assert source_recall_strict(["a.md", "b.md"], expected_sources_all=["a.md", "b.md"]) == 1.0
+    assert source_recall_strict(["a.md"], expected_sources_all=["a.md", "b.md"]) == 0.0
+
+    # any 任一命中
+    assert source_recall_strict(["a.md"], expected_sources_any=["a.md", "b.md"]) == 1.0
+    assert source_recall_strict(["c.md"], expected_sources_any=["a.md", "b.md"]) == 0.0
+
+    # all + any 并存：各占一半
+    assert (
+        source_recall_strict(["a.md", "b.md"], expected_sources_all=["a.md", "b.md"], expected_sources_any=["x.md"])
+        == 0.5
+    )
+
+    # 无任何期望 → 1（不惩罚）
+    assert source_recall_strict(["a.md"]) == 1.0
+
+
+def test_generation_ablation_any_field_no_fallback():
+    """生成消融的取值逻辑（调生产 _resolve_expected_sources，非手抄）：显式空 any 不回退旧字段。"""
+    from evals.rag.metrics import source_recall_strict
+    from evals.rag.run_generation_ablation import _resolve_expected_sources
+
+    # 显式空 any + 旧字段恰好是 all 的复制（历史形态）——or 链会双重计分
+    case = {
+        "question": "q",
+        "expected_keywords": [],
+        "expected_sources_all": ["a.md", "b.md"],
+        "expected_sources_any": [],  # 显式无 any 条件
+        "expected_sources": ["a.md", "b.md"],  # 旧字段（any 键存在时必须被忽略）
+        "forbidden_sources": [],
+    }
+    expected_all, expected_any = _resolve_expected_sources(case)
+    assert expected_any == []  # 没有回退成 ["a.md", "b.md"]
+    # 只命中 a.md：all 缺 b → hard-AND 0 分；any 为空不参与
+    assert source_recall_strict(["a.md"], expected_sources_all=expected_all, expected_sources_any=expected_any) == 0.0
+
+    # 旧数据集形态（无 any 键）：expected_sources 作为 any 兼容
+    legacy = {"expected_sources": ["a.md"]}
+    _, legacy_any = _resolve_expected_sources(legacy)
+    assert legacy_any == ["a.md"]

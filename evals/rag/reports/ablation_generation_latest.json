@@ -1,0 +1,2852 @@
+{
+  "meta": {
+    "generated_at": "2026-08-19T19:47:05",
+    "num_cases": 60,
+    "generation_model": "glm-5.3",
+    "embedding": "ollama/bge-m3",
+    "recalculated_at": "2026-08-20T11:48:13",
+    "recalc_note": "hard-AND 口径离线重算（all 全中得 1 否则 0；空 any 不回退旧字段），基于 pred_sources 无需重调 LLM"
+  },
+  "groups": {
+    "A_dense_retrieval": {
+      "summary": {
+        "retrieval_rerank_type": "none",
+        "keyword_recall": 0.6028,
+        "source_recall_strict": 0.7917,
+        "forbidden_violation_rate": 0.4833
+      },
+      "cases": [
+        {
+          "id": "formal_gen_001",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "memory_high_usage.md",
+            "mock_incident_drill_script.md"
+          ],
+          "answer_preview": "**根据检索到的文档，无法明确回答“标准排查的第一步”这一问题。**\n\n具体说明如下：\n\n1. **文档1（cpu_high_usage.md）**：虽然标题为《CPU 使用率过高排查手册》，但检索到的章节内容仅包含**告警阈值定义**（CPU 使用率持续 5 分钟超过 80% 触发告警，system-metrics 数据源），并未包含排查步骤的具体内容。\n\n2. **文档3（mock_incid"
+        },
+        {
+          "id": "formal_gen_002",
+          "question_type": "single_hop",
+          "keyword_recall": 0.8333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "# CPU 高告警时的日志查询要点\n\n根据《CPU 使用率过高排查手册》（cpu_high_usage.md），要点如下：\n\n## 一、日志主题（数据源）\n\n排查需查询两类日志：\n\n| 数据源 | 用途 |\n|---|---|\n| **system-metrics** | 获取当前时间的 CPU 指标，确认告警状态 |\n| **query_logs** | 查看同时段是否有异常慢查询（慢 SQL "
+        },
+        {
+          "id": "formal_gen_003",
+          "question_type": "single_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "mock_incident_drill_script.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "The user is asking: \"When CPU is high, why should we focus on process name and PID?\"\n\nLet me look at the retrieved documents:\n\n1. Document 1 (perf_capacity_planning_false_friend.md): This is a false f"
+        },
+        {
+          "id": "formal_gen_004",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "memory_high_usage.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "# HighCPUUsage 告警排查展开思路\n\n## 一、先确认告警定义（来自文档）\n\n根据 `cpu_high_usage.md`，HighCPUUsage 告警的触发条件为：\n\n| 项目 | 值 |\n|---|---|\n| 数据源 | system-metrics |\n| 阈值 | CPU 使用率 80% |\n| 触发窗口 | 持续 5 分钟 |\n\n也就是说，收到该告警意味着 **CPU 使"
+        },
+        {
+          "id": "formal_gen_005",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "mock_incident_drill_script.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "**文档中没有关于“日志默认回看最近 30 分钟”这一说法的依据，无法回答该问题。**\n\n具体说明：\n\n1. **文档1（cpu_high_usage.md）**：仅说明了 CPU 告警的触发条件——使用率持续 5 分钟超过 80%（system-metrics 数据源，阈值 80%，窗口 5 分钟）。其中提到的时间窗口是**告警判定的 5 分钟窗口**，并未提及任何“日志回看 30 分钟”的默认"
+        },
+        {
+          "id": "formal_gen_006",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "memory_high_usage.md",
+            "mock_incident_drill_script.md"
+          ],
+          "answer_preview": "The user is asking me to summarize the risk impact of CPU alerts into three points, not just operational steps.\n\nLet me look at the documents:\n\nDocument 1 (cpu_high_usage.md): CPU usage sustained 5 mi"
+        },
+        {
+          "id": "formal_gen_007",
+          "question_type": "confusable",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "memory_high_usage.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "## 结论\n\n线上收到 CPU 高告警时，应**优先参考“性能故障排查”类文档，即 `cpu_high_usage.md`（CPU 使用率过高排查手册）**，而不是容量规划文档。\n\n## 依据\n\n**1. 容量规划文档自身已明确声明其定位与边界**\n\n文档 `perf_capacity_planning_false_friend.md` 中明确写道：\n\n> “本文档讨论的是‘性能容量规划’——提前"
+        },
+        {
+          "id": "formal_gen_008",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "mock_incident_drill_script.md",
+            "service_unavailable.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "用户问的是：CPU 高但还没有超时错误时，应该先解释现象、还是先给日志排查动作？请按文档回答。\n\n让我看看检索到的三个文档：\n\n1. 文档1：性能容量规划（易混淆文档）——明确说这是 false friend，讨论的是容量规划，不是故障排查。CPU 高时应先读 slow_response.md / cpu_high_usage.md。所以这个文档本身不是答案来源，但它指出了正确方向：CPU 高时应"
+        },
+        {
+          "id": "formal_gen_009",
+          "question_type": "single_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "disk_high_usage.md",
+            "cpu_high_usage.md"
+          ],
+          "answer_preview": "根据检索到的文档内容，**无法回答“标准处置从哪一步开始”这一问题**。\n\n**文档中已有的相关信息：**\n\n文档1（memory_high_usage.md，章节：内存持续升高与 OOM 定位手册/告警阈值）仅说明了告警触发条件：\n\n> 内存使用率持续超过 85% 告警（system-metrics，阈值 85%）\n\n**说明：**\n\n- 该文档只描述了**告警阈值**（85%、system-m"
+        },
+        {
+          "id": "formal_gen_010",
+          "question_type": "single_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "disk_high_usage.md",
+            "cpu_high_usage.md"
+          ],
+          "answer_preview": "根据检索到的文档内容，**无法回答该问题**。\n\n具体说明如下：\n\n- **文档1（memory_high_usage.md）** 仅提供了内存告警的**阈值信息**：内存使用率持续超过 85% 触发告警（数据源为 system-metrics），但未包含内存高告警的典型症状描述。\n- **文档2（disk_high_usage.md）** 和 **文档3（cpu_high_usage.md）**"
+        },
+        {
+          "id": "formal_gen_011",
+          "question_type": "single_hop",
+          "keyword_recall": 0.8333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "service_unavailable.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "根据文档1（memory_high_usage.md）的排查流程，两类日志在 OOM 定位中承担不同角色：\n\n## system-metrics（系统指标）——判断内存问题的“形态”\n\n查系统指标的核心目的是**确认内存增长模式**，从而区分根因类型：\n\n- **缓涨**：内存持续缓慢上升，是**泄漏**的典型特征；\n- **台阶式跳升**：通常是**大对象或缓存一次性加载**导致。\n\n对于 Ja"
+        },
+        {
+          "id": "formal_gen_012",
+          "question_type": "single_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cache_tuning_playbook.md",
+            "memory_high_usage.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "根据文档2（memory_high_usage.md，章节：内存持续升高与 OOM 定位手册/告警阈值），内存高告警的配置信息如下：\n\n**建议的日志过滤条件：**\n\n1. **告警来源（数据源）**：`system-metrics`\n2. **阈值条件**：内存使用率 **持续超过 85%**\n\n也就是说，如果你要直接搜日志，可以按 `system-metrics` 作为来源/系统标识进行过滤，"
+        },
+        {
+          "id": "formal_gen_013",
+          "question_type": "single_hop",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "disk_high_usage.md"
+          ],
+          "answer_preview": "## 按知识库的解释\n\n### 前提：内存高的判定\n\n根据知识库，内存使用率持续超过 **85%** 即触发告警（system-metrics 数据源，见文档3《内存持续升高与 OOM 定位手册/告警阈值》）。\n\n### 为什么伴随 Full GC\n\n根据文档1（排查流程），内存升高时需结合 **GC 日志**判断：\n\n- **Full GC 频繁且老年代不回落**，是**内存泄漏的典型特征**。"
+        },
+        {
+          "id": "formal_gen_014",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "perf_capacity_planning_false_friend.md",
+            "cpu_high_usage.md"
+          ],
+          "answer_preview": "## 区分思路：先看告警的指标来源和指标类型\n\n根据检索到的文档，可以从以下几点入手：\n\n### 1. 内存高告警的判别特征（文档明确支持）\n\n依据 `memory_high_usage.md`：\n- **指标来源**：system-metrics（系统指标监控）\n- **触发条件**：内存使用率**持续超过 85%**（阈值 85%）\n- 即：告警内容是“内存使用率”这一资源类指标越限，而非业务"
+        },
+        {
+          "id": "formal_gen_015",
+          "question_type": "confusable",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "**不能直接替代。** 而且需要先说明一点：本次检索到的文档中并没有“监控术语词典”这一文档，无法基于文档内容对两者做直接对比。但结合现有文档的内容定位，可以给出明确判断：\n\n**1. 两类文档的用途不同**\n\n- 术语词典类文档通常只回答“OOM 是什么”——即概念定义（如 Out Of Memory 的含义、触发机制等）。\n- 而内存高告警处置文档（memory_high_usage.md）提"
+        },
+        {
+          "id": "formal_gen_016",
+          "question_type": "single_hop",
+          "keyword_recall": 0.8333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "service_unavailable.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "根据检索到的文档，内存高告警（system-metrics 中内存使用率持续超过 85% 触发告警）至少需要确认以下内容：在日志主题上，一是查看 system-metrics 系统指标，确认内存使用率是否确实持续超过 85% 的告警阈值；二是查看 application-logs 应用日志，检查 ERROR 集中出现的时间点与对应堆栈，以确认是否已发生 OOM 重启——因为 OOM 重启会造成服务"
+        },
+        {
+          "id": "formal_gen_017",
+          "question_type": "single_hop",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "mock_incident_drill_script.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "## 回答\n\n根据 **slow_response.md（慢响应（P99 超标）排查手册）** 的判定章节，P99 延迟超过 3 秒且持续 5 分钟，即触发慢响应告警。标准排查的起点是**判定环节**，具体如下：\n\n### 排查起点：先做升级判定\n\n在进入慢响应排查流程前，需先检查是否满足**升级为服务不可用**的条件：\n\n| 检查项 | 升级阈值 | 升级后动作 |\n|---|---|---|\n"
+        },
+        {
+          "id": "formal_gen_018",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cache_tuning_playbook.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "## 结论\n\n**检索到的文档中没有给出慢响应告警的具体时间窗口数值和过滤表达式"
+        },
+        {
+          "id": "formal_gen_019",
+          "question_type": "single_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cache_tuning_playbook.md",
+            "perf_capacity_planning_false_friend.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "## 为什么慢响应排查要查数据库慢查询日志\n\n根据检索到的文档，主要有以下几方面原因：\n\n### 1. 数据库是共享资源，慢查询可能拖慢全局\n\n根据 `slow_response.md` 的分层排查方法，第一步是通过 **system-metrics** 判断是“整体慢”还是“个别接口慢”：\n\n- **整体慢** → 优先查共享资源（**数据库、连接池**）\n- 个别慢 → 查具体代码路径\n\n当整"
+        },
+        {
+          "id": "formal_gen_020",
+          "question_type": "single_hop",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "service_unavailable.md"
+          ],
+          "answer_preview": "## 回答\n\n根据知识库文档，**接口变慢但尚未出现 500/503 错误的场景，应优先查阅 `slow_response.md`（慢响应处置手册）**。\n\n### 依据\n\n两份文档都明确指向了这一分流规则：\n\n1. **文档1（service_unavailable.md / 恢复顺序章节）**明确说明：\n   > “慢响应但未不可用见 slow_response.md”\n\n2. **文档3（c"
+        },
+        {
+          "id": "formal_gen_021",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "The user is asking me to compare the trigger conditions for slow response (慢响应) and service unavailability (服务不可用) based on the retrieved documents.\n\nLet me analyze the documents:\n\nDocument 1 (service"
+        },
+        {
+          "id": "formal_gen_022",
+          "question_type": "confusable",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 0.5,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cache_tuning_playbook.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "用户的问题是：缓存调优手册也写了慢响应，你会怎么避免把缓存建议误当成故障根因结论？\n\n这是一个关于方法论的问题——如何避免把\"缓存调优建议\"（一种优化手段）误当成\"故障根因结论\"（一种诊断结果）。\n\n让我分析一下检索到的文档：\n\n1. 文档1（perf_capacity_planning_false_friend.md）：明确说明这是\"性能容量规划\"文档，是评测刻意设计的 false friend"
+        },
+        {
+          "id": "formal_gen_023",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cache_tuning_playbook.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "根据检索到的文档内容，**无法回答这个问题**。\n\n**原因说明：**\n\n检索到的三个文档均不包含“慢响应文档（slow_response.md）”的具体内容：\n\n1. **文档1（cache_tuning_playbook.md）**：讨论的是缓存调优，说明何时引入缓存（如慢查询持续出现、读多写少的数据优先考虑缓存）。\n\n2. **文档2、文档3（perf_capacity_planning_f"
+        },
+        {
+          "id": "formal_gen_024",
+          "question_type": "single_hop",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "cache_tuning_playbook.md",
+            "cpu_high_usage.md"
+          ],
+          "answer_preview": "根据当前检索到的三份文档，**无法回答该问题**——文档中没有包含慢响应场景下“用户影响”和“下游影响”的具体内容。\n\n具体情况说明如下：\n\n1. **三份文档均未覆盖慢响应的影响面**：\n   - `memory_high_usage.md`（OOM 处置）：仅提到“内存问题的连锁反应（GC 停顿导致慢响应）见 slow_response.md”，即只指出慢响应可能是内存问题的一种连锁反应，并未"
+        },
+        {
+          "id": "formal_gen_025",
+          "question_type": "single_hop",
+          "keyword_recall": 0.8333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "service_unavailable.md",
+            "cpu_high_usage.md"
+          ],
+          "answer_preview": "根据检索到的文档，**没有找到磁盘使用率告警触发后的具体处置步骤**，无法直接回答“第一步应该做什么”。\n\n**文档中已有的相关信息：**\n\n1. **文档1（disk_high_usage.md）** 仅包含告警阈值定义，不含处置流程：\n   - 使用率超过 80% → 预警\n   - 使用率超过 90% → 严重告警\n   - 水位 100%（disk_full）→ 最严重形态，会导致数据库拒"
+        },
+        {
+          "id": "formal_gen_026",
+          "question_type": "single_hop",
+          "keyword_recall": 0.8333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "memory_high_usage.md",
+            "cpu_high_usage.md"
+          ],
+          "answer_preview": "根据文档《磁盘使用率告警处理手册》（disk_high_usage.md）中的告警阈值章节，磁盘告警的阈值划分如下：\n\n## 磁盘告警阈值划分\n\n| 级别 | 阈值 | 说明 |\n|------|------|------|\n| **预警** | 磁盘使用率超过 **80%** | 触发预警告警 |\n| **严重告警** | 磁盘使用率超过 **90%** | 触发严重告警 |\n| **磁盘写满*"
+        },
+        {
+          "id": "formal_gen_027",
+          "question_type": "single_hop",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "用户问的是\"磁盘高时建议怎么查系统日志？请说出日志主题、时间窗口和查询条件。\"\n\n让我看看检索到的文档内容：\n\n文档1（disk_high_usage.md）：讲的是磁盘使用率告警阈值——80%预警、90%严重告警，数据源是 system-metrics。磁盘写满是最严重形态。\n\n文档2（slow_response.md）：讲的是慢响应排查，涉及 system-metrics、applicatio"
+        },
+        {
+          "id": "formal_gen_028",
+          "question_type": "single_hop",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "用户问的是：为什么磁盘打满会影响日志记录和数据库稳定性？\n\n我需要结合检索到的文档内容来回答。让我看看文档里有什么相关信息：\n\n文档1（disk_high_usage.md - 告警阈值）：\n- 磁盘使用率超过 80% 预警、超过 90% 严重告警（system-metrics 数据源）\n- 磁盘写满（disk_full，水位 100%）是最严重形态：数据库拒绝写入、服务直接不可用\n\n文档2（di"
+        },
+        {
+          "id": "formal_gen_029",
+          "question_type": "multi_hop",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "service_unavailable.md",
+            "monitoring_glossary_noise.md"
+          ],
+          "answer_preview": "根据知识库内容，当**磁盘高使用率**与 **500 错误**同时出现时，应联想到以下两类文档：\n\n## 1. 磁盘使用率告警处理手册（disk_high_usage.md）\n\n- 该手册定义了磁盘告警阈值：**超过 80% 预警、超过 90% 严重告警**（system-metrics 数据源）。\n- 其中明确指出：**磁盘写满（disk_full，水位 100%）是最严重形态，会导致数据库拒绝"
+        },
+        {
+          "id": "formal_gen_030",
+          "question_type": "confusable",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "用户问的是：性能容量规划文档里也提到磁盘增长率，这能直接替代磁盘告警处置方案吗？\n\n让我看看检索到的文档内容：\n\n文档1和文档2是关于\"性能容量规划\"的，明确说明这是 false friend（易混淆文档），是评测刻意设计的。文档1说：\n- 本文档讨论的是\"性能容量规划\"——提前评估资源需求、做预算与扩容计划\n- 注意与\"性能故障排查\"区分：慢响应/CPU 高时应先读 slow_response."
+        },
+        {
+          "id": "formal_gen_031",
+          "question_type": "single_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "perf_capacity_planning_false_friend.md",
+            "cache_tuning_playbook.md"
+          ],
+          "answer_preview": "**结论：检索到的三个文档中，均未直接说明“磁盘告警时应先记录故障时间而非直接删日志”的原因。**\n\n**文档中相关但不充分的信息：**\n\n- 文档2（disk_high_usage.md）仅定义了告警阈值和严重形态：磁盘使用率超过 80% 预警、超过 90% 严重告警，写满（100%）时会导致数据库拒绝写入、服务直接不可用。这说明磁盘告警是需要严肃对待的故障，但该文档未涉及告警处理流程中“记录故"
+        },
+        {
+          "id": "formal_gen_032",
+          "question_type": "single_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "memory_high_usage.md",
+            "cpu_high_usage.md"
+          ],
+          "answer_preview": "**排障提醒：** 磁盘使用率超过 80% 触发预警、超过 90% 为严重告警，一旦写满（水位 100%）将导致数据库拒绝写入、服务直接不可用，请尽快清理空间或扩容以防业务中断。\n\n（依据：文档1 disk_high_usage.md「告警阈值」章节）"
+        },
+        {
+          "id": "formal_gen_033",
+          "question_type": "single_hop",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "根据检索到的文档，服务不可用（503）告警的触发条件在《服务不可用（503）处置手册》中有明确定义，满足以下**任一条件**即判定为服务不可用：\n\n1. **健康检查连续失败**\n2. **错误率超过 50%**\n3. **P99 延迟超过 3 秒，且持续 5 分钟**\n\n**补充说明：**\n\n- 《慢响应（P99 超标）排查手册》也印证了这一判定逻辑：当慢响应告警出现后，若**错误率超过 50%"
+        },
+        {
+          "id": "formal_gen_034",
+          "question_type": "single_hop",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "mock_incident_drill_script.md",
+            "service_unavailable.md"
+          ],
+          "answer_preview": "**明确说明：检索到的文档中没有直接解释“排查服务不可用为什么要先拿到故障时间”这一步骤及其原因。** 三份文档分别只涉及判定标准、恢复顺序和演练脚本，均未将“获取故障时间”列为排查第一步，也未说明其理由。\n\n不过，文档中的以下内容可以间接支撑对这一问题的理解：\n\n1. **判定标准依赖时间维度**（文档1）：服务不可用的判定条件是“健康检查连续失败、或错误率超过 50%、或 P99 超过 3 秒"
+        },
+        {
+          "id": "formal_gen_035",
+          "question_type": "single_hop",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cache_tuning_playbook.md",
+            "service_unavailable.md"
+          ],
+          "answer_preview": "根据检索到的文档（service_unavailable.md），应用日志排查要点如下：\n\n## 文档明确给出的排查方式\n\n**过滤条件：**\n- 在 application-logs 中查 **ERROR 级别日志集中出现的时间点与堆栈**（文档1「应用自身」分诊项）\n- 关注 **OOM 重启**迹象——OOM 重启会造成**周期性不可用**，若日志呈现周期性模式，可结合 memory_hig"
+        },
+        {
+          "id": "formal_gen_036",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "The user is asking: \"为什么服务不可用会被定义成紧急级别？\" (Why is service unavailability defined as an emergency/critical level?)\n\nLet me look at the retrieved documents:\n\nDocument 1 (service_unavailable.md): 健康检查连续失败"
+        },
+        {
+          "id": "formal_gen_037",
+          "question_type": "single_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "**先参考 service_unavailable.md（服务不可用（503）处置手册）。**\n\n理由如下：\n\n1. **健康检查失败直接命中不可用判定条件**。根据文档1（service_unavailable.md/判定章节）：健康检查连续失败、或错误率超过 50%、或 P99 超过 3秒持续 5分钟，即判定为服务不可用。你已观察到健康检查失败，无需等待其他指标确认。\n\n2. **slow_r"
+        },
+        {
+          "id": "formal_gen_038",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "## 区分标准（依据文档）\n\n根据检索到的文档，两者的判定指标不同，可按以下维度区分：\n\n| 维度 | 慢响应 | 服务不可用 |\n|------|--------|-----------|\n| **核心指标** | P99 延迟超过 3 秒，持续 5 分钟 | 错误率超过 50%，或健康检查失败 |\n| **服务状态** | 服务仍在处理请求，只是“慢” | 服务已无法正常提供服务 |\n| **"
+        },
+        {
+          "id": "formal_gen_039",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "mock_incident_drill_script.md",
+            "monitoring_glossary_noise.md",
+            "security_waf_playbook.md"
+          ],
+          "answer_preview": "用户问的是：\"如果回答里只说这是 warning 级别，为什么不符合知识库？\"\n\n这个问题看起来是在问一个关于知识库/评测场景的问题。用户似乎在问：如果某个回答只说\"这是 warning 级别\"，为什么这样的回答不符合知识库的要求？\n\n让我看看检索到的文档：\n1. 文档1：监控术语词典（噪声文档）——明确说明这是干扰项，不含排查步骤\n2. 文档2：故障演练脚本（模拟数据）——明确说明这是演练用的模"
+        },
+        {
+          "id": "formal_gen_040",
+          "question_type": "single_hop",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "service_unavailable.md"
+          ],
+          "answer_preview": "The user is asking me to summarize the troubleshooting inputs for service unavailability into at least three items: time, logs, and business impact.\n\nLet me look at the documents:\n\nDocument 1 (service"
+        },
+        {
+          "id": "formal_gen_041",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.8333,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "service_unavailable.md"
+          ],
+          "answer_preview": "用户问的是：CPU 高且响应慢时，联合诊断至少要覆盖哪两类告警和哪两类日志？\n\n让我分析文档内容：\n\n文档1（cpu_high_usage.md - 告警阈值）：\n- CPU 使用率持续 5分钟超过 80% 触发告警（system-metrics 数据源，阈值 80%，窗口 5分钟）\n\n文档2（service_unavailable.md - 快速分诊）：\n- 数据源速查：application-"
+        },
+        {
+          "id": "formal_gen_042",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cache_tuning_playbook.md",
+            "service_unavailable.md"
+          ],
+          "answer_preview": "# 数据库超时导致接口 500 的联看文档建议\n\n根据知识库内容，该场景的处置主线在 **service_unavailable.md（服务不可用处置手册）**，建议按以下优先级联看：\n\n## 一、核心处置文档（最优先）\n\n**1. service_unavailable.md** —— 主处置入口\n- **快速分诊章节**：数据库问题导致请求失败时，按以下路径排查：\n  - `system-me"
+        },
+        {
+          "id": "formal_gen_043",
+          "question_type": "multi_hop",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "service_unavailable.md"
+          ],
+          "answer_preview": "用户问的是：磁盘打满引发服务不可用时，回答里至少应该覆盖哪些事实点？\n\n这是一个关于\"回答应该覆盖哪些事实点\"的元问题，需要结合文档内容来回答。\n\n让我梳理文档中的关键事实：\n\n文档1（disk_high_usage.md - 告警阈值）：\n- 磁盘使用率超过 80% 预警、超过 90% 严重告警（system-metrics 数据源）\n- 磁盘写满（disk_full，水位 100%）是最严重形"
+        },
+        {
+          "id": "formal_gen_044",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "monitoring_glossary_noise.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "## 回答\n\n**根据本次检索到的三个文档，无法确定“缓存穿透”场景下的主诊断文档和辅助调优文档分别是哪类**——文档中没有直接涉及缓存穿透这一具体故障场景的内容。\n\n### 检索文档的实际情况\n\n本次召回的三个文档均非正式排障手册，且其中两个明确声明为评测干扰项：\n\n| 文档 | 性质 | 与问题的关系 |\n|------|------|------------|\n| 监控术语词典（noise）"
+        },
+        {
+          "id": "formal_gen_045",
+          "question_type": "multi_hop",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "k8s_ingress_tls_guide.md",
+            "security_waf_playbook.md"
+          ],
+          "answer_preview": "根据知识库内容，应该联看以下两类文档：\n\n## 1. `k8s_ingress_tls_guide.md`（K8s Ingress TLS 证书配置指南）\n\n用于排查 **HTTPS 握手异常**。该文档的“常见错误”章节覆盖了典型的握手失败原因：\n\n- **CN/SAN 不匹配** → 浏览器报证书错误；\n- **secret 与 Ingress 不在同一 namespace** → 挂载失败；"
+        },
+        {
+          "id": "formal_gen_046",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cache_tuning_playbook.md",
+            "mock_incident_drill_script.md",
+            "service_unavailable.md"
+          ],
+          "answer_preview": "根据检索到的三份文档，回答如下：\n\n**1. 数据库恢复演练 → 参考 `mock_incident_drill_script.md`（故障演练脚本）**\n\n该文档明确说明自己是“演练用的模拟剧本”，用于注入故障、观察告警、走一遍预案，正好对应“演练”场景。但需注意：文中出现的“CPU 80%”“错误率 50%”“P99 3 秒”等数字均为演练注入目标，**不是真实处置依据**。\n\n**2. 入口"
+        },
+        {
+          "id": "formal_gen_047",
+          "question_type": "confusable",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cache_tuning_playbook.md",
+            "mock_incident_drill_script.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "## 答案：应参考 **slow_response.md**（慢响应（P99 超标）排查手册）\n\n### 具体说明\n\n**1. 术语手册 ≠ 处置手册**\n\n首先需要说明：您提到的“监控术语手册”并不在本次检索到的文档中。但即便存在，术语手册的作用是解释概念（如 P99 的定义），**不包含线上告警触发后的处置流程**。真正排障需要参考操作类文档。\n\n**2. 检索文档中的明确指向**\n\n- **"
+        },
+        {
+          "id": "formal_gen_048",
+          "question_type": "confusable",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "mock_incident_drill_script.md"
+          ],
+          "answer_preview": "**不能。**\n\n根据文档内容，理由如下：\n\n1. **演练脚本明确声明为模拟数据**：文档1（mock_incident_drill_script.md）开头即说明这是“演练用的模拟剧本”，文中出现的所有数字（如“CPU 80%”“错误率 50%”“P99 3 秒”等）均为**演练注入目标**，不是真实处置手册。文档2（免责章节）进一步强调：“演练环境数据全部模拟，不反映生产真实水位。”\n\n2."
+        },
+        {
+          "id": "formal_gen_049",
+          "question_type": "confusable",
+          "keyword_recall": 0.8333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "disk_high_usage.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "**不能直接说明。** 结合检索到的文档，理由如下：\n\n## 依据\n\n**1. 容量预算属于前瞻性规划，不是故障记录**\n\n文档1（perf_capacity_planning_false_friend.md）明确指出：性能容量规划是“**提前评估资源需求、做预算与扩容计划**”，并特别强调要与“性能故障排查”区分开。也就是说，这类文档天然是面向未来的风险测算和预案设计，而非对线上已发生事件的记录"
+        },
+        {
+          "id": "formal_gen_050",
+          "question_type": "confusable",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 0.5,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "mock_incident_drill_script.md",
+            "service_unavailable.md"
+          ],
+          "answer_preview": "**主参考文档应为：`service_unavailable.md`（服务不可用（503）处置手册）。**\n\n具体说明如下：\n\n1. **为什么是这份文档**：`service_unavailable.md` 是正式的排障处置手册，包含完整的处置流程——快速分诊（按概率排查下游数据库、应用自身、上游依赖）和恢复顺序（先恢复可用再查根因）。虽然手册标题针对 503，但其中明确提到“数据库不可写入（磁"
+        },
+        {
+          "id": "formal_gen_051",
+          "question_type": "confusable",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 0.5,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "mock_incident_drill_script.md",
+            "memory_high_usage.md"
+          ],
+          "answer_preview": "## 回答\n\n**先说明一点：** 检索到的三份文档中**没有包含“术语词典”的内容**，因此无法核实“CPU 高不一定等于故障”这一说法的原文出处和上下文。以下回答基于已检索到的告警文档逻辑进行推断。\n\n### 结论：要按告警文档走\n\n“CPU 高不一定等于故障”与“按告警文档排查”**并不矛盾**，两者是两个层面的概念：\n\n1. **告警 ≠ 故障确认，但告警 = 排查触发信号。**\n   根"
+        },
+        {
+          "id": "formal_gen_052",
+          "question_type": "confusable",
+          "keyword_recall": 0.75,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "mock_incident_drill_script.md",
+            "monitoring_glossary_noise.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "**不应该判好。** 根据检索到的文档内容，这种回答恰恰是评测设计要惩罚的典型错误模式。具体理由如下：\n\n## 1. 演练脚本是模拟剧本，不是处置依据\n\n文档1（mock_incident_drill_script.md）明确声明：\n\n> 这是**演练用的模拟剧本**……文中出现的\"CPU 80%\"\"错误率 50%\"\"P99 3 秒\"等数字均为演练注入目标，**不是真实处置手册**。真实排障请读 "
+        },
+        {
+          "id": "formal_gen_053",
+          "question_type": "single_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "security_waf_playbook.md"
+          ],
+          "answer_preview": "根据文档3（WAF 安全防护处置手册/覆盖的攻击类型），WAF 手册提到的三类主要防护对象（攻击类型）是：\n\n1. **SQL 注入**：采用特征化拦截，并以参数化查询作为治本手段；\n2. **XSS（跨站脚本攻击）**：采用输出转义 + CSP（内容安全策略）防护；\n3. **CC 攻击**：采用限流（IP/会话维度）+ 人机校验进行防护。"
+        },
+        {
+          "id": "formal_gen_054",
+          "question_type": "single_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "k8s_ingress_tls_guide.md",
+            "mysql_backup_restore.md"
+          ],
+          "answer_preview": "## 回答\n\n根据《MySQL 备份与恢复手册》中的内容，校验 GTID 一致性是 PITR（基于时间点恢复）流程中的关键校验环节，原因可以从文档描述的流程中归纳如下：\n\n### 1"
+        },
+        {
+          "id": "formal_gen_055",
+          "question_type": "single_hop",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "k8s_ingress_tls_guide.md"
+          ],
+          "answer_preview": "## Ingress TLS 排障：两个方向的排查要点\n\n### 一、证书方向（文档有明确说明）\n\n根据文档，排查证书问题时重点检查以下几点：\n\n1. **CN/SAN 与访问域名是否匹配**\n   - 证书的 CN（Common Name）必须与访问域名一致；\n   - 多域名场景必须使用 SAN（Subject Alternative Name）扩展——**现代浏览器只认 SAN，仅填 CN "
+        },
+        {
+          "id": "formal_gen_056",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "k8s_ingress_tls_guide.md",
+            "monitoring_glossary_noise.md",
+            "security_waf_playbook.md"
+          ],
+          "answer_preview": "根据检索到的文档，可以明确确认的入口层有两个：**WAF 层**和 **Ingress 层**。但文档并未完整描述 CDN 到 Pod 的全链路，以下是结合文档内容的回答：\n\n## 文档明确支持的入口层\n\n**1. WAF（Web 应用防火墙）层**\n- 来源：`security_waf_playbook.md`\n- 作用：在流量进入业务前进行安全防护，覆盖的攻击类型包括：\n  - SQL 注入（"
+        },
+        {
+          "id": "formal_gen_057",
+          "question_type": "no_answer",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "mock_incident_drill_script.md",
+            "service_unavailable.md"
+          ],
+          "answer_preview": "**结论：知识库中没有针对 Redis Sentinel 主从切换失败的专门标准处置方案。**\n\n现有三个文档的覆盖范围如下，均不涉及 Redis Sentinel 或主从切换场景：\n\n| 文档 | 内容 | 是否适用 |\n|---|---|---|\n| service_unavailable.md | 服务不可用（503）的通用恢复顺序（重启/扩容/降级摘流量，错误率 50% 以上切备用实例） "
+        },
+        {
+          "id": "formal_gen_058",
+          "question_type": "no_answer",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "service_unavailable.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "用户问的是\"Kafka 分区倾斜导致消费堆积时，按照当前知识库应该怎么处理？\"\n\n让我看看检索到的文档内容：\n\n文档1：服务不可用（503）处置手册/恢复顺序 - 讲的是服务不可用时的恢复顺序：先恢复可用再查根因，重启/扩容/降级摘流量，错误率50%以上时直接切流量到备用实例。\n\n文档2：性能容量规划（易混淆文档）/与故障排查的关系 - 讲的是容量不足是慢的可能根因之一，但排查入口永远是实时指标而"
+        },
+        {
+          "id": "formal_gen_059",
+          "question_type": "no_answer",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "k8s_ingress_tls_guide.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "**结论：知识库中没有直接针对“Nginx 热升级失败后连接中断”的操作手册。**\n\n检索到的三份文档均未涉及 Nginx 二进制热升级（hot upgrade）、升级失败回滚或升级期间连接中断的具体处置步骤。\n\n**最接近的间接参考：**\n\n若热升级失败已导致服务不可用（如 503、健康检查失败、错误率飙升），可参考 **service_unavailable.md（服务不可用（503）处置手册"
+        },
+        {
+          "id": "formal_gen_060",
+          "question_type": "no_answer",
+          "keyword_recall": 0.25,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "memory_high_usage.md",
+            "service_unavailable.md"
+          ],
+          "answer_preview": "**结论：当前知识库不能直接回答这个问题。**\n\n## 检索结果说明\n\n本次检索到的三份文档均未涉及 Redis、缓存雪崩或主从复制延迟相关内容：\n\n| 文档 | 覆盖范围 | 与问题的相关性 |\n|------|---------|--------------|\n| cpu_high_usage.md | CPU 使用率过高排查 | 无关（明确声明“本手册只覆盖 CPU\"） |\n| servic"
+        }
+      ]
+    },
+    "D_full_llm_rerank": {
+      "summary": {
+        "retrieval_rerank_type": "llm",
+        "keyword_recall": 0.6278,
+        "source_recall_strict": 0.8833,
+        "forbidden_violation_rate": 0.2833
+      },
+      "cases": [
+        {
+          "id": "formal_gen_001",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "mock_incident_drill_script.md"
+          ],
+          "answer_preview": "**根据检索到的文档，无法回答“标准排查的第一步”这一问题。**\n\n具体说明如下：\n\n1. **文档1（cpu_high_usage.md）** 仅包含“告警阈值”章节，说明了告警触发条件（CPU 使用率持续 5 分钟超过 80%，system-metrics 数据源），但**未包含排查步骤**的内容。\n\n2. **文档2、文档3（mock_incident_drill_script.md）** "
+        },
+        {
+          "id": "formal_gen_002",
+          "question_type": "single_hop",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "用户问的是\"CPU 高告警时的日志查询要点，至少说出日志主题、时间窗口和过滤条件\"。\n\n我需要结合检索到的文档内容来回答。让我分析一下文档：\n\n文档1（cpu_high_usage.md - 标准排查流程）：\n- 确认当前状态：先查 system-metrics 拿当前时间的 CPU 指标，再用 query_logs 看同时段是否有异常慢查询\n- 区分类型：us 高（用户态）查 query_log"
+        },
+        {
+          "id": "formal_gen_003",
+          "question_type": "single_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cpu_high_usage.md"
+          ],
+          "answer_preview": "The user is asking: \"CPU 高的时候，为什么要重点看进程名和 PID？\" (When CPU is high, why should we focus on process name and PID?)\n\nLet me look at the retrieved documents:\n\nDocument 1 (cpu_high_usage.md - 标准排查流程):\n1. C"
+        },
+        {
+          "id": "formal_gen_004",
+          "question_type": "single_hop",
+          "keyword_recall": 0.8333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cpu_high_usage.md"
+          ],
+          "answer_preview": "根据文档，HighCPUUsage 对应的是「CPU 使用率过高」告警，其触发条件是：**CPU 使用率持续 5 分钟超过 80%**（数据源 system-metrics）。拿到这个告警后，建议按以下路径展开：\n\n## 第一步：确认当前状态\n\n1. 查 **system-metrics**，获取当前时间的 CPU 指标，确认告警是否仍在持续；\n2. 查 **query_logs**，看同时段是否"
+        },
+        {
+          "id": "formal_gen_005",
+          "question_type": "single_hop",
+          "keyword_recall": 0.8333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "**文档中没有找到关于“日志默认回看最近 30 分钟”这一设定的说明或原因。**\n\n检索到的文档中与该问题相关的内容仅有：\n\n1. **告警触发条件**（文档1）：CPU 使用率持续 **5 分钟**超过 80% 触发告警（system-metrics 数据源，阈值 80%，窗口 5 分钟）。\n\n2. **排查流程**（文档2）：排查时先查 system-metrics 获取**当前时间**的 C"
+        },
+        {
+          "id": "formal_gen_006",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "memory_high_usage.md",
+            "disk_high_usage.md"
+          ],
+          "answer_preview": "根据检索到的文档，**无法完成该总结**，原因如下：\n\n## 说明\n\n文档中与 CPU 告警相关的内容仅有一条（来源：cpu_high_usage.md），且只包含**告警阈值配置信息**：\n\n> CPU 使用率持续 5 分钟超过 80% 触发告警（system-metrics 数据源，阈值 80%，窗口 5 分钟）。\n\n该文档**未包含任何关于 CPU 告警的风险影响描述**（如服务性能下降、请"
+        },
+        {
+          "id": "formal_gen_007",
+          "question_type": "confusable",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "## 回答\n\n**应优先参考故障排查类文档（即 `cpu_high_usage.md`），而非容量规划文档。**\n\n### 依据\n\n**1. 文档本身已明确标注了优先级关系**\n\n容量规划文档（`perf_capacity_planning_false_friend.md`）在开头即声明：\n\n> \"本文档讨论的是'性能容量规划'——提前评估资源需求、做预算与扩容计划。注意与'性能故障排查'区分：慢"
+        },
+        {
+          "id": "formal_gen_008",
+          "question_type": "single_hop",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "service_unavailable.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "The user is asking: \"CPU 高但还没有超时错误时，你会先解释现象、还是先给日志排查动作？请按文档回答。\"\n\nLet me look at the documents provided:\n\nDocument 1 (service_unavailable.md): About 503 service unavailable handling. Says \"先恢复可用再查根因\" ("
+        },
+        {
+          "id": "formal_gen_009",
+          "question_type": "single_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "mock_incident_drill_script.md",
+            "cpu_high_usage.md"
+          ],
+          "answer_preview": "**结论：检索到的文档中没有明确说明内存告警后标准处置的第一步。**\n\n具体分析如下：\n\n1. **文档1（memory_high_usage.md）** 仅给出了内存告警的触发条件——内存使用率持续超过 85%（system-metrics 数据源，阈值 85%），但**未包含任何处置步骤**的内容。\n\n2. **文档2（mock_incident_drill_script.md）** 中的流程"
+        },
+        {
+          "id": "formal_gen_010",
+          "question_type": "single_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "disk_high_usage.md",
+            "cpu_high_usage.md"
+          ],
+          "answer_preview": "根据检索到的文档内容，**无法回答该问题**。\n\n**说明：**\n\n- 文档1（memory_high_usage.md）中仅提供了内存告警的**阈值信息**：内存使用率持续超过 85% 触发告警（system-metrics 数据源，阈值 85%）。\n- 文档中**未包含**关于内存高告警典型症状（如 OOM、进程被杀、服务卡顿等）的具体描述。\n- 文档2、文档3 分别涉及磁盘和 CPU 告警，"
+        },
+        {
+          "id": "formal_gen_011",
+          "question_type": "single_hop",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "service_unavailable.md"
+          ],
+          "answer_preview": "根据《内存持续升高与 OOM 定位手册》，两类日志在 OOM 排查中承担不同角色，缺一不可：\n\n## system-metrics（系统指标日志）——判断“问题类型”\n\n1. **确认内存增长形态**：通过指标曲线区分是**缓涨**（典型泄漏特征）还是**台阶式增长**（大对象或缓存一次性加载），这决定了后续排查方向。\n2. **结合 GC 日志识别泄漏**：Java 服务若出现 **Full G"
+        },
+        {
+          "id": "formal_gen_012",
+          "question_type": "single_hop",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "根据文档内容，内存高告警直接搜日志时，建议按以下条件过滤：\n\n## 建议的过滤条件\n\n**1. system-metrics（系统指标）**\n- 过滤条件：**内存使用率 > 85%**（这是文档中明确的告警阈值）\n- 用途：确认内存是**缓涨**（泄漏特征）还是**台阶式上升**（大对象/缓存一次性加载）\n\n**2. GC 日志（Java 服务）**\n- 过滤关键字：**Full GC** 相关"
+        },
+        {
+          "id": "formal_gen_013",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "memory_high_usage.md"
+          ],
+          "answer_preview": "# 内存高伴随 Full GC、OOM 或 swap 的原因（按知识库解释）\n\n## 1. Full GC：内存泄漏的典型特征\n\n根据**文档1（排查流程）**，内存持续升高分为两种形态：\n- **缓涨**：对应内存"
+        },
+        {
+          "id": "formal_gen_014",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "cpu_high_usage.md"
+          ],
+          "answer_preview": "## 区分思路：先看告警的指标类型，再看伴随现象\n\n### 1. 最直接的区分：看告警来源的监控指标\n\n**内存高告警**（文档1，memory_high_usage.md）有明确定义：\n- **数据源**：system-metrics\n- **指标**：内存使用率\n- **触发条件**：持续超过 **85%**\n\n也就是说，内存高告警是**资源水位类告警**——它监控的是系统资源消耗本身，触发时"
+        },
+        {
+          "id": "formal_gen_015",
+          "question_type": "confusable",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "service_unavailable.md"
+          ],
+          "answer_preview": "**不能替代。**\n\n根据检索到的文档，可以明确得出以下结论：\n\n## 1. 文档中已有明确说明\n\n`service_unavailable.md` 的恢复顺序章节中直接指出：\n\n> 术语词典类纯词面文档（monitoring_glossary_noise.md）**不是处置依据**。\n\n也就是说，术语词典只负责解释“OOM 是什么”这类词面含义，属于知识参考，不具备可操作的处置流程。\n\n## 2"
+        },
+        {
+          "id": "formal_gen_016",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "slow_response.md",
+            "cpu_high_usage.md"
+          ],
+          "answer_preview": "根据检索到的文档，内存高告警至少需要确认以下内容：在日志主题上，核心数据源是 system-metrics（系统指标），用于确认内存使用率是否超过 85% 的告警阈值"
+        },
+        {
+          "id": "formal_gen_017",
+          "question_type": "single_hop",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "根据检索到的文档内容，**无法回答“标准慢响应排查从哪里开始”这一问题**，原因如下：\n\n**文档中已有的相关信息：**\n\n1. **触发条件确认**（文档1，slow_response.md/判定章节）：P99 延迟超过 3 秒持续 5 分钟确实会触发慢响应告警，这与您描述的场景一致。\n\n2. **升级条件**（文档1、文档2）：若同时出现错误率超过 50% 或健康检查失败，则不再按慢响应处理，"
+        },
+        {
+          "id": "formal_gen_018",
+          "question_type": "single_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cache_tuning_playbook.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "根据检索到的文档，**文档中并未提供具体的时间窗口数值和完整的过滤表达式语法**，只能给出以下可确认的排查条件：\n\n## 文档中可确认的日志查询条件\n\n**数据源（来自 slow_response.md）**：\n- system-metrics（系统指标）\n- application-logs（应用日志）\n- query_logs / slow_query（数据库日志）\n\n**可用的过滤条件**："
+        },
+        {
+          "id": "formal_gen_019",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "slow_response.md",
+            "cache_tuning_playbook.md"
+          ],
+          "answer_preview": "## 为什么慢响应场景下要查数据库慢查询日志\n\n根据排查手册，主要有以下几方面原因：\n\n### 1. 数据库是共享资源，是慢响应的高频根因\n\n慢响应排查的第一步是通过 system-metrics 区分是**整体慢**还是**个别接口慢**（文档1）。如果是整体慢，应优先排查共享资源——**数据库、连接池**正是典型的共享资源。一条慢 SQL 可能拖慢所有依赖它的接口，因此数据库层是必查项。\n\n#"
+        },
+        {
+          "id": "formal_gen_020",
+          "question_type": "single_hop",
+          "keyword_recall": 0.8333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "## 结论\n\n接口变慢但尚未出现错误（未到服务不可用级别），按知识库应遵循 **slow_response.md（慢响应/P99 超标排查手册）** 的分层排查流程——文档3（service_unavailable.md）明确指引：“慢响应但未不可用见 slow_response.md”。\n\n## 优先看什么\n\n**第一步：先看 system-metrics，判断是“整体慢”还是“个别接口慢”**"
+        },
+        {
+          "id": "formal_gen_021",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "用户问的是慢响应和服务不可用的触发条件对比。我需要基于检索到的文档内容来回答。\n\n文档1（slow_response.md）：\n- P99 延迟超过 3秒持续 5分钟告警\n- 错误率超过 50% 或健康检查失败则升级为服务不可用（见 service_unavailable.md）\n\n文档2（service_unavailable.md）：\n- 健康检查连续失败、或错误率超过 50%、或 P99 超"
+        },
+        {
+          "id": "formal_gen_022",
+          "question_type": "confusable",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cache_tuning_playbook.md",
+            "perf_capacity_planning_false_friend.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "用户问的是一个很具体的问题：缓存调优手册（cache_tuning_playbook.md）里也提到了慢查询/慢响应相关内容，我会怎么避免把\"缓存建议\"误当成\"故障根因结论\"？\n\n让我先梳理一下文档内容：\n\n1. 文档1（perf_capacity_planning_false_friend.md）：这是一个\"易混淆文档\"，讨论的是性能容量规划，明确说它是评测刻意设计的 false friend，"
+        },
+        {
+          "id": "formal_gen_023",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "根据 slow_response.md 文档，这样做的原因文档中明确写的是：**“避免拿历史数据误判”**。\n\n具体来说，文档在“分层排查（自上而下）”的第 4 条“当前时间对照”中规定：排查时先取当前时间的 system-metrics 基线，避免拿历史数据误判。\n\n结合该文档的整体排查逻辑，这一要求的意义在于：\n\n1. **排查依赖多数据源的时序对齐**：文档的排查流程需要将 system-m"
+        },
+        {
+          "id": "formal_gen_024",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "service_unavailable.md",
+            "cpu_high_usage.md"
+          ],
+          "answer_preview": "根据检索到的文档内容，**无法回答该问题**。\n\n**说明：**\n\n您询问的“慢响应场景的用户影响和下游影响”相关内容，应来自 `slow_response.md` 文档，但本次检索到的三份文档中均**未包含该文档的正文内容**，只有对它的引用：\n\n| 来源文档 | 与慢响应相关的表述 |\n|---------|------------------|\n| memory_high_usage.md "
+        },
+        {
+          "id": "formal_gen_025",
+          "question_type": "single_hop",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "mock_incident_drill_script.md",
+            "memory_high_usage.md"
+          ],
+          "answer_preview": "**根据检索到的文档，无法回答“磁盘使用率告警触发后第一步应该做什么”这一问题**——文档中未包含磁盘告警的具体处置步骤。\n\n**文档中与磁盘告警相关的信息仅有以下内容：**\n\n1. **告警阈值与严重程度**（来源：disk_high_usage.md）：\n   - 使用率超过 80% 触发预警，超过 90% 触发严重告警（数据源为 system-metrics）；\n   - 磁盘写满（disk"
+        },
+        {
+          "id": "formal_gen_026",
+          "question_type": "single_hop",
+          "keyword_recall": 0.8333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "memory_high_usage.md",
+            "cpu_high_usage.md"
+          ],
+          "answer_preview": "根据文档《磁盘使用率告警处理手册》（disk_high_usage.md）中的告警阈值说明，磁盘告警的阈值划分如下：\n\n| 级别 | 阈值 | 说明 |\n|------|------|------|\n| **预警** | 磁盘使用率超过 **80%** | 提前预警，需关注 |\n| **严重告警** | 磁盘使用率超过 **90%** | 需要立即处理 |\n| **最严重形态** | 磁盘写满，水"
+        },
+        {
+          "id": "formal_gen_027",
+          "question_type": "single_hop",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "service_unavailable.md"
+          ],
+          "answer_preview": "The user is asking: \"磁盘高时建议怎么查系统日志？请说出日志主题、时间窗口和查询条件。\" (When disk usage is high, how should one check system logs? Please specify the log topic, time window, and query conditions.)\n\nLet me look at the"
+        },
+        {
+          "id": "formal_gen_028",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "service_unavailable.md"
+          ],
+          "answer_preview": "## 核心机制：磁盘打满 = 所有写操作失败\n\n根据文档，磁盘使用率达到 100%（disk_full）时，**所有写入操作都会失败**（文档1）。日志记录和数据库运行恰恰都高度依赖持续写入磁盘，因此首当其冲。\n\n## 对日志记录的影响\n\n**日志本身就是磁盘的主要写入来源"
+        },
+        {
+          "id": "formal_gen_029",
+          "question_type": "multi_hop",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "service_unavailable.md",
+            "monitoring_glossary_noise.md"
+          ],
+          "answer_preview": "按知识库内容，会联想到以下两类文档：\n\n## 1. 磁盘告警处理类：`disk_high_usage.md`（磁盘使用率告警处理手册）\n\n- 直接对应“磁盘高”这一现象，包含告警阈值（80% 预警、90% 严重告警）。\n- 该文档还指出关键关联：**磁盘写满（disk_full，水位 100%）会导致数据库拒绝写入、服务直接不可用**——这正好解释了磁盘高与错误同时出现的可能因果链。\n\n## 2."
+        },
+        {
+          "id": "formal_gen_030",
+          "question_type": "confusable",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "**不能替代。** 根据检索到的文档内容，性能容量规划文档与磁盘告警处置方案属于两类不同性质的文档，二者不可互相替代。\n\n## 具体依据\n\n**1. 容量规划文档本身已明确声明其定位与边界**\n\n文档3（perf_capacity_planning_false_friend.md）明确指出：\n- 该文档讨论的是“**提前评估资源需求、做预算与扩容计划**”，属于事前规划性质；\n- 它与“性能故障排"
+        },
+        {
+          "id": "formal_gen_031",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cache_tuning_playbook.md",
+            "disk_high_usage.md",
+            "service_unavailable.md"
+          ],
+          "answer_preview": "根据检索到的文档，需要先说明：**文档中并没有明确出现“磁盘告警时先记录故障时间”这一具体步骤**，但结合文档内容，可以推导出“不直接删日志、先定位再处置”的依据如下：\n\n## 1. 排查流程的第一步是定位，而非删除\n\n文档3（disk_high_usage.md）的排查流程明确要求：\n- 先用 `df -h` 定位满的挂载点，`du` 找大目录；\n- 重点检查**日志目录和数据库数据目录的写入增"
+        },
+        {
+          "id": "formal_gen_032",
+          "question_type": "single_hop",
+          "keyword_recall": 0.8333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "memory_high_usage.md",
+            "cpu_high_usage.md"
+          ],
+          "answer_preview": "**排障提醒：** 磁盘使用率超 80% 即预警、超 90% 为严重告警，若任其发展至写满（disk_full，水位 100%），数据库将拒绝写入、服务直接不可用，请务必在告警阶段及时清理或扩容。\n\n（依据：文档1 disk_high_usage.md「告警阈值」章节）"
+        },
+        {
+          "id": "formal_gen_033",
+          "question_type": "single_hop",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "根据检索到的文档，**服务不可用的判定（触发）条件**在文档1（service_unavailable.md）中有明确定义，满足以下**任一条件**即判定为服务不可用：\n\n1. **健康检查连续失败**\n2. **错误率超过 50%**\n3. **P99 延迟超过 3 秒，且持续 5 分钟**\n\n**补充说明：**\n\n- 文档2（slow_response.md）从慢响应排查角度印证了这一逻辑：当"
+        },
+        {
+          "id": "formal_gen_034",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "mock_incident_drill_script.md",
+            "service_unavailable.md",
+            "mysql_backup_restore.md"
+          ],
+          "answer_preview": "**根据提供的文档，无法回答这个问题**——文档中没有关于“服务不可用排查流程”或“为何先获取故障时间”的内容。\n\n具体说明如下：\n\n1. **文档1（service_un"
+        },
+        {
+          "id": "formal_gen_035",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "## 应用日志排查建议（基于文档）\n\n### 文档明确给出的内容\n\n**数据源**：`application-logs"
+        },
+        {
+          "id": "formal_gen_036",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "The user is asking: \"为什么服务不可用会被定义成紧急级别？\" (Why is service unavailability defined as an emergency/critical level?)\n\nLet me look at the documents provided:\n\nDocument 1 (disk_high_usage.md): About disk us"
+        },
+        {
+          "id": "formal_gen_037",
+          "question_type": "single_hop",
+          "keyword_recall": 0.8333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "service_unavailable.md"
+          ],
+          "answer_preview": "**先参考 service_unavailable.md 的「判定」章节（文档1），确认是否构成服务不可用。**\n\n理由与处置路径如下：\n\n**1. 第一步：判定（文档1）**\n健康检查失败正是判定服务不可用的三个条件之一（健康检查连续失败 / 错误率超过 50% / P99 超过 3 秒持续 5 分钟）。看到健康检查失败 + status 500，应先对照该标准确认是否达到\"服务不可用\"级别。注"
+        },
+        {
+          "id": "formal_gen_038",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.8333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "The user is asking: \"服务不可用和慢响应都可能影响用户，如何先区分它们？\" (Both service unavailability and slow response can affect users, how to distinguish them first?)\n\nI need to answer based on the retrieved documents. Let"
+        },
+        {
+          "id": "formal_gen_039",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "service_unavailable.md",
+            "monitoring_glossary_noise.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "用户问的是：\"如果回答里只说这是 warning 级别，为什么不符合知识库？\"\n\n这个问题有点模糊，需要理解上下文。从文档来看：\n\n- 文档2（service_unavailable.md）：健康检查连续失败、或错误率超过 50%、或 P99 超过 3秒持续 5分钟，判定为服务不可用。\n- 文档3（slow_response.md）：P99 延迟超过 3秒持续 5分钟告警；错误率超过 50% 或健"
+        },
+        {
+          "id": "formal_gen_040",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "# 服务不可用排查输入概括\n\n根据检索到的文档内容，可将排查输入概括为以下三项：\n\n## 一、时间维度\n\n- **判定时间窗口**：P99 延迟超过 3 秒且持续 5 分钟，即满足服务不可用判定条件（文档1、文档3）\n- **故障起始时间点**：从 application-logs 中定位 ERROR 集中出现的时间点（文档2）\n- **时间分布模式**：观察故障是否呈周期性出现——"
+        },
+        {
+          "id": "formal_gen_041",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "service_unavailable.md"
+          ],
+          "answer_preview": "## 联合诊断所需的数据源\n\n根据提供的文档，**CPU 高 + 响应慢**的联合诊断至少应覆盖以下数据源：\n\n### 两类告警"
+        },
+        {
+          "id": "formal_gen_042",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cache_tuning_playbook.md",
+            "service_unavailable.md"
+          ],
+          "answer_preview": "用户问的是：数据库超时导致接口 500 时，知识库里建议优先联看哪些文档？\n\n让我分析检索到的文档：\n\n文档1（service_unavailable.md - 服务不可用（503）处置手册/快速分诊）：\n- 提到数据源速查：application-logs（应用日志）、system-metrics（系统指标）、query_logs / slow_query（数据库日志）\n- 下游数据库：syst"
+        },
+        {
+          "id": "formal_gen_043",
+          "question_type": "multi_hop",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "service_unavailable.md"
+          ],
+          "answer_preview": "用户问的是：磁盘打满引发服务不可用时，回答里至少应该覆盖哪些事实点？\n\n这是一个关于知识整理/回答规范的问题。用户想知道，当需要回答\"磁盘打满引发服务不可用\"这类问题时，回答中至少应该包含哪些事实点。\n\n我需要从检索到的文档中提取相关事实点：\n\n文档1（disk_high_usage.md - 排查流程）：\n1. 确认写入来源：df -h 定位满的挂载点，du 找大目录；重点检查日志目录和数据库数"
+        },
+        {
+          "id": "formal_gen_044",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 0.5,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cache_tuning_playbook.md",
+            "service_unavailable.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "## 回答\n\n**场景定性**：缓存穿透 → 数据库压力上升 → 接口拖慢，属于**“慢响应但未不可用”**的场景，而非服务不可用（503）。\n\n### 主诊断文档：慢响应排查类文档（slow_response.md）\n\n依据检索到的文档：\n- 文档2（service_unavailable.md）明确指出：“**慢响应但未不可用见 slow_response.md**”；\n- 文档3（perf_"
+        },
+        {
+          "id": "formal_gen_045",
+          "question_type": "multi_hop",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "k8s_ingress_tls_guide.md",
+            "security_waf_playbook.md"
+          ],
+          "answer_preview": "根据知识库文档内容，应该联看以下两类文档：\n\n## 1. K8s Ingress TLS 证书配置指南（k8s_ingress_tls_guide.md）\n\n**用于排查 HTTPS 握手异常**。该文档的“常见错误”章节列出了入口层 TLS 握手失败的典型原因：\n- **CN/SAN 不匹配** → 浏览器报证书错误；\n- **secret 与 Ingress 不在同一 namespace** "
+        },
+        {
+          "id": "formal_gen_046",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "mock_incident_drill_script.md",
+            "service_unavailable.md",
+            "mysql_backup_restore.md"
+          ],
+          "answer_preview": "根据检索到的文档，回答如下：\n\n**1. 数据库恢复演练 → 参考 `mysql_backup_restore.md`（MySQL 备份与恢复手册）**\n\n该手册明确了恢复演练的原则：\n- 任何恢复操作先在临时实例完成校验，禁止直接对生产回放；\n- 每次恢复演练留档，并与 `mock_incident_drill_script.md` 的演练流程配合。\n\n注意：`mock_incident_dri"
+        },
+        {
+          "id": "formal_gen_047",
+          "question_type": "confusable",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "mock_incident_drill_script.md",
+            "perf_capacity_planning_false_friend.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "线上慢响应告警触发时，应参考 **slow_response.md（慢响应（P99 超标）排查手册）**，而不是监控术语手册。\n\n具体说明如下：\n\n1. **术语手册 vs 排查手册的定位不同**：监控术语手册只负责解释 P99 这类指标的含义，属于概念性资料；而 slow_response.md 是正式的排查处置文档，其中明确定义了告警判定条件——**P99 延迟超过 3 秒且持续 5 分钟即触"
+        },
+        {
+          "id": "formal_gen_048",
+          "question_type": "confusable",
+          "keyword_recall": 0.8333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "mock_incident_drill_script.md"
+          ],
+          "answer_preview": "**不能。** 演练脚本中的 OOM 文本不能直接作为线上内存泄漏的证据。\n\n## 原因\n\n根据文档说明，演练脚本具有明确的免责声明：\n\n1. **数据全部为模拟**：文档1明确指出这是“演练用的模拟剧本”，文中出现的数字（如\"CPU 80%\"“错误率 50%”“P99 3 秒”等）均为**演练注入目标**，不是真实处置手册。\n2. **不反映生产真实水位**：文档2进一步强调“演练环境数据全部模"
+        },
+        {
+          "id": "formal_gen_049",
+          "question_type": "confusable",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "**不能。容量预算中提到 OOM 和 Full GC，不能直接说明线上已经发生内存故障。**\n\n## 原因分析\n\n**1. 容量规划文档的性质是前瞻性评估，不是故障记录**\n\n根据文档2（perf_capacity_planning_false_friend.md）的明确说明"
+        },
+        {
+          "id": "formal_gen_050",
+          "question_type": "confusable",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 0.5,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "主参考文档应该是 **service_unavailable.md（服务不可用（503）处置手册）**。\n\n**依据：**\n\n1. **明确的升级指向**：slow_response.md 中明确规定，“错误率超过 50% 或健康检查失败则升级为服务不可用（见 service_unavailable.md）”，即一旦问题被判定为服务不可用，处置依据应切换到 service_unavailable."
+        },
+        {
+          "id": "formal_gen_051",
+          "question_type": "confusable",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "monitoring_glossary_noise.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "用户的问题是：术语词典提到\"CPU 高不一定等于故障\"，那收到 HighCPUUsage 告警后还要不要按告警文档走？\n\n首先我需要仔细分析检索到的三个文档：\n\n文档1（cpu_high_usage.md）：这是正式的 CPU 使用率过高排查手册，其中告警阈值章节明确说明：CPU 使用率持续 5分钟超过 80% 触发告警（system-metrics 数据源，阈值 80%，窗口 5分钟）。\n\n文档"
+        },
+        {
+          "id": "formal_gen_052",
+          "question_type": "confusable",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "mock_incident_drill_script.md",
+            "service_unavailable.md",
+            "monitoring_glossary_noise.md"
+          ],
+          "answer_preview": "**不应该判好。这种回答应判定为不合格（判差）。**\n\n## 判断依据（来自文档本身的明确说明）\n\n**1. 术语词典是评测设计的干扰项**\n\n文档1（monitoring_glossary_noise.md）明确自述：\n> 本文档是术语罗列页，**不含任何排查步骤**。检索系统若对\"CPU\"\"磁盘\"\"内存\"等词只做词面匹配，会把本文档误判为相关——它是评测**\"噪声/易混淆查询\"能力的干扰项**"
+        },
+        {
+          "id": "formal_gen_053",
+          "question_type": "single_hop",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "k8s_ingress_tls_guide.md",
+            "security_waf_playbook.md"
+          ],
+          "answer_preview": "根据检索到的文档内容，**无法回答该问题**。\n\n提供的 WAF 手册（security_waf_playbook.md）相关片段仅涉及以下两部分内容：\n\n1. **与其他组件的边界**：说明 TLS 证书问题（CN/SAN/secret 配置）不在 WAF 范围内，WAF 只拦截入口流量，数据库备份安全也不属于其职责范围；\n2. **误报处置流程**：说明业务请求被拦截时如何确认误报、按 URL"
+        },
+        {
+          "id": "formal_gen_054",
+          "question_type": "single_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "k8s_ingress_tls_guide.md",
+            "mysql_backup_restore.md"
+          ],
+          "answer_preview": "## 为什么要校验 GTID 一致性\n\n根据《MySQL 备份与恢复手册》中的 PITR（基于时间点恢复）流程，校验 GTID 一致性主要有以下几方面原因：\n\n### 1. 确保事务无丢失（数据完整性）\n\nPITR 的流程是：**"
+        },
+        {
+          "id": "formal_gen_055",
+          "question_type": "single_hop",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "k8s_ingress_tls_guide.md"
+          ],
+          "answer_preview": "The user is asking about Ingress TLS troubleshooting - specifically what to check in two directions: the certificate side and the controller side.\n\nLet me look at the documents provided:\n\nDocument 1 ("
+        },
+        {
+          "id": "formal_gen_056",
+          "question_type": "single_hop",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "k8s_ingress_tls_guide.md",
+            "security_waf_playbook.md"
+          ],
+          "answer_preview": "根据检索到的文档，可以确认的中间关键入口层包括以下两个：\n\n## 1. WAF（Web 应用防火墙）层\n\n依据文档2（security_waf_playbook.md）：\n- WAF 负责**拦截入口流量**，对 HTTPS 流量进行安全防护；\n- 需注意其职责边界：TLS 证书问题（CN/SAN/secret 配置）**不在 WAF 范围**，由 Ingress 层处理。\n\n## 2. Ingr"
+        },
+        {
+          "id": "formal_gen_057",
+          "question_type": "no_answer",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "mock_incident_drill_script.md",
+            "service_unavailable.md"
+          ],
+          "answer_preview": "**结论：知识库中没有针对 Redis Sentinel 主从切换失败的专门处置方案。**\n\n检索到的三份文档均不包含该场景的标准处置流程：\n\n| 文档 | 内容 | 是否适用 |\n|---|---|---|\n| mock_incident_drill_script.md | 演练用模拟剧本（注入故障、观察告警），且明确声明**不是真实处置手册** | ❌ 不适用 |\n| service_unav"
+        },
+        {
+          "id": "formal_gen_058",
+          "question_type": "no_answer",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "k8s_ingress_tls_guide.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "**根据当前知识库，无法回答该问题。**\n\n检索到的三份文档均不涉及 Kafka 相关内容，具体覆盖范围如下：\n\n| 文档 | 主题 | 与问题的相关性 |\n|------|------|--------------|\n| memory_high_usage.md | 内存持续升高与 OOM 定位处置 | 无关 |\n| perf_capacity_planning_false_friend.md "
+        },
+        {
+          "id": "formal_gen_059",
+          "question_type": "no_answer",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "disk_high_usage.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "**结论：知识库中没有直接对应“Nginx 热升级失败后连接中断”的操作手册。**\n\n## 检索情况说明\n\n当前知识库中收录的三份手册均与该问题无直接对应关系：\n\n| 文档 | 主题 | 与问题的相关性 |\n|------|------|--------------|\n| slow_response.md | 慢响应（P99 超标）排查 | 无直接相关，仅涉及延迟告警判定 |\n| memory_h"
+        },
+        {
+          "id": "formal_gen_060",
+          "question_type": "no_answer",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cache_tuning_playbook.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "## 结论：当前知识库**不能直接回答**这个问题\n\n### 知识库覆盖情况分析\n\n检索到的三份文档中，与问题相关的内容如下：\n\n| 文档 | 相关内容 | 与问题的匹配度 |\n|------|---------|--------------|\n| 文档1（缓存调优手册/调优要点） | 提到“热数据过期时间加随机抖动，**防雪崩**” | ⚠️ 仅涉及雪崩的**事前预防**，未涉及雪崩发生后的处置"
+        }
+      ]
+    },
+    "E_full_bge_rerank": {
+      "summary": {
+        "retrieval_rerank_type": "bge",
+        "keyword_recall": 0.5861,
+        "source_recall_strict": 0.7917,
+        "forbidden_violation_rate": 0.5
+      },
+      "cases": [
+        {
+          "id": "formal_gen_001",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "mock_incident_drill_script.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "**根据检索到的文档，无法明确回答“标准排查的第一步”这一问题。**\n\n具体说明如下：\n\n**文档1（cpu_high_usage.md）**：虽然标题是“CPU 使用率过高排查手册”，但本次检索到的章节仅为“告警阈值”部分，内容只定义了告警触发条件（system-metrics 数据源，阈值 80%，窗口 5 分钟），**未包含排查步骤的具体内容**。\n\n**文档2（mock_incident_"
+        },
+        {
+          "id": "formal_gen_002",
+          "question_type": "single_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "## CPU 高告警日志查询要点\n\n根据检索到的文档，核心要点如下（依据 **文档3：cpu_high_usage.md「告警阈值」章节**）：\n\n| 要素 | 内容 |\n|------|------|\n| **日志主题（数据源）** | `system-metrics`（系统指标） |\n| **时间窗口** | 5 分钟（持续 5 分钟） |\n| **过滤条件** | CPU 使用率 > 80%"
+        },
+        {
+          "id": "formal_gen_003",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "perf_capacity_planning_false_friend.md",
+            "cpu_high_usage.md"
+          ],
+          "answer_preview": "**根据检索到的文档，无法直接回答这个问题。**\n\n具体说明如下：\n\n- **文档3（cpu_high_usage.md，CPU 使用率过高排查手册）** 是与本问题最相关的文档，但检索到的片段仅包含“处置动作”章节的内容（慢 SQL 加索引/改写、突发流量限流/扩容、无法定位时采集 perf/火焰图并转性能团队），**并未涉及“进程名和 PID”的作用及其原因的说明**。\n- **文档1（性能容"
+        },
+        {
+          "id": "formal_gen_004",
+          "question_type": "single_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "根据检索到的文档，**HighCPUUsage** 告警对应的排查手册是 `cpu_high_usage.md`（CPU 使用率过高排查手册）。建议按以下步骤展开：\n\n## 一、标准排查流程\n\n**第 1 步：确认当前状态**\n- 先查 **system-metrics**，获取当前时间的 CPU 指标；\n- 再用 **query_logs** 查看同时段是否有异常慢查询——**慢 SQL 消耗 "
+        },
+        {
+          "id": "formal_gen_005",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "mock_incident_drill_script.md"
+          ],
+          "answer_preview": "**根据检索到的文档，无法回答该问题。**\n\n三份文档中均未提及“日志默认回看最近 30 分钟”这一设定，也没有解释其背后的原因。\n\n**文档中与 CPU 告警相关的仅有以下信息：**\n\n1. **告警触发条件**（来源：cpu_high_usage.md）：CPU 使用率持续 5 分钟超过 80% 触发告警（数据源 system-metrics，阈值 80%，窗口 5 分钟）——但这是告警阈值设"
+        },
+        {
+          "id": "formal_gen_006",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "mock_incident_drill_script.md",
+            "cpu_high_usage.md"
+          ],
+          "answer_preview": "**文档中没有找到 CPU 告警风险影响的相关内容，无法按要求总结成三点。**\n\n具体说明如下：\n\n1. **检索到的 CPU 相关文档（cpu_high_usage.md）仅包含告警触发条件**：CPU 使用率持续 5 分钟超过 80% 触发告警（system-metrics 数据源，阈值 80%，窗口 5 分钟），但未描述该告警对应的风险或影响（如服务降级、响应变慢、级联故障等）。\n\n2. *"
+        },
+        {
+          "id": "formal_gen_007",
+          "question_type": "confusable",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "mock_incident_drill_script.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "## 结论\n\n线上收到 **CPU 高告警**时，应优先参考**真实故障排查/处置手册类文档**——具体来说，根据文档1的明确指引，应先读 **cpu_high_usage.md**（若伴随慢响应，则读 slow_response.md），而**不是**容量规划文档。\n\n## 原因分析\n\n**1. 容量规划文档是“事前规划”性质，不是处置手册**\n\n文档1（perf_capacity_planni"
+        },
+        {
+          "id": "formal_gen_008",
+          "question_type": "single_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "service_unavailable.md",
+            "perf_capacity_planning_false_friend.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "用户问的是：CPU 高但还没有超时错误时，你会先解释现象、还是先给日志排查动作？请按文档回答。\n\n让我看看文档内容：\n\n文档1：性能容量规划——明确说是 false friend，会被\"性能\"关键词误召回。它说慢响应/CPU 高时应先读 slow_response.md / cpu_high_usage.md。所以文档1不是答案来源，但它指出了 CPU 高应该看 cpu_high_usage.md"
+        },
+        {
+          "id": "formal_gen_009",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "mock_incident_drill_script.md",
+            "cpu_high_usage.md"
+          ],
+          "answer_preview": "**根据现有文档，无法明确回答该问题。**\n\n具体说明如下：\n\n1. **文档1（memory_high_usage.md）** 仅提供了内存告警的阈值信息：内存使用率持续超过 85% 触发告警（数据源 system-metrics）。但检索到的内容只包含“告警阈值”章节，**未包含内存告警触发后的标准处置步骤**。\n\n2. **文档3（故障演练脚本）** 描述了一般性的处置流程参考：告警触发后，"
+        },
+        {
+          "id": "formal_gen_010",
+          "question_type": "single_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "memory_high_usage.md",
+            "cpu_high_usage.md"
+          ],
+          "answer_preview": "根据检索到的文档，**无法回答该问题**。\n\n具体说明：\n\n- 文档3（memory_high_usage.md，内存持续升高与 OOM 定位手册）中仅提供了**告警阈值**部分的内容，即：内存使用率持续超过 85% 触发告警（system-metrics 数据源，阈值 85%）。\n- 该文档中**未包含**关于内存高告警典型症状（如 OOM、进程被杀、交换分区活跃等）的描述内容。\n- 文档1（磁"
+        },
+        {
+          "id": "formal_gen_011",
+          "question_type": "single_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "# 处理 OOM 风险时两类日志的排查价值\n\n根据《内存持续升高与 OOM 定位手册》，系统指标日志和应用日志在 OOM 排查中承担**不同分工**，二者互补：\n\n## 一、系统指标日志——判断“内存怎么涨的”\n\n**核心价值：确认内存增长模式与 GC 行为特征**\n\n1. **区分增长趋势**：\n   - **缓涨** → 典型的内存泄漏特征（如缓存/Map 只进不出、连接/流未关闭）\n   -"
+        },
+        {
+          "id": "formal_gen_012",
+          "question_type": "single_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "slow_response.md",
+            "cache_tuning_playbook.md"
+          ],
+          "answer_preview": "根据文档内容，内存高告警的直接搜日志过滤条件如下：\n\n## 建议过滤条件\n\n| 过滤项 | 条件 |\n|--------|------|\n| **数据源** | `system-metrics` |\n| **指标** | 内存使用率 |\n| **阈值** | 持续超过 **85%** |\n\n**来源依据**：memory_high_usage.md「告警阈值」章节明确记载——内存使用率持续超过 8"
+        },
+        {
+          "id": "formal_gen_013",
+          "question_type": "single_hop",
+          "keyword_recall": 0.8333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "monitoring_glossary_noise.md"
+          ],
+          "answer_preview": "用户问的是\"为什么内存高会伴随 Full GC、OOM 或 swap？请按知识库解释。\"\n\n我需要结合检索到的三个文档来回答这个问题。\n\n文档1（memory_high_usage.md - 排查流程）：\n- 讲了内存持续升高与OOM定位的排查流程\n- 提到：看趋势与GC——system-metrics确认是缓涨（泄漏）还是台阶（大对象/缓存一次性加载）；Java服务结合GC日志——Full GC"
+        },
+        {
+          "id": "formal_gen_014",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "perf_capacity_planning_false_friend.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "用户问的是：内存高告警和慢响应告警都可能影响体验，如何先区分你现在面对的是哪一种？\n\n我需要结合检索到的文档内容来回答。让我看看文档里有什么相关信息：\n\n文档1：性能容量规划（false friend）——明确说这是易混淆文档，讨论的是容量规划，不是故障排查。这个文档是评测刻意设计的干扰项，不应该用它来回答。\n\n文档2：cpu_high_usage.md——CPU 使用率过高排查手册，提到\"内存问"
+        },
+        {
+          "id": "formal_gen_015",
+          "question_type": "confusable",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "mock_incident_drill_script.md",
+            "service_unavailable.md",
+            "monitoring_glossary_noise.md"
+          ],
+          "answer_preview": "**不能。** 根据检索到的文档，理由如下：\n\n## 1. 术语词典自身已明确声明定位\n\n文档3（monitoring_glossary_noise.md）开头即写明：\n\n> 本文档是**术语罗列页，不含任何排查步骤**。检索系统若对\"CPU\"\"磁盘\"\"内存\"等词只做词面匹配，会把本文档误判为相关——它是评测\"噪声/易混淆查询\"能力的**干扰项**。\n\n也就是说，即使词典里解释了 OOM 的定义，"
+        },
+        {
+          "id": "formal_gen_016",
+          "question_type": "single_hop",
+          "keyword_recall": 0.8333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "memory_high_usage.md",
+            "service_unavailable.md"
+          ],
+          "answer_preview": "用户问的是：内存高告警至少需要确认哪些日志主题、时间窗口和异常现象。要求用一段话说明。\n\n我需要结合检索到的文档内容回答。让我看看文档中关于内存高告警的信息：\n\n文档2（memory_high_usage.md）：\n- 内存使用率持续超过 85% 告警（system-metrics，阈值 85%）\n- 章节：内存持续升高与 OOM 定位手册/告警阈值\n\n文档3（service_unavailabl"
+        },
+        {
+          "id": "formal_gen_017",
+          "question_type": "single_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cache_tuning_playbook.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "The user asks: \"P99 连续 5 分钟超过 3 秒时，标准慢响应排查从哪里开始？\" (When P99 exceeds 3 seconds for 5 consecutive minutes, where does the standard slow response troubleshooting start?)\n\nLet me look at the documents:\n\nD"
+        },
+        {
+          "id": "formal_gen_018",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "根据检索到的文档（slow_response.md），可以回答部分内容，但**具体的时间窗口长度和过滤表达式在文档中未给出**，以下先说明文档中明确的信息：\n\n## 文档中明确的排查条件\n\n**1. 需要查询的数据源/日志**\n- system-metrics（系统指标）\n- application-logs（应用日志）\n- query_logs / slow_query（数据库日志）\n\n**2."
+        },
+        {
+          "id": "formal_gen_019",
+          "question_type": "single_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cache_tuning_playbook.md",
+            "slow_response.md",
+            "cpu_high_usage.md"
+          ],
+          "answer_preview": "## 为什么慢响应排查要查数据库慢查询日志\n\n根据《慢响应（P99 超标）排查手册》，核心原因是：**慢响应的根因不一定在应用代码，而很可能出在数据库这类共享资源上**。具体逻辑如下：\n\n### 1. 分层排查方法论：先定位问题层级\n\n排查手册采用**自上而下**的分层排查策略：\n\n- 第一步先用 **system-metrics** 判断是“整体慢”还是“个别接口慢”；\n- 如果是**整体慢**"
+        },
+        {
+          "id": "formal_gen_020",
+          "question_type": "single_hop",
+          "keyword_recall": 0.8333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "service_unavailable.md",
+            "perf_capacity_planning_false_friend.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "The user asks: \"如果接口变慢但还没有 500 错误，按知识库应该优先看什么？\" (If the interface is slow but there are no 500 errors yet, according to the knowledge base, what should be prioritized?)\n\nLet me analyze the documents:\n"
+        },
+        {
+          "id": "formal_gen_021",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "The user is asking me to compare the trigger conditions for slow response (慢响应) and service unavailable (服务不可用). Let me look at the documents provided.\n\nDocument 1 (service_unavailable.md, 判定 section)"
+        },
+        {
+          "id": "formal_gen_022",
+          "question_type": "confusable",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 0.5,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "perf_capacity_planning_false_friend.md",
+            "cache_tuning_playbook.md"
+          ],
+          "answer_preview": "用户问的是：缓存调优手册也写了慢响应，你会怎么避免把缓存建议误当成故障根因结论？\n\n这是一个关于知识助手如何避免误判根因的元问题。用户在测试我是否会盲目地把缓存调优手册的建议当作慢响应故障的根因结论。\n\n让我分析文档内容：\n\n1. 文档1（cpu_high_usage.md）：CPU 使用率过高排查手册的处置动作部分。明确说明\"本手册只覆盖 CPU；内存问题见 memory_high_usage."
+        },
+        {
+          "id": "formal_gen_023",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "根据 slow_response.md 文档第 4 点「当前时间对照」的说明，其原因是：**避免拿历史数据误判**。\n\n具体来说，文档原文为：\n\n> 排查时先取当前时间的 system-metrics 基线，避免拿历史数据误判。\n\n需要说明的一点是，文档强调的是先取**当前时间的 system-metrics 基线**，作为整个排查的参照点，而不仅是针对应用日志这一步。其背后的逻辑可以理解为：\n\n"
+        },
+        {
+          "id": "formal_gen_024",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "memory_high_usage.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "**很抱歉，当前检索到的文档中不包含慢响应场景的具体内容，无法回答这个问题。**\n\n具体情况说明如下：\n\n1. **slow_response.md 本身未被检索到**。用户影响和下游影响这类细节应记载在 slow_response.md 中，但本次提供的文档里没有该文件的内容。\n\n2. **三份文档均只是“指向”了 slow_response.md**，可作为佐证：\n   - 文档1（cpu_h"
+        },
+        {
+          "id": "formal_gen_025",
+          "question_type": "single_hop",
+          "keyword_recall": 0.8333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "disk_high_usage.md",
+            "mock_incident_drill_script.md"
+          ],
+          "answer_preview": "**根据检索到的文档，无法回答“磁盘使用率告警触发后第一步应该做什么”这一问题。**\n\n具体说明如下：\n\n**文档中已有的相关信息：**\n\n- 文档2（disk_high_usage.md）仅说明了磁盘告警的**阈值定义**：\n  - 使用率超过 80% → 预警\n  - 使用率超过 90% → 严重告警\n  - 磁盘写满（disk_full，水位 100%）是最严重形态，会导致数据库拒绝写入、服"
+        },
+        {
+          "id": "formal_gen_026",
+          "question_type": "single_hop",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "memory_high_usage.md",
+            "cpu_high_usage.md"
+          ],
+          "answer_preview": "根据文档《磁盘使用率告警处理手册》（disk_high_usage.md）中的告警阈值说明，磁盘告警的阈值划分如下：\n\n| 级别 | 阈值 | 说明 |\n|------|------|------|\n| **预警** | 磁盘使用率超过 **80%** | 触发预警告警 |\n| **严重告警** | 磁盘使用率超过 **90%** | 触发严重告警 |\n| **磁盘写满** | 水位达到 **10"
+        },
+        {
+          "id": "formal_gen_027",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "用户问的是\"磁盘高时建议怎么查系统日志？请说出日志主题、时间窗口和查询条件。\"\n\n我需要结合检索到的文档来回答。让我看看文档内容：\n\n文档3（disk_high_usage.md）是关于磁盘使用率告警处理手册的，其中提到：\n1. 确认写入来源：`df -h` 定位满的挂载点，`du` 找大目录；重点检查日志目录和数据库数据目录的写入增速。\n2. 常见三类写入：\n- 日志暴涨：日志级别开太低（DEB"
+        },
+        {
+          "id": "formal_gen_028",
+          "question_type": "single_hop",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "cache_tuning_playbook.md"
+          ],
+          "answer_preview": "The user is asking: \"为什么磁盘打满会影响日志记录和数据库稳定性？\" (Why does a full disk affect log recording and database stability?)\n\nI need to answer based on the retrieved documents. Let me look at what the documents s"
+        },
+        {
+          "id": "formal_gen_029",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "service_unavailable.md",
+            "monitoring_glossary_noise.md"
+          ],
+          "answer_preview": "根据知识库内容，磁盘高和 500 错误同时出现时，应联想到以下两类文档：\n\n## 1. disk_high_usage.md（磁盘高使用率处置手册）\n\n文档1（service_unavailable.md）中明确建立了两者的因果关联：\n\n> “数据库不可写入（**磁盘满，见 disk_high_usage.md**）会直接导致全部请求 500。”\n\n即磁盘满是 500 错误的可能根因之一，需要通过"
+        },
+        {
+          "id": "formal_gen_030",
+          "question_type": "confusable",
+          "keyword_recall": 0.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "mock_incident_drill_script.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "**结论：不能替代。** 两者定位完全不同，且检索到的文档本身也明确提示了这一点。\n\n## 具体分析\n\n**1. 性能容量规划是“事前规划”，不是“事中处置”**\n\n文档1（perf_capacity_planning_false_friend.md）明确自我"
+        },
+        {
+          "id": "formal_gen_031",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "service_unavailable.md",
+            "cache_tuning_playbook.md"
+          ],
+          "answer_preview": "## 结论先行\n\n**检索到的三份文档中没有直接回答这个问题的内容。** 文档1（disk_high_usage.md）只定义了磁盘告警的阈值（80% 预警 / 90% 严重告警）和磁盘写满的后果，并未涉及“记录故障时间 vs"
+        },
+        {
+          "id": "formal_gen_032",
+          "question_type": "single_hop",
+          "keyword_recall": 0.8333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "mock_incident_drill_script.md",
+            "memory_high_usage.md"
+          ],
+          "answer_preview": "**排障提醒：** 磁盘使用率超 80% 触发预警、超 90% 触发严重告警，一旦水位达到 100%（disk_full）将导致数据库拒绝写入、服务直接不可用，需立即清理空间或扩容。\n\n（依据：disk_high_usage.md「告警阈值」章节）"
+        },
+        {
+          "id": "formal_gen_033",
+          "question_type": "single_hop",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "根据检索到的文档，**服务不可用的判定（触发）条件有三个**（来源：service_unavailable.md）：\n\n1. **健康检查连续失败**\n2. **错误率超过 50%**\n3. **P99 延迟超过 3 秒且持续 5 分钟**\n\n满足其中任意一条，即判定为服务不可用。\n\n**补充说明：**\n\n- slow_response.md 印证了这一升级逻辑：慢响应（P99 超标）告警出现时，"
+        },
+        {
+          "id": "formal_gen_034",
+          "question_type": "single_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "service_unavailable.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "The user is asking: \"服务不可用的标准排查为什么先要拿到故障时间？\" (Why does the standard troubleshooting for service unavailability first require obtaining the failure time?)\n\nLet me look at the documents:\n\nDocument 1: Ab"
+        },
+        {
+          "id": "formal_gen_035",
+          "question_type": "single_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "The user is asking about how to check application logs in a service unavailable (503) scenario, specifically asking for time ranges and filter conditions.\n\nLet me look at the documents:\n\nDocument 1 (s"
+        },
+        {
+          "id": "formal_gen_036",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "The user is asking: \"为什么服务不可用会被定义成紧急级别？\" (Why is service unavailability defined as an emergency/critical level?)\n\nLet me look at the retrieved documents:\n\nDocument 1 (service_unavailable.md): 健康检查连续失败"
+        },
+        {
+          "id": "formal_gen_037",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "service_unavailable.md",
+            "perf_capacity_planning_false_friend.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "## 结论：先参考 **service_unavailable.md（文档1）**\n\n## 判断依据\n\n**1. 健康检查失败直接指向服务不可用**\n\n- 文档1（service_unavailable.md）明确列出判定条件：**健康检查连续失败**、或错误率超过 50%、或 P99 超过 3秒持续 5分钟，即判定为服务不可用。\n- 文档3（slow_response.md）也交叉印证了这一点："
+        },
+        {
+          "id": "formal_gen_038",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "mock_incident_drill_script.md",
+            "service_unavailable.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "The user is asking: \"服务不可用和慢响应都可能影响用户，如何先区分它们？\" (Service unavailability and slow response can both affect users, how to distinguish them first?)\n\nLet me look at the documents:\n\n1. Document 1 (perf_cap"
+        },
+        {
+          "id": "formal_gen_039",
+          "question_type": "single_hop",
+          "keyword_recall": 0.0,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "k8s_ingress_tls_guide.md",
+            "monitoring_glossary_noise.md",
+            "security_waf_playbook.md"
+          ],
+          "answer_preview": "用户问的是：\"如果回答里只说这是 warning 级别，为什么不符合知识库？\"\n\n这个问题有点模糊。让我理解一下上下文。用户似乎在问：如果某个回答只说\"这是 warning 级别\"，为什么这样的回答不符合知识库（的要求）？\n\n结合检索到的文档：\n- 文档1是监控术语词典（噪声文档），明确说明它是干扰项，不含排查步骤，真正的排障内容见 cpu_high_usage.md 等正式手册。\n- 文档2是 "
+        },
+        {
+          "id": "formal_gen_040",
+          "question_type": "single_hop",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "service_unavailable.md"
+          ],
+          "answer_preview": "The user is asking me to summarize the troubleshooting inputs for service unavailability into at least three items: time, logs, and business impact.\n\nLet me look at the documents:\n\nDocument 2 (service"
+        },
+        {
+          "id": "formal_gen_041",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "perf_capacity_planning_false_friend.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "用户问的是：CPU 高且响应慢时，联合诊断至少要覆盖哪两类告警和哪两类日志？\n\n我需要从文档中找答案。\n\n文档2（cpu_high_usage.md）提到：\n- 处置动作：慢 SQL、突发流量、无法定位时采集 perf/火焰图\n- 注意：本手册只覆盖 CPU；内存问题见 memory_high_usage.md，整体响应慢见 slow_response.md\n\n文档3（slow_response."
+        },
+        {
+          "id": "formal_gen_042",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cache_tuning_playbook.md",
+            "service_unavailable.md"
+          ],
+          "answer_preview": "根据知识库文档，数据库超时/慢查询导致接口 500 时，建议按以下优先级联看：\n\n## 优先联看的文档\n\n**1. `service_unavailable.md`（服务不可用处置手册）—— 主处置入口**\n- 快速分诊章节指出：先看 system-metrics 中数据库连接池水位，再用 slow_query 日志确认是否存在锁等待/慢查询拖垮服务\n- 恢复顺序章节强调：错误率 50% 以上时直"
+        },
+        {
+          "id": "formal_gen_043",
+          "question_type": "multi_hop",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "The user is asking: \"磁盘打满引发服务不可用时，回答里至少应该覆盖哪些事实点？\" (When disk full causes service unavailability, what fact points should the answer cover at minimum?)\n\nThis is a meta-question about what facts should"
+        },
+        {
+          "id": "formal_gen_044",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cache_tuning_playbook.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "## 结论\n\n| 角色 | 文档 | 类型 |\n|---|---|---|\n| **主诊断文档** | `slow_response.md`（慢响应 / P99 超标排查手册） | 诊断类（分层排查手册） |\n| **辅助调优文档** | `cache_tuning_playbook.md`（缓存调优手册） | 调优类（读优化手册） |\n\n## 判断依据\n\n**1. 症状决定主诊断入口**\n\n该场"
+        },
+        {
+          "id": "formal_gen_045",
+          "question_type": "multi_hop",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "k8s_ingress_tls_guide.md",
+            "security_waf_playbook.md",
+            "service_unavailable.md"
+          ],
+          "answer_preview": "根据知识库内容，应该联看以下两类文档：\n\n## 1. K8s Ingress TLS 证书配置指南（k8s_ingress_tls_guide.md）\n\n用于排查**入口层 HTTPS 握手异常**。该文档的“常见错误”章节列出了典型的握手失败原因：\n\n- **CN/SAN 不匹配** → 浏览器报证书错误；\n- **secret 与 Ingress 不在同一 namespace** → 挂载失败"
+        },
+        {
+          "id": "formal_gen_046",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "mock_incident_drill_script.md",
+            "service_unavailable.md",
+            "mysql_backup_restore.md"
+          ],
+          "answer_preview": "根据检索到的文档，可以明确回答前一半，后一半需要说明文档覆盖情况：\n\n**1. 数据库恢复演练 → `mysql_backup_restore.md`（MySQL 备份与恢复手册）**\n\n该手册明确规定了恢复演练的原则：\n- 任何恢复操作先在临时实例完成校验，禁止直接对生产回放；\n- 每次恢复演练留档，并与 `mock_incident_drill_script.md` 的演练流程配合。\n\n即：以"
+        },
+        {
+          "id": "formal_gen_047",
+          "question_type": "confusable",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "mock_incident_drill_script.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "线上慢响应告警真正触发时，应参考 **slow_response.md（慢响应（P99 超标）排查手册）**，而不是演练脚本。\n\n具体说明如下：\n\n1. **正式处置文档**：根据文档2（slow_response.md），该手册给出了慢响应的判定标准——P99 延迟超过 3 秒且持续 5 分钟触发告警。线上真实告警触发时，应按此手册进行排查处置。\n\n2. **升级路径**：若排查中发现**错误率"
+        },
+        {
+          "id": "formal_gen_048",
+          "question_type": "confusable",
+          "keyword_recall": 0.8333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "mock_incident_drill_script.md"
+          ],
+          "answer_preview": "**不能。** 演练脚本中的 OOM 文本不能直接作为线上内存泄漏的证据。\n\n## 原因\n\n根据文档1（mock_incident_drill_script.md）的明确说明：\n\n> 这是**演练用的模拟剧本**：注入故障、观察告警、走一遍预案。文中出现的\"CPU 80%\"\"错误率 50%\"\"P99 3 秒\"等数字均为**演练注入目标**，不是真实处置手册。\n\n演练脚本中的 OOM 相关内容属于*"
+        },
+        {
+          "id": "formal_gen_049",
+          "question_type": "confusable",
+          "keyword_recall": 0.8333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "**不能直接说明。** 容量预算中提到 OOM 和 Full GC，属于**事前的风险评估与预防性规划**，而非线上故障的实证。\n\n## 为什么不能等同\n\n根据文档2（perf_capacity_planning_false_friend.md），容量规划的本质是“**提前**评估资源需求、做预算与扩容计划”。在这类文档中出现 OOM、Full GC 等字眼，通常是在：\n\n- 预估内存资源时，考虑"
+        },
+        {
+          "id": "formal_gen_050",
+          "question_type": "confusable",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 0.5,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "mock_incident_drill_script.md",
+            "service_unavailable.md",
+            "monitoring_glossary_noise.md"
+          ],
+          "answer_preview": "# 主参考文档：service_unavailable.md\n\n如果问题是**服务不可用**，主参考文档应该是 **service_unavailable.md（服务不可用（503）处置手册）**。\n\n## 说明\n\n**1. 关于“缓存调优手册”**\n\n检索到的文档中**并没有**缓存调优手册，无法核实其中关于 500 错误的内容。但需要指出：500（服务器内部错误）与服务不可用（通常对应 503"
+        },
+        {
+          "id": "formal_gen_051",
+          "question_type": "confusable",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 0.5,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "memory_high_usage.md",
+            "monitoring_glossary_noise.md",
+            "perf_capacity_planning_false_friend.md"
+          ],
+          "answer_preview": "用户的问题是：术语词典提到 CPU 高不一定等于故障，那收到 HighCPUUsage 告警后还要不要按告警文档走？\n\n让我分析一下检索到的文档：\n\n1. 文档1（perf_capacity_planning_false_friend.md）：这是一个\"易混淆文档\"，讨论的是性能容量规划，明确说明它是评测刻意设计的 false friend，会被\"性能\"关键词误召回。它不是排查文档。\n\n2. 文档"
+        },
+        {
+          "id": "formal_gen_052",
+          "question_type": "confusable",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 1.0,
+          "pred_sources": [
+            "mock_incident_drill_script.md",
+            "service_unavailable.md",
+            "monitoring_glossary_noise.md"
+          ],
+          "answer_preview": "**不应该判好。这种回答应判定为不合格（判差）。**\n\n依据检索到的文档内容，理由如下：\n\n## 1. 术语词典是明确的“噪声干扰项”\n\n文档1（monitoring_glossary_noise.md）自我声明：\n\n> “本文档是术语罗列页，**不含任何排查步骤**。检索系统若对'CPU''磁盘''内存'等词只做词面匹配，会把本文档误判为相关——它是评测**'噪声/易混淆查询'能力的干扰项**。"
+        },
+        {
+          "id": "formal_gen_053",
+          "question_type": "single_hop",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "mock_incident_drill_script.md",
+            "k8s_ingress_tls_guide.md",
+            "security_waf_playbook.md"
+          ],
+          "answer_preview": "根据检索到的文档内容，**无法回答这个问题**。\n\n检索到的 WAF 手册（security_waf_playbook.md）片段仅包含“误报处置”章节的内容，涉及的是业务请求被 WAF 拦截后的白名单处理流程（定位规则 ID、按 URL + 规则粒度添加白名单、审批记录等），**并未提及“三类主要防护对象”或任何防护对象分类的信息**。\n\n另外两份文档也不包含相关内容：\n- 文档1（k8s_in"
+        },
+        {
+          "id": "formal_gen_054",
+          "question_type": "single_hop",
+          "keyword_recall": 0.6667,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "k8s_ingress_tls_guide.md",
+            "mysql_backup_restore.md"
+          ],
+          "answer_preview": "# 为什么要校验 GTID 一致性\n\n根据 `mysql_backup_restore.md` 中的恢复流程，GTID 校"
+        },
+        {
+          "id": "formal_gen_055",
+          "question_type": "single_hop",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "k8s_ingress_tls_guide.md",
+            "security_waf_playbook.md"
+          ],
+          "answer_preview": "# Ingress TLS 排障要点\n\n根据检索到的文档，**证书方向**的排查要点如下：\n\n## 证书方向（文档有明确说明）\n\n依据 `k8s_ingress_tls_guide.md` 的「常见错误」章节，需检查以下三项：\n\n1. **CN/SAN 是否匹配**\n   - 证书的 CN/SAN 与实际访问域名不匹配时，浏览器会报证书错误。\n\n2. **secret 与 Ingress 的 na"
+        },
+        {
+          "id": "formal_gen_056",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "k8s_ingress_tls_guide.md",
+            "security_waf_playbook.md"
+          ],
+          "answer_preview": "## 回答\n\n根据检索到的文档内容，**无法完整回答**该问题。文档中未系统性地描述 CDN 到 Pod 的完整访问链路架构。\n\n不过，从文档中可以提取到以下与入口层相关的信息：\n\n### 文档中提及的入口层组件\n\n| 组件 | 职责 | 来源 |\n|------|------|------|\n| **WAF** | 拦截入口流量，做安全防护 | 文档2 |\n| **Ingress** | 域名 "
+        },
+        {
+          "id": "formal_gen_057",
+          "question_type": "no_answer",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "disk_high_usage.md",
+            "mock_incident_drill_script.md",
+            "service_unavailable.md"
+          ],
+          "answer_preview": "**结论：知识库中没有针对 Redis Sentinel 主从切换失败的专门标准处置方案。**\n\n## 检索情况说明\n\n当前检索到的三份文档均不包含 Redis Sentinel 相关内容：\n\n| 文档 | 内容 | 是否适用 |\n|------|------|----------|\n| service_unavailable.md | 服务不可用（503）的通用处置手册 | ❌ 非专门针对 Re"
+        },
+        {
+          "id": "formal_gen_058",
+          "question_type": "no_answer",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cpu_high_usage.md",
+            "service_unavailable.md",
+            "cache_tuning_playbook.md"
+          ],
+          "answer_preview": "## 结论：当前知识库中没有针对该问题的处置文档\n\n检索到的三份文档均不涉及 Kafka 分区倾斜或消费堆积的处理：\n\n| 文档 | 覆盖范围 | 与本问题相关性 |\n|---|---|---|\n| cpu_high_usage.md | CPU 使用率过高排查（慢 SQL、us/sy/wa 指标区分） | 无直接关联 |\n| cache_tuning_playbook.md | 缓存 Key 设"
+        },
+        {
+          "id": "formal_gen_059",
+          "question_type": "no_answer",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "mock_incident_drill_script.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "**结论：知识库中没有直接针对“Nginx 热升级失败后连接中断”的操作手册。**\n\n三个检索到的文档均不直接对应该场景：\n\n| 文档 | 内容 | 是否适用 |\n|---|---|---|\n| service_unavailable.md | 服务不可用（503）处置手册 | ❌ 非专门针对 Nginx 热升级，但处置思路可参考（见下） |\n| mock_incident_drill_scrip"
+        },
+        {
+          "id": "formal_gen_060",
+          "question_type": "no_answer",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [
+            "cache_tuning_playbook.md",
+            "service_unavailable.md",
+            "slow_response.md"
+          ],
+          "answer_preview": "## 结论：当前知识库**不能直接回答**这个问题\n\n### 知识库覆盖情况分析\n\n**问题拆解为两部分，逐一对照文档：**\n\n| 问题组成部分 | 知识库覆盖情况 |\n|---|---|\n| 缓存雪崩的**预防** | ✅ 部分覆盖 |\n| 缓存雪崩**发生后的处置** | ❌ 未覆盖 |\n| **主从复制延迟**的处理 | ❌ 完全未覆盖 |\n\n**具体说明：**\n\n1. **文档1（cach"
+        }
+      ]
+    },
+    "N_no_rag": {
+      "summary": {
+        "retrieval_rerank_type": "none",
+        "keyword_recall": 0.2292,
+        "source_recall_strict": 0.0667,
+        "forbidden_violation_rate": 0.0
+      },
+      "cases": [
+        {
+          "id": "formal_gen_001",
+          "question_type": "single_hop",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定。当前上下文为空（未检索到任何资料），因此无法确认贵方针对“CPU 告警持续 5 分钟超过 80%”这一场景所定义的标准排查流程第一步是什么。\n\n不同组织的运维手册（Runbook/SOP）对此定义可能不同，我不便凭空推测以免误导。\n\n如果您能提供相关的告警处理规范、运维手册或排查流程文档，我可以基于这些资料为您准确回答。"
+        },
+        {
+          "id": "formal_gen_002",
+          "question_type": "single_hop",
+          "keyword_recall": 0.0,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "**说明：当前上下文为空（未检索到任何资料），无法从已有资料中确定贵司环境"
+        },
+        {
+          "id": "formal_gen_003",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "The user is asking a question in Chinese about operations/DevOps knowledge. The question is: \"When CPU is high, why should we focus on process name and PID?\"\n\nThe context says: 无（未检索）which means \"None"
+        },
+        {
+          "id": "formal_gen_004",
+          "question_type": "single_hop",
+          "keyword_recall": 0.0,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "**先说明：本次未检索到任何上下文资料"
+        },
+        {
+          "id": "formal_gen_005",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定。\n\n当前上下文为空（未检索到任何资料），因此无法基于上下文回答“CPU 告警排查时日志为什么默认回看最近 30 分钟”这一具体设计原因。该问题可能涉及特定监控平台或内部运维手册的约定，我不能凭空编造答案。\n\n建议：\n- 提供相关的运维手册、告警处理 SOP 或监控平台配置文档，我可以据此给出准确解释；\n- 或者告诉我所用监控系统的名称/版本，我可以协助分析其默认配置的含义。"
+        },
+        {
+          "id": "formal_gen_006",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "The user is asking me to summarize the risk impact of CPU alerts into three points, not just operational steps. The context says \"无（未检索）\" which means \"None (not retrieved)\" - so there's no context pro"
+        },
+        {
+          "id": "formal_gen_007",
+          "question_type": "confusable",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "The user is asking a question in Chinese about operations/DevOps knowledge. Let me translate:\n\n\"You are an operations knowledge assistant. Please answer questions based on context; if the context does"
+        },
+        {
+          "id": "formal_gen_008",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "**无法从已有资料确定。**\n\n当前上下文为“无（未检索）”，未提供任何文档内容，因此无法依据文档回答“CPU 高但还没有超时错误时，应先解释现象还是先给日志排查动作”这一流程性问题。\n\n如需我按文档回答，请提供相关资料（例如故障排查 SOP、值班响应规范、知识库条目等），我会严格基于该文档内容作答。\n\n如果您希望，我也可以提供一般性的排查经验建议，但需说明：那将不是基于文档的回答。"
+        },
+        {
+          "id": "formal_gen_009",
+          "question_type": "single_hop",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定。\n\n当前上下文为空（未检索到任何资料），因此无法确认贵方关于“内存使用率连续 5 分钟超过 85%”的标准处置流程（SOP/Runbook）具体从哪一步开始。不同组织和系统的处置规范差异较大，我不便凭空推测。\n\n建议您提供以下任一资料，我可以据此为您解答：\n- 内存告警的处置手册或 Runbook 文档\n- 监控告警分级与响应规范\n- 相关的运维知识库条目"
+        },
+        {
+          "id": "formal_gen_010",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定。\n\n当前上下文为空（未检索到任何资料），因此我无法基于已有资料概括“内存高告警最典型的三个症状”。为避免编造不准确的信息，我不能凭空给出答案。\n\n建议您：\n1. 提供相关的运维知识库文档、告警处理手册或监控规范等资料，我可以基于这些内容为您概括；\n2. 或确认检索配置是否正常，以便从知识库中获取相关内容后再提问。"
+        },
+        {
+          "id": "formal_gen_011",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "The user is asking in Chinese about OOM (Out of Memory) risk handling, specifically why we need to check both system metric logs and application logs. The context says \"无（未检索）\" which means no context "
+        },
+        {
+          "id": "formal_gen_012",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定该问题的答案。\n\n当前上下文为空（未检索到任何相关资料），因此我无法提供“内存高告警日志搜索的过滤条件”的具体建议。为避免误导，我不会编造过滤条件。\n\n建议您：\n1. 提供相关的运维知识库文档、日志平台使用手册或告警处理SOP作为上下文；\n2. 或咨询贵司日志平台（如ELK、Loki、Splunk等）的管理员，确认内存告警日志的关键字段（如告警级别、主机名、指标名等）后再构建过滤"
+        },
+        {
+          "id": "formal_gen_013",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定答案。\n\n**说明：** 本次未检索到任何知识库上下文（上下文为“无”），因此无法按照知识库内容解释“内存高为什么会伴随 Full GC、OOM 或 swap”这一问题。为避免编造知识库中不存在的内容，我不能给出基于知识库的回答。\n\n**建议：**\n- 请提供或检索相关的知识库文档（如 JVM 内存管理、GC 机制、Linux 内存与 swap 相关的运维知识条目），我可以基于该"
+        },
+        {
+          "id": "formal_gen_014",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "The user is asking a question in Chinese about operations/monitoring. They're asking: \"Memory high alerts and slow response alerts can both affect user experience. How do you first distinguish which o"
+        },
+        {
+          "id": "formal_gen_015",
+          "question_type": "confusable",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "**无法从已有资料确定。** 当前未检索到任何上下文，我看不到该术语词典中 OOM 词条的具体内容，也看不到内存高告警处置文档的内容，因此无法就这两份具体文档给出替代与否的结论。\n\n不过可以说明一个通用原则（属于一般性常识，非来自检索资料）：\n\n- **术语词典**：解释概念——OOM 是什么、发生机制、常见表现，属于“知识型”内容。\n- **告警处置文档**：面向操作——告警阈值与级别、排查步骤"
+        },
+        {
+          "id": "formal_gen_016",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "当前未检索到任何上下文资料（上下文为“无”），因此无法从已有资料确定内存高告警需要确认的具体日志主题、时间窗口和异常现象。为避免编造，我不能在缺少依据的情况下给出结论。建议您提供相关资料（例如：内存告警处理手册/Runbook、监控告警规则与日志采集配置、历史内存高告警案例或复盘文档等），我可以基于这些资料为您整理出准确的一段话说明。"
+        },
+        {
+          "id": "formal_gen_017",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定。\n\n当前上下文为空（未检索到任何资料），因此无法确认贵方“标准慢响应排查流程”的具体定义和起始步骤。不同团队/公司的排查 SOP 差异较大（有的从监控大盘确认开始，有的从最近变更/发布记录开始，有的从应用日志或链路追踪开始），我不能替您编造一个“标准”答案。\n\n建议：\n- 提供贵方的运维知识库、排查手册或相关文档片段，我可以基于这些资料给出准确回答；\n- 或者告诉我是否需要我提"
+        },
+        {
+          "id": "formal_gen_018",
+          "question_type": "single_hop",
+          "keyword_recall": 0.0,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "The user is asking in Chinese about slow response alerts and what log conditions to check. They want at least the time window and filter expressions.\n\nThe context is explicitly stated as \"无（未检索）\" whic"
+        },
+        {
+          "id": "formal_gen_019",
+          "question_type": "single_hop",
+          "keyword_recall": 0.0,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "The user is asking a question in Chinese about operations/DevOps knowledge. The question is: \"Why should we still check database slow query logs in slow response scenarios?\"\n\nThe context says: 无（未检索）w"
+        },
+        {
+          "id": "formal_gen_020",
+          "question_type": "single_hop",
+          "keyword_recall": 0.0,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定。当前上下文显示知识库未检索到任何内容（上下文为“无”），因此我无法基于知识库回答“接口变慢但未出现 500 错误时应优先排查什么”这一问题。\n\n为避免编造，我不会给出未经知识库支持的排查结论。\n\n建议：\n- 请先检索或提供相关知识库内容（如性能排查手册、监控告警处理规范等），我可以基于其给出准确答案；\n- 如果您希望，我也可以提供**通用**的接口变慢排查思路（如查看响应时间趋"
+        },
+        {
+          "id": "formal_gen_021",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定该问题的答案。\n\n**原因说明：** 本次未检索到任何上下文资料，而“慢响应”和“服务不可用”的触发条件（如响应时间阈值、错误率阈值、健康检查失败次数等）属于具体的监控告警配置，不同系统、不同平台的定义各不相同。在没有依据的情况下给出具体数值，属于编造，可能造成误导。\n\n**建议：** 如需准确对比，可提供以下任一类型的资料，我可以基于其内容为您梳理两者的触发条件差异：\n\n- 监"
+        },
+        {
+          "id": "formal_gen_022",
+          "question_type": "confusable",
+          "keyword_recall": 0.0,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "The user is asking a question in Chinese. Let me translate and understand it:\n\n\"You are an operations knowledge assistant. Please answer questions based on context; if the context doesn't provide an a"
+        },
+        {
+          "id": "formal_gen_023",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定。当前未检索到任何上下文，“慢响应”相关文档的具体内容我并不掌握，因此无法确认文档中强调“先取当前时间再查应用日志”的具体原因。\n\n如果您能提供该文档的相关内容，我可以基于文档为您分析说明。"
+        },
+        {
+          "id": "formal_gen_024",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定。\n\n当前未检索到任何上下文资料，因此无法概括慢响应场景中的用户影响和下游影响的具体内容。为避免编造信息，我不能凭空给出结论。\n\n如果您能提供相关的故障处理文档、SOP、告警说明或事件复盘材料，我可以基于这些内容为您概括：\n- **用户影响**（如页面加载缓慢、请求超时、功能不可用等）\n- **下游影响**（如依赖服务被拖慢、连接池/线程池堆积、级联超时或雪崩等）\n\n请补充资料后"
+        },
+        {
+          "id": "formal_gen_025",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定答案。\n\n当前上下文为空（未检索到任何资料），因此我无法基于已有内容回答“磁盘使用率告警触发后第一步应该做什么”。不同团队的处理流程可能不同（例如有的先确认告警真实性，有的先定位具体挂载点），在没有依据的情况下我不做推测，以免误导。\n\n如果您能提供相关的运维手册（Runbook）、告警处理 SOP 或知识库文档，我可以基于这些资料给出准确的回答。"
+        },
+        {
+          "id": "formal_gen_026",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定。\n\n当前未检索到任何上下文，因此无法给出贵方环境中磁盘告警 warning 和严重（critical）阈值的具体划分标准。\n\n如需确认，建议查阅以下位置：\n\n- **监控系统的告警规则配置**：如 Prometheus 的告警规则文件（`alerting rules`）、Zabbix 的触发器（trigger）配置、云监控平台的阈值设置等；\n- **运维知识库或告警规范文档**"
+        },
+        {
+          "id": "formal_gen_027",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定。\n\n当前上下文为空（未检索到任何资料），因此无法给出贵方环境对应的**日志主题、时间窗口和查询条件**的具体答案。这些信息通常来自内部运维手册/故障处理预案（例如指定查询哪个日志主题、回溯多长时间、用什么过滤条件），我不能凭空编造。\n\n建议：\n- 提供相关的运维知识库文档、Runbook 或日志平台（如 ELK/Loki/云日志服务）的查询规范，我可以据此提取准确的排查步骤；\n"
+        },
+        {
+          "id": "formal_gen_028",
+          "question_type": "single_hop",
+          "keyword_recall": 0.0,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "The user is asking a question in Chinese about why disk being full affects log recording and database stability. The context says \"无（未检索）\" which means \"None (not retrieved)\" - so there's no context pr"
+        },
+        {
+          "id": "formal_gen_029",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定。\n\n当前上下文为空（未检索到任何知识库文档），因此我不知道知识库中“磁盘高”和“500 错误”分别关联或指向哪两类文档，也无法确认知识库是否对这种组合场景有既定的排查路径。\n\n如果您能提供知识库的相关文档内容（例如磁盘监控/告警类文档、应用或网关 5xx 错误排查类文档等），或重新执行检索后再提问，我可以基于实际资料给出关联分析。"
+        },
+        {
+          "id": "formal_gen_030",
+          "question_type": "confusable",
+          "keyword_recall": 0.0,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "The user is asking a question in Chinese about operations/DevOps knowledge. Let me translate:\n\n\"You are an operations knowledge assistant. Please answer questions based on context; if the context does"
+        },
+        {
+          "id": "formal_gen_031",
+          "question_type": "single_hop",
+          "keyword_recall": 0.0,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "The user is asking a question in Chinese about operations/DevOps knowledge. The question is: \"When there's a disk alarm, why should we first record the failure time instead of directly deleting logs?\""
+        },
+        {
+          "id": "formal_gen_032",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定：本次未检索到任何上下文，因此无法基于资料总结磁盘高告警的典型影响，也不能凭空编造排障提醒。\n\n如您能提供相关的告警说明、运维手册或知识库"
+        },
+        {
+          "id": "formal_gen_033",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定。当前上下文为空（未检索到任何资料），因此我无法基于上下文回答“服务不可用告警最常见的触发条件”这一问题。\n\n建议您提供相关的监控告警配置文档、告警规则说明或运维知识库内容，我可以据此给出准确回答。如果您希望了解行业通用做法（非基于您的资料），也可以明确告知，我可以补充说明，但会注明这是一般性知识而非来自您的上下文。"
+        },
+        {
+          "id": "formal_gen_034",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "The user is asking a question in Chinese about operations/DevOps knowledge. The question is: \"Why does the standard troubleshooting process for service unavailability start with getting the failure ti"
+        },
+        {
+          "id": "formal_gen_035",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定该问题的答案。\n\n**原因说明：** 当前上下文为“无（未检索）”，即没有检索到任何相关资料（如运维手册、故障处理预案、日志平台使用文档等），因此无法基于已有资料给出服务不可用场景下查应用日志的具体时间范围和过滤条件。\n\n**建议：** 如需获得准确答案，请提供以下任一资料，我可以基于其内容为您解答：\n\n- 运维知识库 / 故障处理手册（Runbook）中关于“服务不可用”的排查"
+        },
+        {
+          "id": "formal_gen_036",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "The user is asking in Chinese: \"Why is service unavailability defined as an emergency/critical level?\" They've set up a context where I'm an ops/DevOps knowledge assistant, and the context is explicit"
+        },
+        {
+          "id": "formal_gen_037",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "The user is asking a question in Chinese about operations/DevOps knowledge. Let me translate:\n\n\"You are an operations knowledge assistant. Please answer questions based on context; if the context does"
+        },
+        {
+          "id": "formal_gen_038",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "The user is asking a question in Chinese about operations/DevOps knowledge. The question is: \"Service unavailability and slow response can both affect users, how do you first distinguish between them?"
+        },
+        {
+          "id": "formal_gen_039",
+          "question_type": "single_hop",
+          "keyword_recall": 0.0,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "The user is asking a question in Chinese. Let me translate it:\n\n\"You are an operations knowledge assistant. Please answer questions based on context; if the context doesn't provide the answer, clearly"
+        },
+        {
+          "id": "formal_gen_040",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "The user is asking me to summarize the troubleshooting inputs for service unavailability into at least three items: time, logs, and business impact. The context says \"无（未检索）\" which means no context wa"
+        },
+        {
+          "id": "formal_gen_041",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.0,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定。\n\n当前上下文为空（未检索到任何资料），而该问题询问的是特定诊断流程中“至少要覆盖的两类告警和两类日志”，这通常对应某份具体的运维规范、SOP 或知识库文档中的明确要求。在没有检索到相关文档的情况下，我无法确认具体是哪两类告警和哪两类日志，为避免编造，不作猜测性回答。\n\n如果您能提供相关的运维手册、故障处理流程文档或知识库片段，我可以基于该资料为您准确回答。"
+        },
+        {
+          "id": "formal_gen_042",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定。\n\n当前上下文为空（未检索到任何知识库文档），因此我无法得知知识库中针对“数据库超时导致接口 500”这一场景建议优先联看哪些文档。为避免编造，我不能给出具体的文档名称或清单。\n\n建议：\n- 请先执行知识库检索，或将相关文档内容作为上下文提供给我；\n- 检索时可尝试关键词如“数据库超时”、“接口 500”、“慢查询”、“连接池”等，以便命中相关排障文档。"
+        },
+        {
+          "id": "formal_gen_043",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "The user is asking in Chinese: \"When a disk being full causes service unavailability, what factual points should the answer cover at minimum?\"\n\nThe context says: 无（未检索）— meaning no context was retriev"
+        },
+        {
+          "id": "formal_gen_044",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.0,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定。\n\n当前上下文为空（未检索到任何资料），因此无法确定缓存穿透场景下所指的“主诊断文档”和“辅助调优文档”具体是哪类文档。这需要依赖具体的知识库文档分类体系才能回答，我不能凭空编造文档类别。\n\n如果您能提供相关的文档检索结果或知识库内容，我可以据此帮您识别对应的文档类型。"
+        },
+        {
+          "id": "formal_gen_045",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定。\n\n当前上下文为空（未检索到任何知识库文档），因此我无法确认知识库中实际存在哪些文档分类，也就无法确定针对“入口层 HTTPS 握手异常 + 疑似恶意攻击流量”这一场景应联看哪两类文档。为避免编造，我不给出具体的文档名称或分类。\n\n补充说明（仅为通用运维经验，非知识库内容，仅供参考）：此类问题通常需要排查两类方向——入口层 HTTPS/TLS 配置与证书相关文档，以及安全防护/"
+        },
+        {
+          "id": "formal_gen_046",
+          "question_type": "multi_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定。\n\n当前上下文为空（未检索到任何资料），因此无法确定：\n\n1. **数据库恢复演练**应参考哪份手册；\n2. **入口 HTTPS 故障**应参考哪份手册。\n\n建议您提供相关的运维知识库文档或手册目录（例如手册名称、编号或链接），我可以基于这些资料为您准确匹配对应的手册。"
+        },
+        {
+          "id": "formal_gen_047",
+          "question_type": "confusable",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "**无法从已有资料确定。** 当前上下文为空（未检索到任何文档），我不知道你们的文档库中实际存在哪些文档，因此无法指出具体应参考哪一份，也不能凭空编造文档名称。\n\n不过可以说明一个通用原则（属于运维常识，并非基于你们的资料）：\n\n- 术语手册（如解释 P99 的那份）通常只负责**概念定义**，不是故障处置的依据。\n- 慢响应告警触发后，真正该看的通常是**告警处置手册 / 应急响应 Runboo"
+        },
+        {
+          "id": "formal_gen_048",
+          "question_type": "confusable",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "The user is asking a question in Chinese about operations/DevOps knowledge. The question is: \"演练脚本里出现了 OOM 文本，这能不能直接当成线上内存泄漏证据？\" which translates to: \"OOM text appeared in the drill/rehearsal script —"
+        },
+        {
+          "id": "formal_gen_049",
+          "question_type": "confusable",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "The user is asking a question in Chinese about operations/DevOps knowledge. The question is: \"容量预算里提到 OOM 和 Full GC，这能直接说明线上已经发生内存故障吗？\" which translates to: \"The capacity budget mentions OOM and Full "
+        },
+        {
+          "id": "formal_gen_050",
+          "question_type": "confusable",
+          "keyword_recall": 0.3333,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定。\n\n原因说明：当前上下文为空（未检索到任何文档），我没有关于贵方文档库结构的信息，因此无法确认：\n\n1. 缓存调优手册的具体内容及其对 500 错误的描述；\n2. 服务不可用问题对应的主参考文档是哪一份（例如可能是服务可用性手册、故障应急响应手册、SLA 运维手册等，但这些都只是常见猜测，并非基于实际资料）。\n\n建议：请提供文档库的检索结果或文档清单（如各手册的标题和适用范围）"
+        },
+        {
+          "id": "formal_gen_051",
+          "question_type": "confusable",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "The user is asking a question in Chinese about operations/monitoring. Let me translate:\n\n\"You are an operations knowledge assistant. Please answer questions based on context; if the context doesn't pr"
+        },
+        {
+          "id": "formal_gen_052",
+          "question_type": "confusable",
+          "keyword_recall": 0.75,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "The user is asking a question in Chinese about evaluation criteria for answers. Let me translate and understand:\n\n\"You are an operations knowledge assistant. Please answer based on context; if the con"
+        },
+        {
+          "id": "formal_gen_053",
+          "question_type": "single_hop",
+          "keyword_recall": 0.1667,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定。\n\n当前上下文为空（未检索到任何相关文档），因此无法确认 WAF 手册中提到的三类主要防护对象具体是什么。\n\n建议您：\n1. 提供该 WAF 手册的相关文档内容或片段，我可以基于资料为您解答；\n2. 或告知手册的具体名称/版本，以便进行检索。\n\n在缺乏原始资料的情况下，我不会凭空推测手册内容，以免提供不准确的信息。"
+        },
+        {
+          "id": "formal_gen_054",
+          "question_type": "single_hop",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "The user is asking in Chinese about MySQL backup and recovery processes, specifically why GTID consistency needs to be verified. The context says \"无（未检索）\" which means no context was retrieved.\n\nThe in"
+        },
+        {
+          "id": "formal_gen_055",
+          "question_type": "single_hop",
+          "keyword_recall": 1.0,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "The user is asking in Chinese about Ingress TLS troubleshooting - what to check from two directions: certificates and controllers. The context says \"无（未检索）\" meaning no context was retrieved, so I shou"
+        },
+        {
+          "id": "formal_gen_056",
+          "question_type": "single_hop",
+          "keyword_recall": 0.0,
+          "source_recall_strict": 0.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定。\n\n当前上下"
+        },
+        {
+          "id": "formal_gen_057",
+          "question_type": "no_answer",
+          "keyword_recall": 0.25,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "**无法从已有资料确定。**\n\n本次未检索到任何上下文（上下文为空），因此无法确认知识库中是否存在 Redis Sentinel 主从切换失败的标准处置方案，也无法引用其中的具体内容。\n\n建议的后续做法：\n\n1. **换关键词重新检索**：可尝试“Redis Sentinel”、“主从切换”、“failover 失败”、“脑裂”、“quorum 不足”等更具体的术语；\n2. **提供文档**：如果"
+        },
+        {
+          "id": "formal_gen_058",
+          "question_type": "no_answer",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "无法从已有资料确定该问题的处理方案。\n\n**原因说明：** 当前未检索到任何知识库内容（上下文为空），因此关于“Kafka 分区倾斜导致消费堆积”的标准处理流程、排查步骤或预案在现有资料中没有对应依据。为避免误导，我不会编造知识库中不存在的内容。\n\n**建议的下一步：**\n1. 请先确认知识库检索是否正常（检索关键词、索引状态、数据源是否已接入）；\n2. 如果您能提供相关的运维文档、SOP 或故障"
+        },
+        {
+          "id": "formal_gen_059",
+          "question_type": "no_answer",
+          "keyword_recall": 0.75,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "The user is asking in Chinese. They're asking: \"After Nginx hot upgrade failure causing connection interruption, is there a directly corresponding operation manual in the knowledge base?\"\n\nThe context"
+        },
+        {
+          "id": "formal_gen_060",
+          "question_type": "no_answer",
+          "keyword_recall": 0.5,
+          "source_recall_strict": 1.0,
+          "forbidden_violation": 0.0,
+          "pred_sources": [],
+          "answer_preview": "The user is asking in Chinese about Redis cache avalanche and how to handle master-slave replication lag after a cache avalanche. They also ask whether the current knowledge base can directly answer t"
+        }
+      ]
+    }
+  }
+}

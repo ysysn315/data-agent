@@ -1,0 +1,795 @@
+{
+  "summary": {
+    "total": 50,
+    "correct": 47,
+    "accuracy": 0.94
+  },
+  "by_tag": {
+    "CASE表达式": {
+      "total": 1,
+      "correct": 1,
+      "accuracy": 1.0
+    },
+    "CTE": {
+      "total": 11,
+      "correct": 11,
+      "accuracy": 1.0
+    },
+    "HAVING": {
+      "total": 3,
+      "correct": 3,
+      "accuracy": 1.0
+    },
+    "NULL处理": {
+      "total": 4,
+      "correct": 4,
+      "accuracy": 1.0
+    },
+    "TopN": {
+      "total": 10,
+      "correct": 9,
+      "accuracy": 0.9
+    },
+    "业务口径": {
+      "total": 9,
+      "correct": 8,
+      "accuracy": 0.8889
+    },
+    "单表聚合": {
+      "total": 17,
+      "correct": 16,
+      "accuracy": 0.9412
+    },
+    "去重计数": {
+      "total": 3,
+      "correct": 3,
+      "accuracy": 1.0
+    },
+    "反连接": {
+      "total": 2,
+      "correct": 2,
+      "accuracy": 1.0
+    },
+    "多表JOIN": {
+      "total": 21,
+      "correct": 20,
+      "accuracy": 0.9524
+    },
+    "子查询": {
+      "total": 6,
+      "correct": 6,
+      "accuracy": 1.0
+    },
+    "日期计算": {
+      "total": 2,
+      "correct": 1,
+      "accuracy": 0.5
+    },
+    "时间过滤": {
+      "total": 8,
+      "correct": 8,
+      "accuracy": 1.0
+    },
+    "条件聚合": {
+      "total": 5,
+      "correct": 3,
+      "accuracy": 0.6
+    },
+    "相关子查询": {
+      "total": 1,
+      "correct": 1,
+      "accuracy": 1.0
+    },
+    "窗口函数": {
+      "total": 4,
+      "correct": 4,
+      "accuracy": 1.0
+    },
+    "防重复聚合": {
+      "total": 3,
+      "correct": 3,
+      "accuracy": 1.0
+    },
+    "集合运算": {
+      "total": 1,
+      "correct": 1,
+      "accuracy": 1.0
+    }
+  },
+  "by_difficulty": {
+    "easy": {
+      "total": 10,
+      "correct": 10,
+      "accuracy": 1.0
+    },
+    "medium": {
+      "total": 20,
+      "correct": 18,
+      "accuracy": 0.9
+    },
+    "hard": {
+      "total": 20,
+      "correct": 19,
+      "accuracy": 0.95
+    }
+  },
+  "cases": [
+    {
+      "id": "t2s_001",
+      "question": "一共有多少个客户？",
+      "tags": [
+        "单表聚合"
+      ],
+      "difficulty": "easy",
+      "golden_sql": "SELECT COUNT(*) AS customer_count FROM customers",
+      "pred_sql": "SELECT COUNT(DISTINCT customer_unique_id) AS total_customers\nFROM customers\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_002",
+      "question": "每种订单状态各有多少个订单？",
+      "tags": [
+        "单表聚合"
+      ],
+      "difficulty": "easy",
+      "golden_sql": "SELECT order_status, COUNT(*) AS order_count FROM orders GROUP BY order_status",
+      "pred_sql": "SELECT order_status, COUNT(*) AS order_count\nFROM orders\nGROUP BY order_status\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_003",
+      "question": "各种支付方式的总支付金额分别是多少？",
+      "tags": [
+        "单表聚合"
+      ],
+      "difficulty": "easy",
+      "golden_sql": "SELECT payment_type, ROUND(SUM(payment_value), 2) AS total_value FROM payments GROUP BY payment_type",
+      "pred_sql": "SELECT payment_type, SUM(payment_value) AS total_payment_value\nFROM payments\nGROUP BY payment_type\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_004",
+      "question": "所有订单项的平均单价是多少？",
+      "tags": [
+        "单表聚合"
+      ],
+      "difficulty": "easy",
+      "golden_sql": "SELECT ROUND(AVG(price), 2) AS avg_price FROM order_items",
+      "pred_sql": "SELECT AVG(price) AS avg_price\nFROM order_items\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_005",
+      "question": "每个州各有多少客户？",
+      "tags": [
+        "单表聚合"
+      ],
+      "difficulty": "easy",
+      "golden_sql": "SELECT customer_state, COUNT(*) AS customer_count FROM customers GROUP BY customer_state",
+      "pred_sql": "SELECT customer_state, COUNT(DISTINCT customer_unique_id) AS customer_count\nFROM customers\nGROUP BY customer_state\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_006",
+      "question": "客户数量最多的前 5 个州是哪几个？",
+      "tags": [
+        "单表聚合",
+        "TopN"
+      ],
+      "difficulty": "easy",
+      "golden_sql": "SELECT customer_state, COUNT(*) AS customer_count FROM customers GROUP BY customer_state ORDER BY customer_count DESC, customer_state LIMIT 5",
+      "pred_sql": "SELECT customer_state, COUNT(DISTINCT customer_unique_id) AS customer_count\nFROM customers\nGROUP BY customer_state\nORDER BY customer_count DESC\nLIMIT 5",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_007",
+      "question": "支付金额最高的前 10 笔支付记录，列出订单号和金额。",
+      "tags": [
+        "单表聚合",
+        "TopN"
+      ],
+      "difficulty": "easy",
+      "golden_sql": "SELECT order_id, payment_value FROM payments ORDER BY payment_value DESC, order_id LIMIT 10",
+      "pred_sql": "SELECT order_id, payment_value\nFROM payments\nORDER BY payment_value DESC\nLIMIT 10",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_008",
+      "question": "商品数量最多的前 5 个品类。",
+      "tags": [
+        "单表聚合",
+        "TopN"
+      ],
+      "difficulty": "easy",
+      "golden_sql": "SELECT product_category_name, COUNT(*) AS product_count FROM products GROUP BY product_category_name ORDER BY product_count DESC, product_category_name LIMIT 5",
+      "pred_sql": "SELECT product_category_name, COUNT(*) AS product_count\nFROM products\nGROUP BY product_category_name\nORDER BY product_count DESC\nLIMIT 5",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_009",
+      "question": "分期期数大于 1 的信用卡支付一共有多少笔？",
+      "tags": [
+        "单表聚合"
+      ],
+      "difficulty": "easy",
+      "golden_sql": "SELECT COUNT(*) AS installment_count FROM payments WHERE payment_type = 'credit_card' AND payment_installments > 1",
+      "pred_sql": "SELECT COUNT(*) AS installment_credit_card_payments\nFROM payments\nWHERE payment_type = 'credit_card'\n  AND payment_installments > 1\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_010",
+      "question": "各州客户贡献的商品销售额（订单项价格合计）分别是多少？",
+      "tags": [
+        "多表JOIN"
+      ],
+      "difficulty": "medium",
+      "golden_sql": "SELECT c.customer_state, ROUND(SUM(oi.price), 2) AS gmv FROM customers c JOIN orders o ON c.customer_id = o.customer_id JOIN order_items oi ON o.order_id = oi.order_id GROUP BY c.customer_state",
+      "pred_sql": "SELECT c.customer_state, SUM(oi.price) AS total_sales\nFROM customers c\nJOIN orders o ON c.customer_id = o.customer_id\nJOIN order_items oi ON o.order_id = oi.order_id\nGROUP BY c.customer_state\nORDER BY total_sales DESC\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_011",
+      "question": "每个卖家所在州卖出的订单项数量。",
+      "tags": [
+        "多表JOIN"
+      ],
+      "difficulty": "medium",
+      "golden_sql": "SELECT s.seller_state, COUNT(*) AS item_count FROM order_items oi JOIN sellers s ON oi.seller_id = s.seller_id GROUP BY s.seller_state",
+      "pred_sql": "SELECT s.seller_state, COUNT(*) AS order_item_count\nFROM order_items oi\nJOIN sellers s ON oi.seller_id = s.seller_id\nGROUP BY s.seller_state\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_012",
+      "question": "各商品品类的销售额（订单项价格合计）。",
+      "tags": [
+        "多表JOIN"
+      ],
+      "difficulty": "medium",
+      "golden_sql": "SELECT p.product_category_name, ROUND(SUM(oi.price), 2) AS gmv FROM order_items oi JOIN products p ON oi.product_id = p.product_id GROUP BY p.product_category_name",
+      "pred_sql": "SELECT p.product_category_name, SUM(oi.price) AS sales\nFROM order_items oi\nJOIN products p ON oi.product_id = p.product_id\nGROUP BY p.product_category_name\nORDER BY sales DESC\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_013",
+      "question": "已送达（delivered）订单一共包含多少个商品项？",
+      "tags": [
+        "多表JOIN"
+      ],
+      "difficulty": "medium",
+      "golden_sql": "SELECT COUNT(*) AS item_count FROM orders o JOIN order_items oi ON o.order_id = oi.order_id WHERE o.order_status = 'delivered'",
+      "pred_sql": "SELECT COUNT(*) AS total_order_items\nFROM orders o\nJOIN order_items oi ON o.order_id = oi.order_id\nWHERE o.order_status = 'delivered'\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_014",
+      "question": "各州客户的平均支付金额分别是多少？",
+      "tags": [
+        "多表JOIN"
+      ],
+      "difficulty": "medium",
+      "golden_sql": "SELECT c.customer_state, ROUND(AVG(pay.payment_value), 2) AS avg_payment FROM customers c JOIN orders o ON c.customer_id = o.customer_id JOIN payments pay ON o.order_id = pay.order_id GROUP BY c.customer_state",
+      "pred_sql": "SELECT\n  c.customer_state,\n  AVG(p.payment_value) AS avg_payment_value\nFROM customers c\nJOIN orders o ON c.customer_id = o.customer_id\nJOIN payments p ON o.order_id = p.order_id\nGROUP BY c.customer_state\nORDER BY avg_payment_value DESC\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_015",
+      "question": "2017 年一共有多少个订单？",
+      "tags": [
+        "时间过滤"
+      ],
+      "difficulty": "easy",
+      "golden_sql": "SELECT COUNT(*) AS order_count FROM orders WHERE order_purchase_timestamp >= '2017-01-01' AND order_purchase_timestamp < '2018-01-01'",
+      "pred_sql": "SELECT COUNT(*) AS order_count\nFROM orders\nWHERE order_purchase_timestamp >= '2017-01-01'\n  AND order_purchase_timestamp < '2018-01-01'\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_016",
+      "question": "2018 年每个月分别有多少订单？",
+      "tags": [
+        "时间过滤",
+        "单表聚合"
+      ],
+      "difficulty": "medium",
+      "golden_sql": "SELECT strftime('%Y-%m', order_purchase_timestamp) AS month, COUNT(*) AS order_count FROM orders WHERE order_purchase_timestamp >= '2018-01-01' AND order_purchase_timestamp < '2019-01-01' GROUP BY month",
+      "pred_sql": "SELECT strftime('%Y-%m', order_purchase_timestamp) AS month,\n       COUNT(*) AS order_count\nFROM orders\nWHERE order_purchase_timestamp >= '2018-01-01'\n  AND order_purchase_timestamp < '2019-01-01'\nGROUP BY month\nORDER BY month\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_017",
+      "question": "2017 年下半年（7 月起）的商品销售额合计是多少？",
+      "tags": [
+        "时间过滤",
+        "多表JOIN"
+      ],
+      "difficulty": "medium",
+      "golden_sql": "SELECT ROUND(SUM(oi.price), 2) AS gmv FROM orders o JOIN order_items oi ON o.order_id = oi.order_id WHERE o.order_purchase_timestamp >= '2017-07-01' AND o.order_purchase_timestamp < '2018-01-01'",
+      "pred_sql": "SELECT SUM(oi.price) AS total_sales\nFROM order_items oi\nJOIN orders o ON oi.order_id = o.order_id\nWHERE o.order_purchase_timestamp >= '2017-07-01'\n  AND o.order_purchase_timestamp < '2018-01-01'\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_018",
+      "question": "2017 年各支付方式的支付金额合计。",
+      "tags": [
+        "时间过滤",
+        "多表JOIN"
+      ],
+      "difficulty": "medium",
+      "golden_sql": "SELECT pay.payment_type, ROUND(SUM(pay.payment_value), 2) AS total_value FROM orders o JOIN payments pay ON o.order_id = pay.order_id WHERE o.order_purchase_timestamp >= '2017-01-01' AND o.order_purchase_timestamp < '2018-01-01' GROUP BY pay.payment_type",
+      "pred_sql": "SELECT p.payment_type, SUM(p.payment_value) AS total_payment_value\nFROM payments p\nJOIN orders o ON p.order_id = o.order_id\nWHERE o.order_purchase_timestamp >= '2017-01-01' AND o.order_purchase_timestamp < '2018-01-01'\nGROUP BY p.payment_type\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_019",
+      "question": "销售额最高的前 5 个商品品类。",
+      "tags": [
+        "多表JOIN",
+        "TopN"
+      ],
+      "difficulty": "medium",
+      "golden_sql": "SELECT p.product_category_name, ROUND(SUM(oi.price), 2) AS gmv FROM order_items oi JOIN products p ON oi.product_id = p.product_id GROUP BY p.product_category_name ORDER BY gmv DESC, p.product_category_name LIMIT 5",
+      "pred_sql": "SELECT\n    p.product_category_name,\n    SUM(oi.price) AS total_sales\nFROM order_items oi\nJOIN products p ON oi.product_id = p.product_id\nGROUP BY p.product_category_name\nORDER BY total_sales DESC\nLIMIT 5",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_020",
+      "question": "商品销售额最高的前 10 个州。",
+      "tags": [
+        "多表JOIN",
+        "TopN"
+      ],
+      "difficulty": "medium",
+      "golden_sql": "SELECT c.customer_state, ROUND(SUM(oi.price), 2) AS gmv FROM customers c JOIN orders o ON c.customer_id = o.customer_id JOIN order_items oi ON o.order_id = oi.order_id GROUP BY c.customer_state ORDER BY gmv DESC, c.customer_state LIMIT 10",
+      "pred_sql": "SELECT c.customer_state AS state, SUM(oi.price) AS total_sales\nFROM customers c\nJOIN orders o ON c.customer_id = o.customer_id\nJOIN order_items oi ON o.order_id = oi.order_id\nGROUP BY c.customer_state\nORDER BY total_sales DESC\nLIMIT 10",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_021",
+      "question": "下单次数最多的前 10 位客户（按客户唯一标识统计）。",
+      "tags": [
+        "多表JOIN",
+        "TopN"
+      ],
+      "difficulty": "medium",
+      "golden_sql": "SELECT c.customer_unique_id, COUNT(*) AS order_count FROM customers c JOIN orders o ON c.customer_id = o.customer_id GROUP BY c.customer_unique_id ORDER BY order_count DESC, c.customer_unique_id LIMIT 10",
+      "pred_sql": "SELECT c.customer_unique_id, COUNT(DISTINCT o.order_id) AS order_count\nFROM customers c\nJOIN orders o ON c.customer_id = o.customer_id\nGROUP BY c.customer_unique_id\nORDER BY order_count DESC\nLIMIT 10",
+      "correct": false,
+      "error": null
+    },
+    {
+      "id": "t2s_022",
+      "question": "用 CTE 先算出各州的销售额，再取销售额最高的前 5 个州。",
+      "tags": [
+        "CTE",
+        "多表JOIN",
+        "TopN"
+      ],
+      "difficulty": "hard",
+      "golden_sql": "WITH state_gmv AS (SELECT c.customer_state AS state, SUM(oi.price) AS gmv FROM customers c JOIN orders o ON c.customer_id = o.customer_id JOIN order_items oi ON o.order_id = oi.order_id GROUP BY c.customer_state) SELECT state, ROUND(gmv, 2) AS gmv FROM state_gmv ORDER BY gmv DESC, state LIMIT 5",
+      "pred_sql": "WITH state_sales AS (\n    SELECT \n        c.customer_state,\n        SUM(oi.price) AS total_sales\n    FROM orders o\n    JOIN order_items oi ON o.order_id = oi.order_id\n    JOIN customers c ON o.customer_id = c.customer_id\n    GROUP BY c.customer_state\n)\nSELECT \n    ss.customer_state,\n    ss.total_sales\nFROM state_sales ss\nORDER BY ss.total_sales DESC\nLIMIT 5",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_023",
+      "question": "支付金额高于全体平均支付金额的支付记录有多少笔？",
+      "tags": [
+        "CTE",
+        "单表聚合"
+      ],
+      "difficulty": "hard",
+      "golden_sql": "WITH avg_pay AS (SELECT AVG(payment_value) AS m FROM payments) SELECT COUNT(*) AS above_avg_count FROM payments, avg_pay WHERE payments.payment_value > avg_pay.m",
+      "pred_sql": "SELECT COUNT(*) AS above_avg_payment_count\nFROM payments\nWHERE payment_value > (SELECT AVG(payment_value) FROM payments)\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_024",
+      "question": "复购客户（下单 2 次及以上的客户唯一标识）一共有多少个？",
+      "tags": [
+        "CTE",
+        "多表JOIN"
+      ],
+      "difficulty": "hard",
+      "golden_sql": "WITH order_per_customer AS (SELECT c.customer_unique_id AS uid, COUNT(*) AS cnt FROM customers c JOIN orders o ON c.customer_id = o.customer_id GROUP BY c.customer_unique_id) SELECT COUNT(*) AS repeat_customers FROM order_per_customer WHERE cnt >= 2",
+      "pred_sql": "SELECT COUNT(*) AS repeat_customer_count\nFROM (\n    SELECT c.customer_unique_id\n    FROM customers c\n    JOIN orders o ON o.customer_id = c.customer_id\n    GROUP BY c.customer_unique_id\n    HAVING COUNT(DISTINCT o.order_id) >= 2\n)\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_025",
+      "question": "每个订单包含的商品项数量分布（各有多少订单含 1、2、3… 个商品项）。",
+      "tags": [
+        "单表聚合"
+      ],
+      "difficulty": "medium",
+      "golden_sql": "SELECT item_count, COUNT(*) AS order_count FROM (SELECT order_id, COUNT(*) AS item_count FROM order_items GROUP BY order_id) t GROUP BY item_count",
+      "pred_sql": "SELECT t.item_count AS item_count,\n       COUNT(*)     AS order_count\nFROM (\n    SELECT order_id,\n           COUNT(*) AS item_count\n    FROM order_items\n    GROUP BY order_id\n) AS t\nGROUP BY t.item_count\nORDER BY t.item_count\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_026",
+      "question": "运费合计最高的前 10 个订单，列出订单号与运费合计。",
+      "tags": [
+        "单表聚合",
+        "TopN"
+      ],
+      "difficulty": "medium",
+      "golden_sql": "SELECT order_id, ROUND(SUM(freight_value), 2) AS total_freight FROM order_items GROUP BY order_id ORDER BY total_freight DESC, order_id LIMIT 10",
+      "pred_sql": "SELECT order_id, SUM(freight_value) AS total_freight\nFROM order_items\nGROUP BY order_id\nORDER BY total_freight DESC\nLIMIT 10",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_027",
+      "question": "用 CTE 统计每月订单数，并给出每月订单占全年比例（2017 年）。",
+      "tags": [
+        "CTE",
+        "时间过滤"
+      ],
+      "difficulty": "hard",
+      "golden_sql": "WITH monthly AS (SELECT strftime('%Y-%m', order_purchase_timestamp) AS month, COUNT(*) AS cnt FROM orders WHERE order_purchase_timestamp >= '2017-01-01' AND order_purchase_timestamp < '2018-01-01' GROUP BY month) SELECT month, cnt, ROUND(cnt * 100.0 / (SELECT SUM(cnt) FROM monthly), 2) AS pct FROM monthly ORDER BY month",
+      "pred_sql": "WITH monthly_orders AS (\n    SELECT \n        strftime('%Y-%m', order_purchase_timestamp) AS month,\n        COUNT(DISTINCT order_id) AS order_count\n    FROM orders\n    WHERE order_purchase_timestamp >= '2017-01-01' \n      AND order_purchase_timestamp < '2018-01-01'\n    GROUP BY strftime('%Y-%m', order_purchase_timestamp)\n),\ntotal_orders AS (\n    SELECT SUM(order_count) AS total_count\n    FROM monthly_orders\n)\nSELECT \n    m.month,\n    m.order_count,\n    ROUND(CAST(m.order_count AS REAL) / t.total_count * 100, 2) AS percentage\nFROM monthly_orders m\nCROSS JOIN total_orders t\nORDER BY m.month\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_028",
+      "question": "信用卡与 boleto 两种支付方式各自的平均分期期数。",
+      "tags": [
+        "单表聚合"
+      ],
+      "difficulty": "medium",
+      "golden_sql": "SELECT payment_type, ROUND(AVG(payment_installments), 2) AS avg_installments FROM payments WHERE payment_type IN ('credit_card', 'boleto') GROUP BY payment_type",
+      "pred_sql": "SELECT\n    payment_type,\n    AVG(payment_installments) AS avg_installments\nFROM payments\nWHERE payment_type IN ('credit_card', 'boleto')\nGROUP BY payment_type\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_029",
+      "question": "分别统计已送达、已取消和其他状态的订单数。",
+      "tags": [
+        "单表聚合",
+        "条件聚合"
+      ],
+      "difficulty": "medium",
+      "golden_sql": "SELECT SUM(CASE WHEN order_status = 'delivered' THEN 1 ELSE 0 END) AS delivered_count, SUM(CASE WHEN order_status = 'canceled' THEN 1 ELSE 0 END) AS canceled_count, SUM(CASE WHEN order_status NOT IN ('delivered', 'canceled') THEN 1 ELSE 0 END) AS other_count FROM orders",
+      "pred_sql": "SELECT\n    CASE\n        WHEN order_status = 'delivered' THEN '已送达'\n        WHEN order_status = 'canceled' THEN '已取消'\n        ELSE '其他'\n    END AS status_category,\n    COUNT(*) AS order_count\nFROM orders\nGROUP BY\n    CASE\n        WHEN order_status = 'delivered' THEN '已送达'\n        WHEN order_status = 'canceled' THEN '已取消'\n        ELSE '其他'\n    END\nORDER BY order_count DESC\nLIMIT 1000",
+      "correct": false,
+      "error": null
+    },
+    {
+      "id": "t2s_030",
+      "question": "列出客户数不少于 10 人的州和城市，以及对应客户数。",
+      "tags": [
+        "单表聚合",
+        "HAVING"
+      ],
+      "difficulty": "medium",
+      "golden_sql": "SELECT customer_state, customer_city, COUNT(*) AS customer_count FROM customers GROUP BY customer_state, customer_city HAVING COUNT(*) >= 10 ORDER BY customer_count DESC, customer_state, customer_city",
+      "pred_sql": "SELECT customer_state, customer_city, COUNT(DISTINCT customer_unique_id) AS customer_count\nFROM customers\nGROUP BY customer_state, customer_city\nHAVING COUNT(DISTINCT customer_unique_id) >= 10\nORDER BY customer_count DESC\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_031",
+      "question": "2017 年下过单的独立客户（按客户唯一标识去重）有多少位？",
+      "tags": [
+        "多表JOIN",
+        "时间过滤",
+        "去重计数"
+      ],
+      "difficulty": "medium",
+      "golden_sql": "SELECT COUNT(DISTINCT c.customer_unique_id) AS active_customers FROM customers c JOIN orders o ON c.customer_id = o.customer_id WHERE o.order_purchase_timestamp >= '2017-01-01' AND o.order_purchase_timestamp < '2018-01-01'",
+      "pred_sql": "SELECT COUNT(DISTINCT c.customer_unique_id) AS unique_customers\nFROM orders o\nJOIN customers c ON o.customer_id = c.customer_id\nWHERE o.order_purchase_timestamp >= '2017-01-01'\n  AND o.order_purchase_timestamp < '2018-01-01'\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_032",
+      "question": "从未下过订单的客户有多少位？",
+      "tags": [
+        "反连接",
+        "子查询",
+        "相关子查询"
+      ],
+      "difficulty": "medium",
+      "golden_sql": "SELECT COUNT(*) AS customers_without_orders FROM customers c WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.customer_id = c.customer_id)",
+      "pred_sql": "SELECT COUNT(*) \nFROM customers c \nWHERE c.customer_id NOT IN (SELECT customer_id FROM orders)",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_033",
+      "question": "从未出现在任何订单项中的商品有多少种？",
+      "tags": [
+        "多表JOIN",
+        "反连接",
+        "NULL处理"
+      ],
+      "difficulty": "medium",
+      "golden_sql": "SELECT COUNT(*) AS unsold_products FROM products p LEFT JOIN order_items oi ON p.product_id = oi.product_id WHERE oi.product_id IS NULL",
+      "pred_sql": "SELECT COUNT(*) AS product_count\nFROM products p\nWHERE NOT EXISTS (\n    SELECT 1 FROM order_items oi WHERE oi.product_id = p.product_id\n)\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_034",
+      "question": "按订单状态统计订单数，以及其中尚无送达时间的订单数。",
+      "tags": [
+        "单表聚合",
+        "条件聚合",
+        "NULL处理"
+      ],
+      "difficulty": "medium",
+      "golden_sql": "SELECT order_status, COUNT(*) AS order_count, SUM(CASE WHEN order_delivered_customer_date IS NULL THEN 1 ELSE 0 END) AS missing_delivery_count FROM orders GROUP BY order_status",
+      "pred_sql": "SELECT\n    order_status,\n    COUNT(*) AS order_count,\n    SUM(CASE WHEN order_delivered_customer_date IS NULL THEN 1 ELSE 0 END) AS no_delivery_date_count\nFROM orders\nGROUP BY order_status\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_035",
+      "question": "全部订单中已送达订单占比是多少？请给出百分比并保留两位小数。",
+      "tags": [
+        "条件聚合",
+        "业务口径"
+      ],
+      "difficulty": "hard",
+      "golden_sql": "SELECT ROUND(SUM(CASE WHEN order_status = 'delivered' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS delivered_rate_pct FROM orders",
+      "pred_sql": "SELECT\n  ROUND(\n    SUM(CASE WHEN order_status = 'delivered' THEN 1 ELSE 0 END) * 100.0 / COUNT(*),\n    2\n  ) AS delivered_percentage\nFROM orders\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_036",
+      "question": "已送达订单从下单到送达平均用了多少天？保留两位小数。",
+      "tags": [
+        "日期计算",
+        "NULL处理",
+        "业务口径"
+      ],
+      "difficulty": "hard",
+      "golden_sql": "SELECT ROUND(AVG(julianday(order_delivered_customer_date) - julianday(order_purchase_timestamp)), 2) AS avg_delivery_days FROM orders WHERE order_status = 'delivered' AND order_delivered_customer_date IS NOT NULL",
+      "pred_sql": "SELECT ROUND(AVG(julianday(order_delivered_customer_date) - julianday(order_purchase_timestamp)), 2) AS avg_delivery_days\nFROM orders\nWHERE order_status = 'delivered'\n  AND order_delivered_customer_date IS NOT NULL\n  AND order_purchase_timestamp IS NOT NULL\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_037",
+      "question": "已送达订单中，按预计日期准时送达和逾期送达的订单各有多少？",
+      "tags": [
+        "日期计算",
+        "条件聚合",
+        "业务口径"
+      ],
+      "difficulty": "hard",
+      "golden_sql": "SELECT SUM(CASE WHEN order_delivered_customer_date <= order_estimated_delivery_date THEN 1 ELSE 0 END) AS on_time_count, SUM(CASE WHEN order_delivered_customer_date > order_estimated_delivery_date THEN 1 ELSE 0 END) AS late_count FROM orders WHERE order_status = 'delivered' AND order_delivered_customer_date IS NOT NULL AND order_estimated_delivery_date IS NOT NULL",
+      "pred_sql": "SELECT\n  CASE\n    WHEN order_delivered_customer_date <= order_estimated_delivery_date THEN '准时送达'\n    ELSE '逾期送达'\n  END AS delivery_status,\n  COUNT(*) AS order_count\nFROM orders\nWHERE order_status = 'delivered'\n  AND order_delivered_customer_date IS NOT NULL\n  AND order_estimated_delivery_date IS NOT NULL\nGROUP BY delivery_status\nLIMIT 1000",
+      "correct": false,
+      "error": null
+    },
+    {
+      "id": "t2s_038",
+      "question": "按每个订单先汇总商品价格与运费后，所有订单的平均订单金额是多少？保留两位小数。",
+      "tags": [
+        "子查询",
+        "防重复聚合",
+        "业务口径"
+      ],
+      "difficulty": "hard",
+      "golden_sql": "SELECT ROUND(AVG(order_total), 2) AS avg_order_total FROM (SELECT order_id, SUM(price + freight_value) AS order_total FROM order_items GROUP BY order_id) t",
+      "pred_sql": "SELECT ROUND(AVG(order_total), 2) AS avg_order_amount\nFROM (\n    SELECT order_id, SUM(price + freight_value) AS order_total\n    FROM order_items\n    GROUP BY order_id\n)\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_039",
+      "question": "使用了两笔及以上支付记录的订单有多少个？",
+      "tags": [
+        "HAVING",
+        "子查询",
+        "防重复聚合"
+      ],
+      "difficulty": "hard",
+      "golden_sql": "SELECT COUNT(*) AS multi_payment_orders FROM (SELECT order_id FROM payments GROUP BY order_id HAVING COUNT(*) >= 2) t",
+      "pred_sql": "SELECT COUNT(*) AS order_count\nFROM (\n    SELECT order_id\n    FROM payments\n    GROUP BY order_id\n    HAVING COUNT(*) >= 2\n) AS sub\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_040",
+      "question": "购买过至少 3 个不同卖家商品的独立客户有多少位？",
+      "tags": [
+        "多表JOIN",
+        "HAVING",
+        "去重计数",
+        "子查询"
+      ],
+      "difficulty": "hard",
+      "golden_sql": "SELECT COUNT(*) AS cross_seller_customers FROM (SELECT c.customer_unique_id FROM customers c JOIN orders o ON c.customer_id = o.customer_id JOIN order_items oi ON o.order_id = oi.order_id GROUP BY c.customer_unique_id HAVING COUNT(DISTINCT oi.seller_id) >= 3) t",
+      "pred_sql": "SELECT COUNT(*) AS customer_count\nFROM (\n    SELECT c.customer_unique_id\n    FROM customers c\n    JOIN orders o ON c.customer_id = o.customer_id\n    JOIN order_items oi ON o.order_id = oi.order_id\n    GROUP BY c.customer_unique_id\n    HAVING COUNT(DISTINCT oi.seller_id) >= 3\n) AS sub\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_041",
+      "question": "买家与卖家位于同一州的独立订单有多少个？",
+      "tags": [
+        "多表JOIN",
+        "去重计数",
+        "业务口径"
+      ],
+      "difficulty": "hard",
+      "golden_sql": "SELECT COUNT(DISTINCT o.order_id) AS same_state_orders FROM orders o JOIN customers c ON o.customer_id = c.customer_id JOIN order_items oi ON o.order_id = oi.order_id JOIN sellers s ON oi.seller_id = s.seller_id WHERE c.customer_state = s.seller_state",
+      "pred_sql": "SELECT COUNT(DISTINCT o.order_id) AS same_state_order_count\nFROM orders o\nJOIN customers c ON o.customer_id = c.customer_id\nJOIN order_items oi ON o.order_id = oi.order_id\nJOIN sellers s ON oi.seller_id = s.seller_id\nWHERE c.customer_state = s.seller_state\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_042",
+      "question": "哪些商品品类的销售额高于所有品类的平均销售额？列出品类和销售额。",
+      "tags": [
+        "CTE",
+        "多表JOIN",
+        "子查询"
+      ],
+      "difficulty": "hard",
+      "golden_sql": "WITH category_gmv AS (SELECT p.product_category_name AS category, SUM(oi.price) AS gmv FROM order_items oi JOIN products p ON oi.product_id = p.product_id GROUP BY p.product_category_name) SELECT category, ROUND(gmv, 2) AS gmv FROM category_gmv WHERE gmv > (SELECT AVG(gmv) FROM category_gmv) ORDER BY gmv DESC, category",
+      "pred_sql": "SELECT \n    p.product_category_name AS category,\n    SUM(oi.price) AS sales\nFROM order_items oi\nJOIN products p ON oi.product_id = p.product_id\nGROUP BY p.product_category_name\nHAVING SUM(oi.price) > (\n    SELECT AVG(category_sales)\n    FROM (\n        SELECT SUM(oi2.price) AS category_sales\n        FROM order_items oi2\n        JOIN products p2 ON oi2.product_id = p2.product_id\n        GROUP BY p2.product_category_name\n    )\n)\nORDER BY sales DESC\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_043",
+      "question": "价格高于其所属品类平均订单项价格的订单项有多少条？",
+      "tags": [
+        "CTE",
+        "多表JOIN",
+        "业务口径"
+      ],
+      "difficulty": "hard",
+      "golden_sql": "WITH category_avg AS (SELECT p.product_category_name AS category, AVG(oi.price) AS avg_price FROM order_items oi JOIN products p ON oi.product_id = p.product_id GROUP BY p.product_category_name) SELECT COUNT(*) AS above_category_avg_items FROM order_items oi JOIN products p ON oi.product_id = p.product_id JOIN category_avg ca ON p.product_category_name = ca.category WHERE oi.price > ca.avg_price",
+      "pred_sql": "WITH cat_avg AS (\n  SELECT\n    p.product_category_name,\n    AVG(oi.price) AS avg_price\n  FROM order_items oi\n  JOIN products p ON oi.product_id = p.product_id\n  GROUP BY p.product_category_name\n)\nSELECT COUNT(*) AS cnt\nFROM order_items oi\nJOIN products p ON oi.product_id = p.product_id\nJOIN cat_avg ca ON p.product_category_name = ca.product_category_name\nWHERE oi.price > ca.avg_price\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_044",
+      "question": "找出每个客户州销售额最高的商品品类，列出州、品类和销售额；并列时按品类名排序取一个。",
+      "tags": [
+        "CTE",
+        "多表JOIN",
+        "窗口函数",
+        "TopN"
+      ],
+      "difficulty": "hard",
+      "golden_sql": "WITH state_category AS (SELECT c.customer_state AS state, p.product_category_name AS category, SUM(oi.price) AS gmv FROM customers c JOIN orders o ON c.customer_id = o.customer_id JOIN order_items oi ON o.order_id = oi.order_id JOIN products p ON oi.product_id = p.product_id GROUP BY c.customer_state, p.product_category_name), ranked AS (SELECT state, category, gmv, ROW_NUMBER() OVER (PARTITION BY state ORDER BY gmv DESC, category) AS rn FROM state_category) SELECT state, category, ROUND(gmv, 2) AS gmv FROM ranked WHERE rn = 1 ORDER BY state",
+      "pred_sql": "WITH state_category_sales AS (\n    SELECT\n        c.customer_state,\n        p.product_category_name,\n        SUM(oi.price) AS sales\n    FROM orders o\n    JOIN customers c ON o.customer_id = c.customer_id\n    JOIN order_items oi ON o.order_id = oi.order_id\n    JOIN products p ON oi.product_id = p.product_id\n    GROUP BY c.customer_state, p.product_category_name\n),\nranked AS (\n    SELECT\n        customer_state,\n        product_category_name,\n        sales,\n        ROW_NUMBER() OVER (\n            PARTITION BY customer_state\n            ORDER BY sales DESC, product_category_name ASC\n        ) AS rn\n    FROM state_category_sales\n)\nSELECT\n    customer_state,\n    product_category_name,\n    sales\nFROM ranked\nWHERE rn = 1\nORDER BY customer_state\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_045",
+      "question": "统计 2017 年每月订单数及截至当月的累计订单数。",
+      "tags": [
+        "CTE",
+        "时间过滤",
+        "窗口函数"
+      ],
+      "difficulty": "hard",
+      "golden_sql": "WITH monthly AS (SELECT strftime('%Y-%m', order_purchase_timestamp) AS month, COUNT(*) AS order_count FROM orders WHERE order_purchase_timestamp >= '2017-01-01' AND order_purchase_timestamp < '2018-01-01' GROUP BY month) SELECT month, order_count, SUM(order_count) OVER (ORDER BY month ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS cumulative_orders FROM monthly ORDER BY month",
+      "pred_sql": "WITH monthly_counts AS (\n    SELECT \n        strftime('%Y-%m', order_purchase_timestamp) AS month,\n        COUNT(*) AS order_count\n    FROM orders\n    WHERE order_purchase_timestamp >= '2017-01-01' \n      AND order_purchase_timestamp < '2018-01-01'\n    GROUP BY strftime('%Y-%m', order_purchase_timestamp)\n)\nSELECT \n    month,\n    order_count,\n    SUM(order_count) OVER (ORDER BY month) AS cumulative_order_count\nFROM monthly_counts\nORDER BY month\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_046",
+      "question": "给出 2017 年每月订单数，以及相较上月增减了多少单；首月差值为空。",
+      "tags": [
+        "CTE",
+        "时间过滤",
+        "窗口函数",
+        "NULL处理"
+      ],
+      "difficulty": "hard",
+      "golden_sql": "WITH monthly AS (SELECT strftime('%Y-%m', order_purchase_timestamp) AS month, COUNT(*) AS order_count FROM orders WHERE order_purchase_timestamp >= '2017-01-01' AND order_purchase_timestamp < '2018-01-01' GROUP BY month) SELECT month, order_count, order_count - LAG(order_count) OVER (ORDER BY month) AS month_over_month_change FROM monthly ORDER BY month",
+      "pred_sql": "WITH monthly AS (\n  SELECT strftime('%Y-%m', order_purchase_timestamp) AS month,\n         COUNT(*) AS order_count\n  FROM orders\n  WHERE order_purchase_timestamp >= '2017-01-01'\n    AND order_purchase_timestamp <  '2018-01-01'\n  GROUP BY month\n)\nSELECT month,\n       order_count,\n       order_count - LAG(order_count) OVER (ORDER BY month) AS diff\nFROM monthly\nORDER BY month\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_047",
+      "question": "找出每个卖家州商品销售额最高的卖家，列出州、卖家 ID 和销售额；并列时按卖家 ID 取一个。",
+      "tags": [
+        "CTE",
+        "多表JOIN",
+        "窗口函数",
+        "TopN"
+      ],
+      "difficulty": "hard",
+      "golden_sql": "WITH seller_gmv AS (SELECT s.seller_state AS state, s.seller_id, SUM(oi.price) AS gmv FROM sellers s JOIN order_items oi ON s.seller_id = oi.seller_id GROUP BY s.seller_state, s.seller_id), ranked AS (SELECT state, seller_id, gmv, ROW_NUMBER() OVER (PARTITION BY state ORDER BY gmv DESC, seller_id) AS rn FROM seller_gmv) SELECT state, seller_id, ROUND(gmv, 2) AS gmv FROM ranked WHERE rn = 1 ORDER BY state",
+      "pred_sql": "WITH seller_sales AS (\n    SELECT\n        s.seller_state,\n        s.seller_id,\n        SUM(oi.price) AS total_sales\n    FROM order_items oi\n    JOIN sellers s ON oi.seller_id = s.seller_id\n    GROUP BY s.seller_state, s.seller_id\n),\nranked AS (\n    SELECT\n        seller_state,\n        seller_id,\n        total_sales,\n        ROW_NUMBER() OVER (\n            PARTITION BY seller_state\n            ORDER BY total_sales DESC, seller_id ASC\n        ) AS rn\n    FROM seller_sales\n)\nSELECT seller_state, seller_id, total_sales\nFROM ranked\nWHERE rn = 1\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_048",
+      "question": "有客户但没有卖家的州一共有多少个？",
+      "tags": [
+        "集合运算",
+        "子查询",
+        "业务口径"
+      ],
+      "difficulty": "hard",
+      "golden_sql": "SELECT COUNT(*) AS states_without_sellers FROM (SELECT customer_state AS state FROM customers EXCEPT SELECT seller_state AS state FROM sellers) t",
+      "pred_sql": "SELECT COUNT(*) AS state_count\nFROM (\n    SELECT DISTINCT customer_state\n    FROM customers\n    WHERE customer_state IS NOT NULL\n    EXCEPT\n    SELECT DISTINCT seller_state\n    FROM sellers\n    WHERE seller_state IS NOT NULL\n)\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_049",
+      "question": "按支付金额将支付记录分为低于 50、50 到 199.99、200 及以上三档，统计每档笔数。",
+      "tags": [
+        "CASE表达式",
+        "条件聚合",
+        "业务口径"
+      ],
+      "difficulty": "hard",
+      "golden_sql": "SELECT CASE WHEN payment_value < 50 THEN '低于50' WHEN payment_value < 200 THEN '50到199.99' ELSE '200及以上' END AS amount_band, COUNT(*) AS payment_count FROM payments GROUP BY amount_band",
+      "pred_sql": "SELECT\n  CASE\n    WHEN payment_value < 50 THEN '低于50'\n    WHEN payment_value <= 199.99 THEN '50到199.99'\n    ELSE '200及以上'\n  END AS payment_range,\n  COUNT(*) AS cnt\nFROM payments\nGROUP BY payment_range\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    },
+    {
+      "id": "t2s_050",
+      "question": "分别按订单汇总支付金额和商品加运费金额，两者相差超过 0.01 的订单有多少个？",
+      "tags": [
+        "CTE",
+        "多表JOIN",
+        "防重复聚合",
+        "业务口径"
+      ],
+      "difficulty": "hard",
+      "golden_sql": "WITH item_totals AS (SELECT order_id, SUM(price + freight_value) AS item_total FROM order_items GROUP BY order_id), payment_totals AS (SELECT order_id, SUM(payment_value) AS payment_total FROM payments GROUP BY order_id) SELECT COUNT(*) AS mismatched_orders FROM item_totals i JOIN payment_totals p ON i.order_id = p.order_id WHERE ABS(i.item_total - p.payment_total) > 0.01",
+      "pred_sql": "SELECT COUNT(*) AS mismatch_order_count\nFROM (\n    SELECT a.order_id\n    FROM (\n        SELECT order_id, SUM(payment_value) AS total_payment\n        FROM payments\n        GROUP BY order_id\n    ) a\n    JOIN (\n        SELECT order_id, SUM(price + freight_value) AS total_item_cost\n        FROM order_items\n        GROUP BY order_id\n    ) b ON a.order_id = b.order_id\n    WHERE ABS(a.total_payment - b.total_item_cost) > 0.01\n)\nLIMIT 1000",
+      "correct": true,
+      "error": null
+    }
+  ],
+  "meta": {
+    "db": "./data/ecommerce.db",
+    "model": "glm-5.2",
+    "num_cases": 50,
+    "dataset_total_cases": 50,
+    "dataset_fingerprint": "c98b497f24f31573a11b32abbc2a7be12e2098ea7836781cf4ab1c0b618c96b6",
+    "elapsed_sec": 916.8,
+    "generated_at": "2026-08-16T23:00:23",
+    "run_name": null,
+    "skill_enabled": true,
+    "schema_mode": "m-schema",
+    "filters": {
+      "tags": [],
+      "difficulties": []
+    }
+  }
+}

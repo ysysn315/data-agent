@@ -77,6 +77,8 @@ flowchart TB
 
 判定口径是 **execution accuracy**：golden SQL 和模型 SQL 在同一数据库执行后比较结果集，而不是比较 SQL 字符串。比较过程处理列序、无显式排序时的行序和浮点容差。当前 50 题按难度与能力标签双轴统计，并可切换 Skills/M-Schema 语义注释做消融。
 
+50 题横评结果（7 模型，最高 glm-5.2 94%）与 RAG 消融结论（混合检索/重排贡献分解，检索 Hit@3 从 72.5% 提升至两轮可审计的 87.5%~90.0%）见 **[evals/REPORTS.md](evals/REPORTS.md)**——含跳过模型的口径说明与消融局限。
+
 以下是扩容前 28 题的历史报告，仅用于保留原始证据，不能直接代表当前 50 题结果：
 
 | 历史报告 | 正确数 | 准确率 |
@@ -92,7 +94,7 @@ flowchart TB
 - 检索数据集：40 条，覆盖普通、困难、易混淆与噪声干扰问题。
 - 分层生成数据集：60 条模板，覆盖 single-hop、multi-hop、confusable 和 no-answer。
 - 指标：Hit@K、Recall@K、MRR、Precision@K、NDCG、MAP、事实召回、来源精确率与幻觉惩罚。
-- 仓库保留的 baseline 来自旧链路：检索 40 条、生成 8 条。它可作历史参照，但缺少当前完整实验产物，不能宣称本项目已实现某个 RAG 指标提升。
+- 仓库保留的 baseline 来自旧链路：检索 40 条、生成 8 条。它可作历史参照；当前语料（随仓库 12 篇）上的消融结果见 [evals/REPORTS.md](evals/REPORTS.md)。
 
 详见 [评测体系](evals/IMPLEMENTATION.md) 与 [RAG 评测说明](evals/rag/README.md)。
 

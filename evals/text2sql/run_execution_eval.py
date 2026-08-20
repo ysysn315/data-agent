@@ -46,6 +46,21 @@ DATASET_PATH = _HERE / "dataset.json"
 REPORTS_DIR = _HERE / "reports"
 SKILL_MD_PATH = _HERE.parent.parent / "app" / "skills" / "buildin" / "sql-generation" / "SKILL.md"
 
+# 限流退避参数：总尝试次数（首跑+重试）/ 基础等待 / 封顶等待（秒），指数递增
+RATE_LIMIT_MAX_ATTEMPTS = 5
+RATE_LIMIT_BASE_WAIT = 5
+RATE_LIMIT_MAX_WAIT = 30
+
+
+def _is_rate_limited(result: dict) -> bool:
+    """按 error 文本判定限流（上游以字符串返回状态码，无结构化标记）。"""
+    return "429" in str(result.get("error") or "")
+
+
+def _rate_limit_wait(attempt: int) -> float:
+    """第 attempt 次失败后的指数退避等待（5→10→20→30 封顶），attempt 从 0 起。"""
+    return min(RATE_LIMIT_MAX_WAIT, RATE_LIMIT_BASE_WAIT * 2**attempt)
+
 
 def load_dataset(path: Path = DATASET_PATH) -> list[dict]:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -217,6 +232,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--limit", type=int, default=None, help="只跑前 N 个用例（抽样）")
     parser.add_argument("--db", default=settings.sqlite_db_path, help="SQLite 演示库路径")
     parser.add_argument("--model", default=None, help="覆盖 LLM 模型名（默认取配置）")
+    parser.add_argument(
+        "--interval",
+        type=float,
+        default=0.0,
+        help="每例之间的间隔秒数（对低 RPM 配额的模型限速，避免 429 污染结果）",
+    )
+    parser.add_argument(
+        "--max-tokens",
+        type=int,
+        default=None,
+        help="覆盖 completion 上限（推理模型如 deepseek-v4-pro 思考即可耗尽默认 4000，"
+        "content 为空被记为'未产出可解析的 SQL'；给 16000 可显著减少此类假失败）",
+    )
     parser.add_argument("--tag", action="append", default=[], help="只跑含该标签的题；可重复指定")
     parser.add_argument(
         "--difficulty",
@@ -249,16 +277,38 @@ def main(argv: list[str] | None = None) -> int:
     skill_body = "" if args.no_skill else read_skill_body()
     schema_context = generate_m_schema(args.db, comments={} if args.schema_mode == "columns" else None)
     schema = fetch_schema(args.db)
-    llm = LLMFactory.create_llm(model=args.model, temperature=0.0, streaming=False)
+    llm_kwargs = {"model": args.model, "temperature": 0.0, "streaming": False}
+    if args.max_tokens:
+        llm_kwargs["max_tokens"] = args.max_tokens
+    llm = LLMFactory.create_llm(**llm_kwargs)
 
     logger.info(f"开始评估：{len(dataset)} 个用例，库={args.db}")
     started = time.time()
     case_results = []
+    rate_limited_count = 0
     for i, case in enumerate(dataset, start=1):
-        r = evaluate_case(case, args.db, schema, skill_body, schema_context, llm)
+        # 限流退避：429 属于"还没测到"，指数退避重试拿到真实结果；
+        # 耗尽后保留 error 并打 rate_limited 标记（区别于真实失败，汇总可分离）
+        for attempt in range(RATE_LIMIT_MAX_ATTEMPTS):
+            r = evaluate_case(case, args.db, schema, skill_body, schema_context, llm)
+            if not _is_rate_limited(r):
+                break
+            if attempt < RATE_LIMIT_MAX_ATTEMPTS - 1:  # 最后一次不再白等
+                wait = _rate_limit_wait(attempt)
+                logger.warning(
+                    f"[{i}/{len(dataset)}] {r['id']} 触发限流，等 {wait}s 重试"
+                    f"（第 {attempt + 1}/{RATE_LIMIT_MAX_ATTEMPTS} 次）"
+                )
+                time.sleep(wait)
+        if _is_rate_limited(r):
+            r = {**r, "rate_limited": True}
+            rate_limited_count += 1
+            logger.warning(f"[{i}/{len(dataset)}] {r['id']} 限流重试耗尽，标记 rate_limited")
         flag = "✓" if r["correct"] else "✗"
         logger.info(f"[{i}/{len(dataset)}] {flag} {r['id']} {r.get('error') or ''}")
         case_results.append(r)
+        if args.interval:
+            time.sleep(args.interval)
 
     report = build_report(case_results)
     report["meta"] = {
@@ -273,6 +323,9 @@ def main(argv: list[str] | None = None) -> int:
         "skill_enabled": not args.no_skill,
         "schema_mode": args.schema_mode,
         "filters": {"tags": args.tag, "difficulties": args.difficulty},
+        "interval_sec": args.interval,
+        "max_tokens": args.max_tokens,
+        "rate_limited_cases": rate_limited_count,
     }
 
     out = args.output or (REPORTS_DIR / "execution_latest.json")
