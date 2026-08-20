@@ -46,6 +46,8 @@ def _resolve_expected_sources(case: dict) -> tuple[list, list]:
     else:
         expected_any = case.get("expected_sources") or []
     return expected_all, expected_any
+
+
 # 生成模型显式钉死（不依赖 .env 隐式约定），no-RAG 组与 RAG 组共用同一模型
 GENERATION_MODEL = "glm-5.3"
 
