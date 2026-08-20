@@ -277,26 +277,26 @@ def test_source_recall_strict_hard_and_semantics():
     assert source_recall_strict(["a.md"]) == 1.0
 
 
-def test_generation_ablation_any_field_no_fallback(tmp_path, monkeypatch):
-    """生成消融的取值逻辑：显式空 any 不回退 expected_sources 旧字段（评审反例）。"""
-    # 模拟 60 条数据集中一例：expected_sources_any 显式为空、expected_sources 是 all 的复制
+def test_generation_ablation_any_field_no_fallback():
+    """生成消融的取值逻辑（调生产 _resolve_expected_sources，非手抄）：显式空 any 不回退旧字段。"""
+    from evals.rag.metrics import source_recall_strict
+    from evals.rag.run_generation_ablation import _resolve_expected_sources
+
+    # 显式空 any + 旧字段恰好是 all 的复制（历史形态）——or 链会双重计分
     case = {
         "question": "q",
         "expected_keywords": [],
         "expected_sources_all": ["a.md", "b.md"],
         "expected_sources_any": [],  # 显式无 any 条件
-        "expected_sources": ["a.md", "b.md"],  # 旧字段恰好是 all 复制（历史形态）
+        "expected_sources": ["a.md", "b.md"],  # 旧字段（any 键存在时必须被忽略）
         "forbidden_sources": [],
     }
-    # 修复前：or 链会把空 any 回退成 expected_sources → all+any 双重计分（1.0），
-    # 而 all 只命中 a.md 时正确答案应为 0.0
-    from evals.rag.metrics import source_recall_strict
-
-    expected_all = case["expected_sources_all"] or []
-    if "expected_sources_any" in case:
-        expected_any = case["expected_sources_any"] or []
-    else:
-        expected_any = case.get("expected_sources") or []
+    expected_all, expected_any = _resolve_expected_sources(case)
+    assert expected_any == []  # 没有回退成 ["a.md", "b.md"]
     # 只命中 a.md：all 缺 b → hard-AND 0 分；any 为空不参与
-    score = source_recall_strict(["a.md"], expected_sources_all=expected_all, expected_sources_any=expected_any)
-    assert score == 0.0  # 修复前（or 回退+部分召回）会得 0.75
+    assert source_recall_strict(["a.md"], expected_sources_all=expected_all, expected_sources_any=expected_any) == 0.0
+
+    # 旧数据集形态（无 any 键）：expected_sources 作为 any 兼容
+    legacy = {"expected_sources": ["a.md"]}
+    _, legacy_any = _resolve_expected_sources(legacy)
+    assert legacy_any == ["a.md"]

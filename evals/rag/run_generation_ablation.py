@@ -31,6 +31,21 @@ DATASET_PATH = "evals/rag/datasets/rag_generation_cases_formal_template.json"
 REPORT_STEM = "evals/rag/reports/ablation_generation"  # 带戳版 + latest 两份，不覆盖历史
 
 RerankPrefer = Literal["auto", "bge", "llm"]
+
+
+def _resolve_expected_sources(case: dict) -> tuple[list, list]:
+    """按字段存在性解析 (expected_all, expected_any)，供 eval_group 与测试共用。
+
+    expected_sources_any 键存在即以此为准（空列表=无 any 条件）；
+    仅该键缺失时兼容旧字段 expected_sources——不能用 or 链，否则空 any
+    会回退成 all 的复制，多源题同时按 all 与 any 双重计分。
+    """
+    expected_all = case.get("expected_sources_all") or []
+    if "expected_sources_any" in case:
+        expected_any = case.get("expected_sources_any") or []
+    else:
+        expected_any = case.get("expected_sources") or []
+    return expected_all, expected_any
 # 生成模型显式钉死（不依赖 .env 隐式约定），no-RAG 组与 RAG 组共用同一模型
 GENERATION_MODEL = "glm-5.3"
 
@@ -70,14 +85,7 @@ async def eval_group(cases, mode: str, prefer: RerankPrefer = "llm") -> dict:
     for c in cases:
         question = c["question"]
         expected_keywords = c.get("expected_keywords") or []
-        # 按字段存在性取值（不做 or 回退）：正式模板显式携带 expected_sources_any，
-        # 空列表=没有 any 条件；旧字段 expected_sources 只在 any 键不存在时兼容，
-        # 否则多源题会同时按 all 与 any 计分（评审指出的双重放宽）
-        expected_all = c.get("expected_sources_all") or []
-        if "expected_sources_any" in c:
-            expected_any = c.get("expected_sources_any") or []
-        else:
-            expected_any = c.get("expected_sources") or []
+        expected_all, expected_any = _resolve_expected_sources(c)
         forbidden_sources = c.get("forbidden_sources") or []
 
         if mode == "none":
