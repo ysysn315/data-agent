@@ -164,7 +164,7 @@ def source_recall_strict(
 ) -> float:
     """
     source 召回分成两部分：
-    - all: 必须全部命中
+    - all: 必须全部命中（hard-AND——缺一个即 0 分，不做部分召回）
     - any: 命中其中一个即可
     """
     pred = {_normalize_source_name(x) for x in (pred_sources or []) if x}
@@ -173,8 +173,7 @@ def source_recall_strict(
 
     scores = []
     if expected_all:
-        hit = sum(1 for src in expected_all if src in pred)
-        scores.append(hit / len(expected_all))
+        scores.append(1.0 if set(expected_all) <= pred else 0.0)
     if expected_any:
         scores.append(1.0 if any(src in pred for src in expected_any) else 0.0)
     if not scores:

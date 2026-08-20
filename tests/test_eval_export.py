@@ -248,3 +248,55 @@ def test_execution_eval_rate_limit_helpers():
     assert RATE_LIMIT_MAX_ATTEMPTS >= 3 and RATE_LIMIT_BASE_WAIT >= 1  # 常量在合理范围
     # 指数退避序列：5→10→20→40 封顶 30（修复前是线性 5/10/15/20——评审指出名实不符）
     assert [_rate_limit_wait(a) for a in range(5)] == [5, 10, 20, 30, 30]
+
+
+def test_source_recall_strict_hard_and_semantics():
+    """严格来源召回的 hard-AND 语义（第三轮评审修复）：
+
+    - all 缺一即 0（原实现按部分召回给 0.5）
+    - any 任一得 1
+    - 显式空 any（键存在、值为 []）= 无 any 条件，不回退旧字段
+    """
+    from evals.rag.metrics import source_recall_strict
+
+    # all 全中 → 1；缺一 → 0（不是 0.5）
+    assert source_recall_strict(["a.md", "b.md"], expected_sources_all=["a.md", "b.md"]) == 1.0
+    assert source_recall_strict(["a.md"], expected_sources_all=["a.md", "b.md"]) == 0.0
+
+    # any 任一命中
+    assert source_recall_strict(["a.md"], expected_sources_any=["a.md", "b.md"]) == 1.0
+    assert source_recall_strict(["c.md"], expected_sources_any=["a.md", "b.md"]) == 0.0
+
+    # all + any 并存：各占一半
+    assert (
+        source_recall_strict(["a.md", "b.md"], expected_sources_all=["a.md", "b.md"], expected_sources_any=["x.md"])
+        == 0.5
+    )
+
+    # 无任何期望 → 1（不惩罚）
+    assert source_recall_strict(["a.md"]) == 1.0
+
+
+def test_generation_ablation_any_field_no_fallback(tmp_path, monkeypatch):
+    """生成消融的取值逻辑：显式空 any 不回退 expected_sources 旧字段（评审反例）。"""
+    # 模拟 60 条数据集中一例：expected_sources_any 显式为空、expected_sources 是 all 的复制
+    case = {
+        "question": "q",
+        "expected_keywords": [],
+        "expected_sources_all": ["a.md", "b.md"],
+        "expected_sources_any": [],  # 显式无 any 条件
+        "expected_sources": ["a.md", "b.md"],  # 旧字段恰好是 all 复制（历史形态）
+        "forbidden_sources": [],
+    }
+    # 修复前：or 链会把空 any 回退成 expected_sources → all+any 双重计分（1.0），
+    # 而 all 只命中 a.md 时正确答案应为 0.0
+    from evals.rag.metrics import source_recall_strict
+
+    expected_all = case["expected_sources_all"] or []
+    if "expected_sources_any" in case:
+        expected_any = case["expected_sources_any"] or []
+    else:
+        expected_any = case.get("expected_sources") or []
+    # 只命中 a.md：all 缺 b → hard-AND 0 分；any 为空不参与
+    score = source_recall_strict(["a.md"], expected_sources_all=expected_all, expected_sources_any=expected_any)
+    assert score == 0.0  # 修复前（or 回退+部分召回）会得 0.75

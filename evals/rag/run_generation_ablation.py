@@ -2,14 +2,15 @@
 
     python -m evals.rag.run_generation_ablation [--cases N]
 
-四组（生成模型 glm-5.3 与 prompt 完全一致，只变检索输入）：
+四组（生成模型 glm-5.3 固定；回答约束基本对齐——no-RAG 组用同款"基于上下文/无法确定"
+模板但无上下文可注入，检索组走 generate_answer 内部模板，两者非逐字相同，见 REPORTS.md 已知局限）：
   A. dense-only 检索        hybrid=F, rerank=F                （差检索喂给 LLM）
   D. 全开检索（LLM 重排）    hybrid=T, rerank=T(prefer=llm)     （主链路默认）
   E. 全开检索（BGE 重排）    hybrid=T, rerank=T(prefer=bge)     （本地交叉编码器对照）
   N. 无检索（no-RAG）        不做检索，仅凭模型自身知识回答（对照组，考幻觉）
 
-数据集：60 条正式模板（关键词召回 / 来源命中 / 禁引来源违规率）。
-报告落 evals/rag/reports/ablation_generation.json。
+数据集：60 条正式模板（关键词召回 / 严格来源召回 / 禁引来源违规率；逐例存 pred_sources 可离线重算）。
+报告落 evals/rag/reports/ablation_generation_<时间戳>.json + _latest.json 副本（不覆盖历史）。
 """
 
 from __future__ import annotations
@@ -69,8 +70,14 @@ async def eval_group(cases, mode: str, prefer: RerankPrefer = "llm") -> dict:
     for c in cases:
         question = c["question"]
         expected_keywords = c.get("expected_keywords") or []
+        # 按字段存在性取值（不做 or 回退）：正式模板显式携带 expected_sources_any，
+        # 空列表=没有 any 条件；旧字段 expected_sources 只在 any 键不存在时兼容，
+        # 否则多源题会同时按 all 与 any 计分（评审指出的双重放宽）
         expected_all = c.get("expected_sources_all") or []
-        expected_any = c.get("expected_sources_any") or c.get("expected_sources") or []
+        if "expected_sources_any" in c:
+            expected_any = c.get("expected_sources_any") or []
+        else:
+            expected_any = c.get("expected_sources") or []
         forbidden_sources = c.get("forbidden_sources") or []
 
         if mode == "none":
