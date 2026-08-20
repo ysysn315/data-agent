@@ -191,8 +191,10 @@ const datasources = ref([])
 const selectedDatasource = ref(localStorage.getItem('data-agent:selected-datasource') || '')
 const suggestions = computed(() => selectedDatasource.value ? datasourceSuggestions : demoSuggestions)
 
-// 单页会话 ID，对应后端 ChatRequest.Id
-const sessionId = 'session-' + Date.now()
+// 会话 ID 持久化到 localStorage：切页/刷新后同一会话可从后端恢复历史
+// （此前每次组件挂载都 Date.now() 重新生成——切走再回来等于换了新会话，记录自然消失）
+const sessionId = localStorage.getItem('data-agent:session-id') || ('session-' + Date.now())
+localStorage.setItem('data-agent:session-id', sessionId)
 
 const renderMarkdown = (text) => marked.parse(text || '')
 
@@ -340,7 +342,10 @@ const clearSession = async () => {
   } catch (e) {
     // 清空失败不阻塞前端重置
   }
-  messages.value = []
+  // 旧会话已在后端删除——sessionId 是模块级常量不可变，换新 id 写入 localStorage 后
+  // 整页重载：下次挂载用新会话（旧历史不会被恢复接口拉回来）
+  localStorage.setItem('data-agent:session-id', 'session-' + Date.now())
+  location.reload()
 }
 
 const changeDatasource = async () => {
@@ -350,6 +355,18 @@ const changeDatasource = async () => {
 }
 
 onMounted(async () => {
+  // 恢复本会话的历史消息（切页/刷新回来不再是空白）——只回填 role/content，
+  // sql_result/context_hits 等元数据不在历史里，恢复后这些面板不展示（已知边界）
+  try {
+    const response = await fetch(`/api/chat/history/${encodeURIComponent(sessionId)}`)
+    if (response.ok) {
+      const data = await response.json()
+      if (data.status === 'success' && Array.isArray(data.messages) && data.messages.length > 0) {
+        messages.value = data.messages.map((m) => ({ role: m.role, content: m.content || '', sources: [] }))
+      }
+    }
+  } catch (e) { /* 历史恢复失败按新会话处理 */ }
+
   try {
     const response = await fetch('/api/datasources')
     if (!response.ok) return
